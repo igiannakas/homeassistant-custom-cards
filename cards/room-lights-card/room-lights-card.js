@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.2.1";
+const RLC_VERSION = "1.3.0";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -336,15 +336,19 @@ const CSS = `
   .pres ha-icon { --mdc-icon-size: 16px; }
   .pres.here { color: ${C.teal}; }
   .pres.warn { color: var(--warning-color, #ffa600); }
-  .m { display: flex; column-gap: 9px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--primary-text-color);
+  .m { display: flex; column-gap: 9px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; overflow: hidden; }
   .g { display: flex; column-gap: 9px; min-width: 0; }
   .g:empty { display: none; }
   .v { display: inline-flex; align-items: center; gap: 2px; }
   .v ha-icon { --mdc-icon-size: 14px; }
-  .v.t ha-icon { color: ${C.orange}; }
-  .v.h ha-icon { color: ${C.blue}; }
-  .v.l ha-icon { color: ${C.amber}; }
+  /* The lights are the point of the card: readings are secondary. Their numbers use the quiet
+     secondary grey and their icons keep their colours, faded towards grey. Rooms with lights on
+     get a faint warm tint, so a lit room stands out on its own. */
+  .v.t ha-icon { color: color-mix(in srgb, ${C.orange} 55%, ${C.grey}); }
+  .v.h ha-icon { color: color-mix(in srgb, ${C.blue} 55%, ${C.grey}); }
+  .v.l ha-icon { color: color-mix(in srgb, ${C.amber} 60%, ${C.grey}); }
+  .room.lit { background: color-mix(in srgb, ${C.orange} 10%, transparent); }
   .room.missing .nm { color: var(--secondary-text-color); }
   /* Press feedback without moving anything: a scale-down shrinks the target under the
      finger and taps near the edge would be lost. */
@@ -509,6 +513,7 @@ class RoomLightsCard extends HTMLElement {
       const m = roomModel(hass, room);
       const color = m.on ? C.orange : C.grey;
       el.classList.toggle("missing", m.missing);
+      el.classList.toggle("lit", m.on);
       const shape = el.querySelector(".shape");
       shape.style.backgroundColor = tint(color, 20);
       const icon = shape.querySelector(":scope > ha-icon");

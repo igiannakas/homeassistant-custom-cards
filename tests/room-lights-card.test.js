@@ -147,6 +147,7 @@ const cfg = {
   eq(rooms().map((el) => el.querySelector(".nm").textContent), ["Living Room", "Kitchen", "Corridor"]);
   assert(rooms()[0].querySelector(".shape > ha-icon").style.color.includes("--orange-color"));
   assert(rooms()[1].querySelector(".shape > ha-icon").style.color.includes("--grey-color"));
+  assert(rooms()[0].classList.contains("lit") && !rooms()[1].classList.contains("lit"), "lit rooms get the warm tint");
   eq(metrics(0), ["20.4°", "43% 115 lx"]);
   eq(metrics(1), ["", ""], "no sensors configured → no readings");
   eq(metrics(2), ["21.1/21.8°", "49/49% – lx"], "two sensors shown in order; unknown = –");
