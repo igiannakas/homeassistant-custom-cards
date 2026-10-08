@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.2.2";
+const RLC_VERSION = "1.2.1";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -342,8 +342,9 @@ const CSS = `
   .g:empty { display: none; }
   .v { display: inline-flex; align-items: center; gap: 2px; }
   .v ha-icon { --mdc-icon-size: 14px; }
-  /* Reading icons stay a quiet dark grey, so the orange of lights that are on is what stands out. */
-  .v ha-icon { color: var(--secondary-text-color, #5e5e5e); }
+  .v.t ha-icon { color: ${C.orange}; }
+  .v.h ha-icon { color: ${C.blue}; }
+  .v.l ha-icon { color: ${C.amber}; }
   .room.missing .nm { color: var(--secondary-text-color); }
   /* Press feedback without moving anything: a scale-down shrinks the target under the
      finger and taps near the edge would be lost. */
