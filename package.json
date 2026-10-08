@@ -1,0 +1,13 @@
+{
+  "name": "homeassistant-custom-cards",
+  "private": true,
+  "description": "Custom Lovelace cards for Home Assistant.",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "check": "for f in cards/*/*.js; do node --check \"$f\" || exit 1; done",
+    "test": "npm run check && for t in tests/*.test.js; do node \"$t\" || exit 1; done"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}
