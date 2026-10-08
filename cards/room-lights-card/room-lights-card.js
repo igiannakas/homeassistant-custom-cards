@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.1.1";
+const RLC_VERSION = "1.1.2";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -89,29 +89,30 @@ function lamps(hass, room) {
 /* Lamps sheet – same look as the other cards' dialogs                       */
 /* ------------------------------------------------------------------------ */
 
+// Same look as the other pop-ups on the dashboard (Boost heating, alarm): 20px title, 56px
+// pill rows with a 36px icon on the left and 16px semibold text, 20px between blocks.
 const SHEET_CSS = `
   :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
     font-family: var(--ha-font-family-body, Roboto, sans-serif); }
   .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px); animation: fade 160ms ease-out; }
   .dialog { position: relative; box-sizing: border-box; width: min(400px, calc(100vw - 32px)); max-height: calc(100vh - 48px);
-    overflow: auto; padding: 22px 18px 18px; border-radius: 32px; color: var(--primary-text-color);
+    overflow: auto; padding: 25px 18px 18px; border-radius: 32px; color: var(--primary-text-color);
     background: color-mix(in srgb, var(--card-background-color, #fff) 94%, transparent);
     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 12px 40px rgba(0,0,0,.25);
     animation: pop 180ms cubic-bezier(.2,.9,.3,1.2); }
-  .head { display: flex; align-items: center; gap: 10px; padding-left: 8px; margin-bottom: 10px; }
+  .head { display: flex; align-items: center; gap: 6px; padding-left: 8px; }
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
-  .title { font-size: 20px; line-height: 26px; font-weight: 600; flex: 1; min-width: 0; }
-  .open { all: unset; cursor: pointer; display: flex; align-items: center; gap: 2px; padding: 6px 4px 6px 10px; border-radius: 16px;
-    font-size: 14px; font-weight: 600; color: var(--primary-color); }
-  .open ha-icon { --mdc-icon-size: 18px; }
-  .lamp { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; min-height: 52px;
-    padding: 6px 8px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); cursor: pointer;
+  .title { font-size: 20px; line-height: 26px; font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list, .buttons { margin-top: 20px; display: grid; gap: 8px; }
+  button { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; height: 56px;
+    padding: 0 12px 0 10px; border-radius: 28px; cursor: pointer; font-size: 16px; line-height: 24px; font-weight: 600;
+    letter-spacing: .1px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color);
     -webkit-tap-highlight-color: transparent; }
-  .lamp .glyph { flex-basis: 34px; height: 34px; }
-  .lamp .glyph ha-icon { --mdc-icon-size: 20px; }
-  .lamp .nm { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; letter-spacing: .1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  button .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
+  button .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
+  .lamp .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
   .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
@@ -119,12 +120,9 @@ const SHEET_CSS = `
   .lamp.on .sw { background: ${C.orange}; }
   .lamp.on .sw::after { transform: translateX(18px); }
   .lamp.missing { opacity: .5; }
-  .close { all: unset; box-sizing: border-box; margin-top: 12px; width: 100%; height: 52px; border-radius: 26px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600;
-    background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
-  .lamp:active, .close:active, .open:active { filter: brightness(.92); }
-  .lamp:focus-visible, .close:focus-visible, .open:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
-  .empty { padding: 14px 8px; color: var(--secondary-text-color); font-size: 14px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
+  button:active { filter: brightness(.92); }
+  button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+  .empty { padding: 0 8px; font-size: 15px; line-height: 21px; color: var(--primary-text-color); }
   @keyframes fade { from { opacity: 0; } }
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
@@ -139,10 +137,12 @@ class RoomLampsSheet {
     const root = this.host.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${SHEET_CSS}</style><div class="backdrop"></div>
       <div class="dialog" role="dialog" aria-modal="true">
-        <div class="head"><div class="glyph"><ha-icon></ha-icon></div><div class="title"></div>
-          ${room.navigation_path ? `<button class="open">Room<ha-icon icon="mdi:chevron-right"></ha-icon></button>` : ""}</div>
+        <div class="head"><div class="glyph"><ha-icon></ha-icon></div><div class="title"></div></div>
         <div class="list"></div>
-        <button class="close">Close</button>
+        <div class="buttons">
+          ${room.navigation_path ? `<button class="open"><span class="glyph"><ha-icon icon="mdi:arrow-right"></ha-icon></span>Open room</button>` : ""}
+          <button class="close"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Close</button>
+        </div>
       </div>`;
     // The sheet opens under the finger that is still holding the tile. When that finger lifts,
     // the browser sends a click to whatever is now under it – the backdrop – which would close
