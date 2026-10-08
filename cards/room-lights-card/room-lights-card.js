@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.0.1";
+const RLC_VERSION = "1.1.1";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -70,7 +70,8 @@ function roomModel(hass, room) {
 /* The lamps behind a room switch (light groups and old-style groups both list them). */
 function lamps(hass, room) {
   const s = hass.states[room.entity];
-  const ids = list(room.lamps).length ? list(room.lamps) : list(s?.attributes?.entity_id);
+  // Configured lamps, else the group's members, else the room's single light itself.
+  const ids = list(room.lamps).length ? list(room.lamps) : list(s?.attributes?.entity_id).length ? list(s.attributes.entity_id) : [room.entity];
   return ids.map((id) => {
     const ls = hass.states[id];
     const on = isOn(ls);
@@ -110,7 +111,7 @@ const SHEET_CSS = `
     -webkit-tap-highlight-color: transparent; }
   .lamp .glyph { flex-basis: 34px; height: 34px; }
   .lamp .glyph ha-icon { --mdc-icon-size: 20px; }
-  .lamp .nm { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lamp .nm { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; letter-spacing: .1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
   .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
@@ -143,6 +144,24 @@ class RoomLampsSheet {
         <div class="list"></div>
         <button class="close">Close</button>
       </div>`;
+    // The sheet opens under the finger that is still holding the tile. When that finger lifts,
+    // the browser sends a click to whatever is now under it – the backdrop – which would close
+    // the sheet at once (or flip a lamp). Ignore taps until shortly after that finger is up.
+    this._guard = true;
+    this._release = () => {
+      ["pointerup", "pointercancel", "touchend"].forEach((t) => document.removeEventListener(t, this._release, true));
+      setTimeout(() => (this._guard = false), 350);
+    };
+    ["pointerup", "pointercancel", "touchend"].forEach((t) => document.addEventListener(t, this._release, true));
+    root.addEventListener(
+      "click",
+      (e) => {
+        if (!this._guard) return;
+        e.stopPropagation();
+        e.preventDefault();
+      },
+      true,
+    );
     this._onKey = (e) => {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -204,6 +223,7 @@ class RoomLampsSheet {
 
   close() {
     document.removeEventListener("keydown", this._onKey, true);
+    this._release?.();
     this.host?.remove();
     if (this._card?._sheet === this) this._card._sheet = null;
   }
@@ -218,8 +238,10 @@ const CSS = `
     cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: 10px; }
   .shape { position: relative; flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
     justify-content: center; transition: background-color 180ms; }
-  .shape ha-icon { --mdc-icon-size: 20px; transition: color 180ms; }
-  .all .nm { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--primary-text-color);
+  /* Same size as Mushroom / tile card icons: 36 px circle, 24 px icon. */
+  .shape ha-icon { --mdc-icon-size: 24px; transition: color 180ms; }
+  /* Text matches Mushroom / tile cards: names 14px medium, readings 12px regular, same colour. */
+  .all .nm { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
@@ -238,9 +260,9 @@ const CSS = `
   .badge ha-icon { --mdc-icon-size: 11px; color: #fff; }
   .badge.on { display: flex; }
   .txt { flex: 1; min-width: 0; }
-  .room .nm { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--primary-text-color);
+  .room .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .m { display: flex; column-gap: 9px; font-size: 12px; line-height: 16px; color: var(--secondary-text-color);
+  .m { display: flex; column-gap: 9px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; }
   .g { display: flex; column-gap: 9px; min-width: 0; }
   .g:empty { display: none; }
@@ -260,8 +282,6 @@ const CSS = `
   .stack .m { flex-direction: column; }
   .stack .g { flex-wrap: wrap; column-gap: 7px; }
   .stack .tile { padding: 9px 8px; gap: 8px; }
-  .stack .room .shape { flex-basis: 32px; width: 32px; height: 32px; }
-  .stack .room .shape ha-icon { --mdc-icon-size: 18px; }
   @container (max-width: 175px) {
     .tile { padding: 9px 6px; gap: 6px; }
     .stack .g { column-gap: 5px; }
@@ -277,38 +297,10 @@ class RoomLightsCard extends HTMLElement {
     return { entity: "", rooms: lights.map((id) => ({ entity: id })) };
   }
 
-  // Visual editor. Rooms are a list: add, reorder and edit each one in the form.
-  static getConfigForm() {
-    const sensors = { entity: { domain: "sensor", multiple: true } };
-    return {
-      schema: [
-        { type: "grid", name: "", schema: [
-          { name: "name", selector: { text: {} } },
-          { name: "entity", selector: { entity: { domain: ["group", "light", "switch"] } } },
-        ] },
-        { name: "rooms", selector: { object: {
-          multiple: true,
-          label_field: "name",
-          description_field: "entity",
-          fields: {
-            name: { label: "Name", selector: { text: {} } },
-            entity: { label: "Lights (light, switch or group)", required: true, selector: { entity: { domain: ["light", "switch", "group"] } } },
-            icon: { label: "Icon", selector: { icon: {} } },
-            navigation_path: { label: "Icon tap goes to", selector: { navigation: {} } },
-            temperature: { label: "Temperature sensor(s)", selector: sensors },
-            humidity: { label: "Humidity sensor(s)", selector: sensors },
-            illuminance: { label: "Light level sensor(s)", selector: sensors },
-            window: { label: "Window sensor (red badge when open)", selector: { entity: { domain: "binary_sensor" } } },
-          },
-        } } },
-      ],
-      computeLabel: (s) => ({ name: "Header label", entity: "All lights (group)", rooms: "Rooms" })[s.name] ?? s.name,
-      computeHelper: (s) =>
-        ({
-          entity: "The header switch turns this off if anything is on, otherwise on.",
-          rooms: "Tap a room to switch it, tap its icon to open its dashboard, long-press for its lamps.",
-        })[s.name],
-    };
+  // Visual editor: a custom element, because Home Assistant's built-in list editor drops
+  // fields that take several entities (the temperature / humidity / light sensors).
+  static getConfigElement() {
+    return document.createElement(RLC_EDITOR_TAG);
   }
 
   setConfig(config) {
@@ -499,12 +491,6 @@ class RoomLightsCard extends HTMLElement {
   }
 
   _openSheet(room) {
-    const s = this._hass.states[room.entity];
-    if (!list(room.lamps).length && !list(s?.attributes?.entity_id).length) {
-      // A single light: Home Assistant's own dialog has everything for it.
-      this._fire("hass-more-info", { entityId: room.entity });
-      return;
-    }
     this._sheet?.close();
     this._sheet = new RoomLampsSheet();
     this._sheet.open(this, room);
@@ -547,10 +533,227 @@ class RoomLightsCard extends HTMLElement {
   }
 }
 
+/* ------------------------------------------------------------------------ */
+/* Visual editor                                                             */
+/* ------------------------------------------------------------------------ */
+
+const RLC_EDITOR_TAG = "room-lights-card-editor";
+const MULTI = ["temperature", "humidity", "illuminance", "lamps"];
+
+const HEADER_SCHEMA = [
+  { type: "grid", name: "", schema: [
+    { name: "entity", selector: { entity: { domain: ["group", "light", "switch"] } } },
+    { name: "name", selector: { text: {} } },
+  ] },
+];
+const ROOM_SCHEMA = [
+  { type: "grid", name: "", schema: [
+    { name: "name", selector: { text: {} } },
+    { name: "icon", selector: { icon: {} } },
+  ] },
+  { name: "entity", required: true, selector: { entity: { domain: ["light", "switch", "group"] } } },
+  { name: "navigation_path", selector: { navigation: {} } },
+  { name: "temperature", selector: { entity: { domain: "sensor", multiple: true } } },
+  { name: "humidity", selector: { entity: { domain: "sensor", multiple: true } } },
+  { name: "illuminance", selector: { entity: { domain: "sensor", multiple: true } } },
+  { name: "window", selector: { entity: { domain: "binary_sensor" } } },
+  { name: "lamps", selector: { entity: { domain: ["light", "switch"], multiple: true } } },
+];
+const EDITOR_LABELS = {
+  entity: "Lights (light, switch or group)",
+  name: "Name",
+  icon: "Icon",
+  navigation_path: "Icon tap goes to",
+  temperature: "Temperature sensors",
+  humidity: "Humidity sensors",
+  illuminance: "Light level sensors",
+  window: "Window sensor (red badge when open)",
+  lamps: "Lamps for the long-press list (optional)",
+};
+const EDITOR_HELPERS = {
+  temperature: "Add more than one to show them all, in order (e.g. 21.1/21.8°).",
+  lamps: "Leave empty to use the members of the room's group.",
+};
+
+const EDITOR_CSS = `
+  :host { display: block; }
+  .rooms-title { margin: 20px 0 8px; font-size: 16px; font-weight: 500; color: var(--primary-text-color); }
+  details { border: 1px solid var(--divider-color, rgba(0,0,0,.12)); border-radius: 12px; margin-bottom: 8px;
+    background: var(--card-background-color, #fff); }
+  summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 10px 12px; cursor: pointer; }
+  summary::-webkit-details-marker { display: none; }
+  summary .ic { flex: 0 0 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); color: var(--grey-color, #9e9e9e); }
+  summary .ic ha-icon { --mdc-icon-size: 24px; }
+  summary .t { flex: 1; min-width: 0; }
+  summary .t1 { font-size: 14px; font-weight: 500; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  summary .t2 { font-size: 12px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  summary .chev { --mdc-icon-size: 24px; color: var(--secondary-text-color); transition: transform 150ms; }
+  details[open] summary .chev { transform: rotate(180deg); }
+  .body { padding: 4px 12px 12px; }
+  .tools { display: flex; justify-content: flex-end; gap: 4px; margin-top: 8px; }
+  button { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    height: 36px; padding: 0 12px; border-radius: 18px; font-size: 14px; font-weight: 500; color: var(--primary-text-color); }
+  button ha-icon { --mdc-icon-size: 20px; color: var(--secondary-text-color); }
+  button:hover { background: rgba(var(--rgb-primary-text-color, 33,33,33), .06); }
+  button:disabled { opacity: .35; cursor: default; background: none; }
+  button.icon { padding: 0; width: 36px; justify-content: center; }
+  button.delete ha-icon { color: var(--error-color, #db4437); }
+  button.add { color: var(--primary-color); border: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
+  button.add ha-icon { color: var(--primary-color); }
+  button:focus-visible { outline: 2px solid var(--primary-color); }
+`;
+
+class RoomLightsCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = JSON.parse(JSON.stringify(config || {}));
+    if (!Array.isArray(this._config.rooms)) this._config.rooms = [];
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this.shadowRoot?.querySelectorAll("ha-form").forEach((f) => (f.hass = hass));
+  }
+
+  /* Several-sensor fields always go to the form as lists (YAML may hold a single string). */
+  _roomData(room) {
+    const d = { ...room };
+    for (const k of MULTI) if (d[k] !== undefined) d[k] = list(d[k]);
+    return d;
+  }
+
+  _render() {
+    const root = this.shadowRoot || this.attachShadow({ mode: "open" });
+    const rooms = this._config.rooms;
+    // Typing in a field sends the config round-trip through Home Assistant; rebuilding the
+    // forms then would drop the cursor. Rebuild only when rooms are added, removed or moved.
+    if (this._shown === rooms.length && !this._dirty) {
+      this._header.data = this._config;
+      rooms.forEach((r, i) => {
+        this._forms[i].data = this._roomData(r);
+        this._summary(i);
+      });
+      return;
+    }
+    this._dirty = false;
+    const open = new Set(this._open || []);
+    root.innerHTML = `<style>${EDITOR_CSS}</style><div class="header"></div>
+      <div class="rooms-title">Rooms</div><div class="list"></div>
+      <button class="add"><ha-icon icon="mdi:plus"></ha-icon>Add room</button>`;
+    this._header = this._form(HEADER_SCHEMA, this._config, (v) => {
+      const next = { ...this._config, ...v };
+      for (const k of ["entity", "name"]) if (!next[k]) delete next[k];
+      this._commit(next);
+    }, { entity: "All lights switch (group)", name: "Header label (default: All lights)" });
+    root.querySelector(".header").appendChild(this._header);
+    const box = root.querySelector(".list");
+    this._forms = [];
+    rooms.forEach((room, i) => {
+      const det = document.createElement("details");
+      if (open.has(i)) det.open = true;
+      det.innerHTML = `<summary><span class="ic"><ha-icon></ha-icon></span><span class="t"><div class="t1"></div><div class="t2"></div></span>
+        <ha-icon class="chev" icon="mdi:chevron-down"></ha-icon></summary>
+        <div class="body"><div class="form"></div><div class="tools">
+          <button class="icon up" title="Move up"><ha-icon icon="mdi:arrow-up"></ha-icon></button>
+          <button class="icon down" title="Move down"><ha-icon icon="mdi:arrow-down"></ha-icon></button>
+          <button class="delete" title="Remove room"><ha-icon icon="mdi:delete-outline"></ha-icon>Remove</button>
+        </div></div>`;
+      det.addEventListener("toggle", () => {
+        this._open = [...box.children].map((d, j) => (d.open ? j : -1)).filter((j) => j >= 0);
+      });
+      const form = this._form(ROOM_SCHEMA, this._roomData(room), (v) => {
+        const next = { ...v };
+        for (const k of Object.keys(next)) {
+          if (next[k] === "" || next[k] === undefined || next[k] === null || (Array.isArray(next[k]) && !next[k].length)) delete next[k];
+        }
+        // One sensor stays a plain entity id, as you would write it in YAML.
+        for (const k of MULTI) if (Array.isArray(next[k]) && next[k].length === 1) next[k] = next[k][0];
+        const roomsNext = this._config.rooms.slice();
+        roomsNext[i] = next;
+        this._commit({ ...this._config, rooms: roomsNext });
+      });
+      det.querySelector(".form").appendChild(form);
+      det.querySelector(".up").disabled = i === 0;
+      det.querySelector(".down").disabled = i === rooms.length - 1;
+      det.querySelector(".up").addEventListener("click", () => this._move(i, -1));
+      det.querySelector(".down").addEventListener("click", () => this._move(i, 1));
+      det.querySelector(".delete").addEventListener("click", () => this._remove(i));
+      box.appendChild(det);
+      this._forms.push(form);
+    });
+    root.querySelector(".add").addEventListener("click", () => this._add());
+    this._shown = rooms.length;
+    rooms.forEach((_, i) => this._summary(i));
+  }
+
+  _form(schema, data, onChange, labels = {}) {
+    const f = document.createElement("ha-form");
+    f.hass = this._hass;
+    f.schema = schema;
+    f.data = data;
+    f.computeLabel = (s) => labels[s.name] ?? EDITOR_LABELS[s.name] ?? s.name;
+    f.computeHelper = (s) => EDITOR_HELPERS[s.name];
+    f.addEventListener("value-changed", (e) => {
+      e.stopPropagation();
+      onChange(e.detail.value);
+    });
+    return f;
+  }
+
+  _summary(i) {
+    const det = this.shadowRoot.querySelectorAll(".list > details")[i];
+    if (!det) return;
+    const r = this._config.rooms[i];
+    const s = this._hass?.states?.[r.entity];
+    det.querySelector(".ic ha-icon").setAttribute("icon", r.icon || s?.attributes?.icon || "mdi:lightbulb-group");
+    det.querySelector(".t1").textContent = r.name || s?.attributes?.friendly_name || "New room";
+    det.querySelector(".t2").textContent = r.entity || "Choose the room's lights";
+  }
+
+  _move(i, d) {
+    const rooms = this._config.rooms.slice();
+    const j = i + d;
+    if (j < 0 || j >= rooms.length) return;
+    [rooms[i], rooms[j]] = [rooms[j], rooms[i]];
+    const open = new Set(this._open || []);
+    const oi = open.has(i);
+    const oj = open.has(j);
+    open.delete(i);
+    open.delete(j);
+    if (oi) open.add(j);
+    if (oj) open.add(i);
+    this._open = [...open];
+    this._dirty = true;
+    this._commit({ ...this._config, rooms });
+  }
+
+  _remove(i) {
+    const rooms = this._config.rooms.filter((_, j) => j !== i);
+    this._open = (this._open || []).filter((j) => j !== i).map((j) => (j > i ? j - 1 : j));
+    this._dirty = true;
+    this._commit({ ...this._config, rooms });
+  }
+
+  _add() {
+    const rooms = [...this._config.rooms, { entity: "" }];
+    this._open = [...(this._open || []), rooms.length - 1];
+    this._dirty = true;
+    this._commit({ ...this._config, rooms });
+  }
+
+  _commit(config) {
+    this._config = config;
+    this._render();
+    this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
+  }
+}
+
 async function registerRoomLightsCard() {
   await window.customElements.whenDefined("home-assistant");
   const registry = window.customElements;
   if (registry.get(RLC_TAG)) return;
+  if (!registry.get(RLC_EDITOR_TAG)) registry.define(RLC_EDITOR_TAG, RoomLightsCardEditor);
   registry.define(RLC_TAG, RoomLightsCard);
   window.customCards = window.customCards || [];
   window.customCards.push({

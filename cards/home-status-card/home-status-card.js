@@ -8,7 +8,7 @@
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.2.0";
+const HSC_VERSION = "1.2.1";
 const HSC_TAG = "home-status-card";
 
 const C = {
@@ -212,12 +212,14 @@ const CSS = `
   .who { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .shape { grid-area: s; align-self: start; width: 36px; height: 36px; border-radius: 50%; display: flex;
     align-items: center; justify-content: center; transition: background-color 180ms; }
-  .shape ha-icon { --mdc-icon-size: 20px; transition: color 180ms; }
-  .name { grid-area: n; min-width: 0; font-size: 14px; line-height: 18px; font-weight: 500; color: var(--primary-text-color);
+  /* Same size as Mushroom / tile card icons: 36 px circle, 24 px icon. */
+  .shape ha-icon { --mdc-icon-size: 24px; transition: color 180ms; }
+  /* Text matches Mushroom / tile cards: name 14px medium, detail 12px regular, same colour. */
+  .name { grid-area: n; min-width: 0; font-size: 14px; line-height: 18px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .name .state { font-weight: 400; color: var(--secondary-text-color); }
-  .detail { grid-area: d; min-width: 0; font-size: 12px; line-height: 15px; color: var(--secondary-text-color);
-    letter-spacing: .2px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .detail { grid-area: d; min-width: 0; font-size: 12px; line-height: 15px; color: var(--primary-text-color);
+    letter-spacing: .4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .alarm { all: unset; grid-area: a; box-sizing: border-box; display: flex; align-items: center; gap: 5px; height: 28px;
     padding: 0 10px 0 7px; border-radius: 14px; cursor: pointer; font-size: 12px; font-weight: 600;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);

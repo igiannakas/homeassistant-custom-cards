@@ -18,7 +18,7 @@
   otherwise turns everything on. No confirmation.
 - **Room tile**: tap switches the room; tap its icon to open the room's
   dashboard; long-press lists the room's lamps with a switch each (a room
-  that is a single light opens Home Assistant's own dialog instead).
+  that is a single light lists just that light, unless you set `lamps`).
 - Icon orange when the room's lights are on, grey when off. A red badge shows
   an open window.
 - Temperature, humidity and light level each have their own icon (T, H and L above). A room can
@@ -29,8 +29,9 @@
 
 ## Configuration
 
-Everything can be set in the visual editor (rooms are a list you can add to
-and reorder).
+Everything can be set in the visual editor: each room is a collapsible section
+with its own fields (several temperature, humidity or light sensors each), and
+buttons to add, reorder and remove rooms.
 
 ```yaml
 type: custom:room-lights-card

@@ -8,7 +8,7 @@
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.0.0";
+const ESC_VERSION = "1.0.1";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -74,16 +74,17 @@ const CSS = `
   ha-card { container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .row { display: flex; align-items: center; gap: 6px; padding: 10px 12px; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-  .shape ha-icon { --mdc-icon-size: 20px; }
+  .shape ha-icon { --mdc-icon-size: 24px; } /* same as Mushroom / tile card icons */
   .stats { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .stat { min-width: 0; padding: 0 6px 0 10px; border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
   .stat:first-child { border-left: none; }
   .k { font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: .02em; color: var(--secondary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .v { font-size: 15px; line-height: 20px; font-weight: 700; color: var(--primary-text-color); white-space: nowrap; }
-  .v small { font-size: 11px; font-weight: 600; color: var(--secondary-text-color); margin-left: 2px; }
+  /* Text matches Mushroom / tile cards: values 14px medium, costs 12px regular, same colour. */
+  .v { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); white-space: nowrap; }
+  .v small { font-size: 11px; font-weight: 400; color: var(--secondary-text-color); margin-left: 2px; }
   .now .v { color: ${TEAL}; }
-  .c { font-size: 12px; line-height: 16px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .c:empty::before { content: "\\00a0"; }
   ha-card:active { filter: brightness(.96); }
   ha-card:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
@@ -93,7 +94,6 @@ const CSS = `
     .row { padding: 10px 8px; }
     .stat { padding: 0 4px 0 8px; }
     .stat:first-child { padding-left: 2px; }
-    .v { font-size: 14px; }
     .v small { font-size: 10px; margin-left: 1px; }
   }
 `;

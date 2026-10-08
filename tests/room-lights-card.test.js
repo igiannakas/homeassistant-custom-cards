@@ -55,14 +55,51 @@ const cfg = {
   const Card = window.customElements.get("room-lights-card");
   assert(Card, "defined after home-assistant");
 
-  // Visual editor: header fields and an editable list of rooms with every room option.
-  const form = Card.getConfigForm();
-  const s = JSON.stringify(form.schema);
-  for (const k of ["name", "entity", "rooms"]) assert(s.includes(`"name":"${k}"`), `editor field ${k}`);
-  const fields = form.schema.find((x) => x.name === "rooms").selector.object.fields;
-  for (const k of ["name", "entity", "icon", "navigation_path", "temperature", "humidity", "illuminance", "window"])
-    assert(fields[k], `room field ${k}`);
-  assert.strictEqual(fields.temperature.selector.entity.multiple, true, "several sensors per room");
+  // Visual editor: own element (Home Assistant's list editor drops multi-entity fields).
+  const ed = Card.getConfigElement();
+  assert.strictEqual(ed.localName, "room-lights-card-editor");
+  document.body.appendChild(ed);
+  const changes = [];
+  ed.addEventListener("config-changed", (e) => changes.push(JSON.parse(JSON.stringify(e.detail.config))));
+  ed.hass = hass();
+  ed.setConfig(cfg);
+  const er = ed.shadowRoot;
+  const sections = () => [...er.querySelectorAll(".list > details")];
+  eq(sections().map((d) => d.querySelector(".t1").textContent), ["Living Room", "Kitchen", "Corridor"]);
+  const roomForm = (i) => sections()[i].querySelector("ha-form");
+  const fieldNames = JSON.stringify(roomForm(0).schema);
+  for (const k of ["name", "icon", "entity", "navigation_path", "temperature", "humidity", "illuminance", "window", "lamps"])
+    assert(fieldNames.includes(`"name":"${k}"`), `room editor field ${k}`);
+  assert(fieldNames.includes('"multiple":true'), "several sensors per reading");
+  // Single sensors are given to the form as lists; two stay two.
+  eq(roomForm(0).data.temperature, ["sensor.lr_t"]);
+  eq(roomForm(2).data.temperature, ["sensor.c_t1", "sensor.c_t2"]);
+  assert.strictEqual(roomForm(0).computeLabel({ name: "humidity" }), "Humidity sensors");
+  // Editing a room: empty values dropped, a single sensor written back as a plain id.
+  const formBefore = roomForm(1);
+  formBefore.dispatchEvent(new window.CustomEvent("value-changed", { detail: { value: {
+    name: "Kitchen", icon: "mdi:silverware", entity: "light.kitchen", navigation_path: "/lovelace/kitchen",
+    temperature: ["sensor.k_t"], humidity: [], illuminance: ["sensor.k_l1", "sensor.k_l2"], window: "" } } }));
+  eq(changes.pop().rooms[1], { name: "Kitchen", icon: "mdi:silverware", entity: "light.kitchen", navigation_path: "/lovelace/kitchen",
+    temperature: "sensor.k_t", illuminance: ["sensor.k_l1", "sensor.k_l2"] });
+  // Home Assistant echoes the config back; the same form stays (typing keeps the cursor).
+  ed.setConfig({ ...cfg, rooms: [cfg.rooms[0], { ...cfg.rooms[1], temperature: "sensor.k_t" }, cfg.rooms[2]] });
+  assert.strictEqual(roomForm(1), formBefore, "form not rebuilt while typing");
+  // Header fields.
+  er.querySelector(".header ha-form").dispatchEvent(new window.CustomEvent("value-changed", { detail: { value: { ...cfg, name: "Lights" } } }));
+  assert.strictEqual(changes.pop().name, "Lights");
+  // Move, remove, add.
+  sections()[2].querySelector(".up").click();
+  eq(changes.pop().rooms.map((r) => r.entity), ["light.living", "group.corridor", "light.kitchen"]);
+  assert(sections()[0].querySelector(".up").disabled && sections()[2].querySelector(".down").disabled);
+  sections()[0].querySelector(".delete").click();
+  eq(changes.pop().rooms.map((r) => r.entity), ["group.corridor", "light.kitchen"]);
+  er.querySelector(".add").click();
+  const added = changes.pop();
+  assert.strictEqual(added.rooms.length, 3);
+  assert(sections()[2].open, "new room opens for editing");
+  assert.strictEqual(sections()[2].querySelector(".t1").textContent, "New room");
+  ed.remove();
   assert.throws(() => new Card().setConfig({ rooms: "x" }));
 
   const card = document.createElement("room-lights-card");
@@ -132,16 +169,23 @@ const cfg = {
   eq(calls.pop(), ["homeassistant", "turn_on", { entity_id: "group.corridor" }]);
 
   // Long-press → lamps sheet; the click that follows the hold does not toggle the room.
-  const P = (type) => new window.MouseEvent(type, { bubbles: true, clientX: 5, clientY: 5, button: 0 });
+  const P = (type) => new window.MouseEvent(type, { bubbles: true, composed: true, clientX: 5, clientY: 5, button: 0 });
   rooms()[0].dispatchEvent(P("pointerdown"));
   await tick(600);
-  rooms()[0].dispatchEvent(P("pointerup"));
-  rooms()[0].click();
-  await tick();
-  assert.strictEqual(calls.length, 0, "no toggle after a hold");
   const sheet = document.querySelector("rlc-lamps-sheet");
   assert(sheet, "lamps sheet opened");
   const sr = sheet.shadowRoot;
+  // Mobile: lifting the holding finger sends a click to whatever is now under it (the backdrop
+  // or a lamp row). That must neither close the sheet nor switch a lamp.
+  sr.querySelector(".backdrop").click();
+  sr.querySelector(".lamp").click();
+  rooms()[0].dispatchEvent(P("pointerup"));
+  sr.querySelector(".backdrop").click();
+  rooms()[0].click();
+  await tick();
+  assert(document.querySelector("rlc-lamps-sheet"), "still open after the finger lifts");
+  assert.strictEqual(calls.length, 0, "no toggle after a hold");
+  await tick(400);
   assert.strictEqual(sr.querySelector(".title").textContent, "Living Room");
   const lampNames = [...sr.querySelectorAll(".lamp .nm")].map((n) => n.textContent);
   eq(lampNames, ["Ceiling light", "Front lamp"], "room name stripped from lamp names");
@@ -168,18 +212,25 @@ const cfg = {
   assert(document.querySelector("rlc-lamps-sheet"));
   document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
   assert(!document.querySelector("rlc-lamps-sheet"));
+  // Once the finger is up, a tap on the backdrop closes it.
+  rooms()[2].dispatchEvent(P("pointerdown"));
+  await tick(600);
+  rooms()[2].dispatchEvent(P("pointerup"));
+  await tick(400);
+  document.querySelector("rlc-lamps-sheet").shadowRoot.querySelector(".backdrop").click();
+  assert(!document.querySelector("rlc-lamps-sheet"), "backdrop tap closes");
   rooms()[2].dispatchEvent(P("pointerdown"));
   rooms()[2].dispatchEvent(P("pointerup"));
   await tick(600);
   assert(!document.querySelector("rlc-lamps-sheet"), "short tap = no sheet");
 
-  // Single light (no members) → Home Assistant's own more-info instead of a sheet.
-  let more = null;
-  card.addEventListener("hass-more-info", (e) => (more = e.detail.entityId));
+  // Single light (no members) → the same sheet, listing that light.
   rooms()[1].dispatchEvent(P("pointerdown"));
   await tick(600);
-  assert.strictEqual(more, "light.kitchen");
-  assert(!document.querySelector("rlc-lamps-sheet"));
+  const one = document.querySelector("rlc-lamps-sheet");
+  assert(one, "sheet for a single light too");
+  eq([...one.shadowRoot.querySelectorAll(".lamp")].map((b) => b.dataset.id), ["light.kitchen"]);
+  document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
 
   // Missing room entity: no crash, shown dimmed.
   card.setConfig({ rooms: [{ name: "Ghost", entity: "light.nope" }] });
