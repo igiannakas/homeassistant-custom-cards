@@ -79,7 +79,7 @@ const cfg = {
   tile("tv").click();
   tile("climate").click();
   r.querySelector(".msg").click();
-  r.querySelector(".who").click();
+  r.querySelector(".name").click();
   await tick();
   assert.strictEqual(JSON.stringify(more), JSON.stringify(["sensor.door", "sensor.epaper"]));
   assert.strictEqual(JSON.stringify(navs), JSON.stringify(["/lovelace/greece-tv", "/lovelace/greece-climate", "/dashboard-cctv/0"]));

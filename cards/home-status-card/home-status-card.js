@@ -8,7 +8,7 @@
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.0.0";
+const HSC_VERSION = "1.1.0";
 const HSC_TAG = "home-status-card";
 
 const C = {
@@ -204,43 +204,50 @@ function confirmDialog({ title, icon, color, bodyIcon, primary, secondary, confi
 
 const CSS = `
   :host { display: block; }
-  ha-card { container-type: inline-size; padding: 12px; display: grid; gap: 10px; }
-  .head { display: flex; align-items: center; gap: 12px; min-width: 0; }
-  .who { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; cursor: pointer;
-    -webkit-tap-highlight-color: transparent; }
-  .shape { flex: 0 0 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    transition: background-color 180ms; }
-  .shape ha-icon { --mdc-icon-size: 22px; transition: color 180ms; }
-  .info { min-width: 0; }
-  .name { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--primary-text-color); }
+  ha-card { container-type: inline-size; padding: 10px 12px; display: grid; gap: 8px; }
+  /* Icon on the left across both lines; title and alarm switch share the first line, so the
+     presence text below gets the full width. */
+  .head { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "s n a" "s d d";
+    column-gap: 10px; align-items: center; }
+  .who { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .shape { grid-area: s; align-self: start; width: 36px; height: 36px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; transition: background-color 180ms; }
+  .shape ha-icon { --mdc-icon-size: 20px; transition: color 180ms; }
+  .name { grid-area: n; min-width: 0; font-size: 14px; line-height: 18px; font-weight: 500; color: var(--primary-text-color);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .name .state { font-weight: 400; color: var(--secondary-text-color); }
-  .detail { font-size: 12px; line-height: 16px; color: var(--secondary-text-color); letter-spacing: .2px;
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .alarm { all: unset; box-sizing: border-box; flex: 0 0 auto; display: flex; align-items: center; gap: 6px; height: 32px;
-    padding: 0 12px 0 8px; border-radius: 16px; cursor: pointer; font-size: 12px; font-weight: 600;
+  .detail { grid-area: d; min-width: 0; font-size: 12px; line-height: 15px; color: var(--secondary-text-color);
+    letter-spacing: .2px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .alarm { all: unset; grid-area: a; box-sizing: border-box; display: flex; align-items: center; gap: 5px; height: 28px;
+    padding: 0 10px 0 7px; border-radius: 14px; cursor: pointer; font-size: 12px; font-weight: 600;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
     transition: background-color 180ms, color 180ms; -webkit-tap-highlight-color: transparent; }
-  .alarm ha-icon { --mdc-icon-size: 18px; color: var(--grey-color, #9e9e9e); }
+  .alarm ha-icon { --mdc-icon-size: 16px; color: var(--grey-color, #9e9e9e); }
   .alarm.on { background: color-mix(in srgb, var(--red-color, #f44336) 20%, transparent); color: var(--red-color, #f44336); }
   .alarm.on ha-icon { color: var(--red-color, #f44336); }
   .alarm:active, .tile:active { transform: scale(.96); }
   .alarm:focus-visible, .tile:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .tiles { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 6px; }
   .tile { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 6px;
-    height: 36px; padding: 0 8px; border-radius: 18px; cursor: pointer; min-width: 0;
+    height: 30px; padding: 0 8px; border-radius: 15px; cursor: pointer; min-width: 0;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color);
     font-size: 12px; font-weight: 500; transition: background-color 180ms; -webkit-tap-highlight-color: transparent; }
-  .tile ha-icon { --mdc-icon-size: 18px; flex: 0 0 auto; color: var(--grey-color, #9e9e9e); }
+  .tile ha-icon { --mdc-icon-size: 16px; flex: 0 0 auto; color: var(--grey-color, #9e9e9e); }
   .tile span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .msg { all: unset; box-sizing: border-box; display: flex; align-items: flex-start; gap: 8px; min-height: 36px; padding: 9px 12px;
-    border-radius: 18px; cursor: pointer; font-size: 12px; line-height: 16px; color: var(--primary-text-color);
+  .msg { all: unset; box-sizing: border-box; display: flex; align-items: flex-start; gap: 8px; min-height: 30px; padding: 7px 12px;
+    border-radius: 15px; cursor: pointer; font-size: 12px; line-height: 16px; color: var(--primary-text-color);
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
-  .msg ha-icon { --mdc-icon-size: 18px; color: var(--grey-color, #9e9e9e); flex: 0 0 auto; margin-top: -1px; }
+  .msg ha-icon { --mdc-icon-size: 16px; color: var(--grey-color, #9e9e9e); flex: 0 0 auto; }
   /* Long ePaper messages wrap in full; nothing is cut off. */
   .msg span { min-width: 0; white-space: pre-line; overflow-wrap: anywhere; }
   .msg span.empty { color: var(--secondary-text-color); }
   .msg:active { transform: scale(.98); }
   .msg:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  /* Wide cards: status buttons and the ePaper line share one row. */
+  @container (min-width: 600px) {
+    ha-card { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+    .head { grid-column: 1 / -1; }
+  }
   @container (max-width: 300px) {
     .alarm .txt { display: none; }
     .alarm { padding: 0 8px; }
@@ -286,25 +293,24 @@ class HomeStatusCard extends HTMLElement {
     root.innerHTML = `<style>${CSS}</style>
       <ha-card>
         <div class="head">
-          <div class="who" role="button" tabindex="0">
-            <div class="shape"><ha-icon></ha-icon></div>
-            <div class="info"><div class="name"></div><div class="detail"></div></div>
-          </div>
+          <div class="shape who" role="button" tabindex="0"><ha-icon></ha-icon></div>
+          <div class="name who"></div>
           <button class="alarm" aria-pressed="false"><ha-icon></ha-icon><span class="txt"></span></button>
+          <div class="detail who"></div>
         </div>
         <div class="tiles"></div>
         <button class="msg"><ha-icon icon="mdi:message-text-outline"></ha-icon><span></span></button>
       </ha-card>`;
     const $ = (s) => root.querySelector(s);
     this._el = {
-      who: $(".who"), shape: $(".shape"), icon: $(".shape ha-icon"), name: $(".name"), detail: $(".detail"),
+      who: [...root.querySelectorAll(".who")], shape: $(".shape"), icon: $(".shape ha-icon"), name: $(".name"), detail: $(".detail"),
       alarm: $(".alarm"), alarmIcon: $(".alarm ha-icon"), alarmTxt: $(".alarm .txt"), tiles: $(".tiles"),
       msg: $(".msg"), msgTxt: $(".msg span"),
     };
     const p = this._config.presence || {};
-    this._el.who.addEventListener("click", () =>
-      this._act(p.navigation_path ? { action: "navigate", path: p.navigation_path } : { action: "more-info", entity: p.occupied }),
-    );
+    const openPresence = () =>
+      this._act(p.navigation_path ? { action: "navigate", path: p.navigation_path } : { action: "more-info", entity: p.occupied });
+    this._el.who.forEach((el) => el.addEventListener("click", openPresence));
     this._el.alarm.addEventListener("click", () => this._toggleAlarm());
     this._el.msg.addEventListener("click", () => this._act({ action: "more-info", entity: this._config.message }));
     this._built = true;
