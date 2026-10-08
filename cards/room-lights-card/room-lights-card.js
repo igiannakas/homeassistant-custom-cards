@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.1.2";
+const RLC_VERSION = "1.1.3";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -112,7 +112,11 @@ const SHEET_CSS = `
     -webkit-tap-highlight-color: transparent; }
   button .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
   button .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
-  .lamp .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Call to action, filled like "Boost heating": the lights colour with white text and icon. */
+  button.open { background: ${C.orange}; color: #fff; }
+  button.open .glyph { background: rgba(255,255,255,.2); }
+  button.open .glyph ha-icon { color: #fff; }
+  button.open .nm, .lamp .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
   .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
@@ -140,7 +144,7 @@ class RoomLampsSheet {
         <div class="head"><div class="glyph"><ha-icon></ha-icon></div><div class="title"></div></div>
         <div class="list"></div>
         <div class="buttons">
-          ${room.navigation_path ? `<button class="open"><span class="glyph"><ha-icon icon="mdi:arrow-right"></ha-icon></span>Open room</button>` : ""}
+          ${room.navigation_path ? `<button class="open"><span class="glyph"><ha-icon></ha-icon></span><span class="nm"></span></button>` : ""}
           <button class="close"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Close</button>
         </div>
       </div>`;
@@ -191,6 +195,12 @@ class RoomLampsSheet {
     g.querySelector("ha-icon").style.color = color;
     const title = root.querySelector(".title");
     if (title.textContent !== m.name) title.textContent = m.name;
+    const open = root.querySelector(".open");
+    if (open) {
+      open.querySelector("ha-icon").setAttribute("icon", m.icon);
+      const label = `Open ${m.name}`;
+      if (open.querySelector(".nm").textContent !== label) open.querySelector(".nm").textContent = label;
+    }
     root.querySelector(".dialog").setAttribute("aria-label", m.name);
 
     const items = lamps(hass, this._room);

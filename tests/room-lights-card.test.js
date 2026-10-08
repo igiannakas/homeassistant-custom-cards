@@ -200,7 +200,9 @@ const cfg = {
   eq(calls.pop(), ["light", "turn_on", { entity_id: "light.front_lr_lamp" }]);
   card.hass = hass({ "light.front_lr_lamp": ["on", { friendly_name: "Front living room lamp" }] });
   assert.strictEqual(sr.querySelectorAll(".lamp")[1].getAttribute("aria-checked"), "true");
-  // "Room" link navigates and closes.
+  // "Open Living Room" call to action navigates and closes.
+  assert.strictEqual(sr.querySelector(".open .nm").textContent, "Open Living Room");
+  assert.strictEqual(sr.querySelector(".open ha-icon").getAttribute("icon"), "mdi:sofa");
   sr.querySelector(".open").click();
   await tick();
   assert.strictEqual(navs.pop(), "/lovelace/living-room");
