@@ -1,0 +1,73 @@
+# Room lights card
+
+`custom:room-lights-card` – all your rooms' lights in one card.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ (o) All lights                                    [on]   │
+│                                                          │
+│ (o) Living Room             (o) Kitchen                  │
+│     T 20.4°  H 43%  L 115 lx    T 21.5°  H 49%  L 27 lx  │
+│                                                          │
+│ (o) Corridor                (o) Study                    │
+│     T 21.1/21.8°  H 49/49%      T 21.5°  H 45%  L 442 lx │
+└──────────────────────────────────────────────────────────┘
+```
+
+- **All lights** (header): one tap turns everything off if anything is on,
+  otherwise turns everything on. No confirmation.
+- **Room tile**: tap switches the room; tap its icon to open the room's
+  dashboard; long-press lists the room's lamps with a switch each (a room
+  that is a single light opens Home Assistant's own dialog instead).
+- Icon orange when the room's lights are on, grey when off. A red badge shows
+  an open window.
+- Temperature, humidity and light level each have their own icon (T, H and L above). A room can
+  have more than one sensor of each kind: they are shown in order, for example
+  `21.1/21.8°`.
+- Every tile has the same height. On a phone, temperature sits on one line and
+  humidity + light level on the next; on wider screens it is all one line.
+
+## Configuration
+
+Everything can be set in the visual editor (rooms are a list you can add to
+and reorder).
+
+```yaml
+type: custom:room-lights-card
+entity: group.home_lights
+rooms:
+  - name: Living Room
+    icon: mdi:sofa
+    entity: light.living_room_lights
+    navigation_path: /lovelace/living-room
+    temperature: sensor.living_room_air_quality_temperature
+    humidity: sensor.living_room_air_quality_humidity
+    illuminance: sensor.living_room_air_quality_illuminance
+    window: binary_sensor.living_room_air_quality_open_window_detected
+  - name: Corridor
+    icon: mdi:door-open
+    entity: group.corridor_downstairs_upstairs_lights
+    navigation_path: /lovelace/corridor
+    temperature:
+      - sensor.corridor_temperature_and_humidity_sensor_temperature
+      - sensor.upstairs_corridor_temperature_and_humidity_sensor_temperature
+    humidity:
+      - sensor.corridor_temperature_and_humidity_sensor_humidity
+      - sensor.upstairs_corridor_temperature_and_humidity_sensor_humidity
+    illuminance: sensor.corridor_motion_sensor_illuminance
+```
+
+| Option | What it is |
+|---|---|
+| `entity` | Group (or light) the header switch controls. Leave out to hide the header. |
+| `name` | Header label. Default `All lights`. |
+| `columns` | Tiles per row, default 2. |
+| `rooms[].entity` | The room's light, switch or group. |
+| `rooms[].name`, `rooms[].icon` | Shown on the tile. |
+| `rooms[].navigation_path` | Where tapping the icon goes. Without it, the icon toggles like the rest of the tile. |
+| `rooms[].temperature`, `humidity`, `illuminance` | One sensor or a list. Leave out to hide that reading. |
+| `rooms[].window` | Binary sensor; a red badge shows while it is on. |
+| `rooms[].lamps` | Optional list of entities for the long-press sheet. By default the room entity's own members are used. |
+
+In the long-press sheet, the room's name is taken off each lamp's name, so
+"Front living room lamp" in Living Room shows as "Front lamp".
