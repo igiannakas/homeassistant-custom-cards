@@ -9,7 +9,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.1.2";
+const AQC_VERSION = "1.1.4";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -38,8 +38,8 @@ const TEXT = [
  * (null = that level is skipped), label, icon, decimals, unit, and whether it is always shown.
  */
 const POLLUTANTS = {
-  co2: { suffix: "co2", t: [800, null, 1000], label: "CO₂", icon: "mdi:molecule-co2", digits: 0, unit: "ppm", always: true, gas: true },
-  voc: { suffix: "voc_index", t: [150, 250, 400], label: "VOC", icon: "mdi:spray", digits: 0, always: true, gas: true },
+  co2: { suffix: "co2", t: [800, null, 1000], label: "CO₂", digits: 0, unit: "ppm", always: true, gas: true },
+  voc: { suffix: "voc_index", t: [150, 250, 400], label: "VOC", digits: 0, always: true, gas: true },
   // Particles: always shown, each with its size class as the label, on a line of their own.
   pm1: { suffix: "pm1", t: [12, null, 36], label: "PM1", digits: 1, always: true, pm: true },
   pm2_5: { suffix: "pm2_5", t: [12, null, 36], label: "PM2.5", digits: 1, always: true, pm: true },
@@ -108,16 +108,18 @@ const CSS = `
   /* Particle sizes as a tidy 2×2 (PM1 PM2.5 / PM4 PM10); four across when the tile is wide. */
   .row.pm { display: grid; grid-template-columns: repeat(2, max-content); column-gap: 10px; }
   @container (min-width: 300px) { .row.pm { grid-template-columns: repeat(4, max-content); } }
+  /* Phone-width tiles: CO₂ is always in ppm, so the unit gives way and status, CO₂ and VOC share one line. */
+  @container (max-width: 270px) { .v small { display: none; } }
   /* Particle size class as a small label in front of each PM value. */
   /* Labels and units are the same size as the values, only lighter. */
   .k { margin-right: 3px; color: color-mix(in srgb, var(--secondary-text-color) 70%, transparent); }
   .v.hot .k { color: inherit; }
-  .st { font-weight: 500; white-space: nowrap; }
+  /* One type style for the whole block: same size and weight; colour alone marks a problem. */
+  .st { white-space: nowrap; }
   .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .v small { font-size: inherit; color: color-mix(in srgb, var(--secondary-text-color) 70%, transparent); }
   .v.hot small { color: inherit; }
-  .v.hot { font-weight: 600; }
   .room:active { filter: brightness(.94); }
   .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   @container (max-width: 175px) { .room { padding: 9px 6px; gap: 6px; } .row { column-gap: 5px; } .m { font-size: 11.5px; } }
