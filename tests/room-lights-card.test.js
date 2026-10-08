@@ -15,6 +15,28 @@ const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 const eq = (a, b, msg) => assert.strictEqual(JSON.stringify(a), JSON.stringify(b), msg);
 
 const calls = [];
+const now = Date.now();
+const wsCalls = [];
+// History for the presence sensors and the room view (for the lamp icons).
+async function ws(m) {
+  wsCalls.push(m.type);
+  if (m.type === "history/history_during_period") {
+    return {
+      // On until 12 minutes ago, then off (an HA restart since then must not reset this).
+      "binary_sensor.k_occ": [{ s: "off", lu: (now - 5 * 3600e3) / 1000 }, { s: "on", lu: (now - 40 * 60e3) / 1000 }, { s: "off", lu: (now - 12 * 60e3) / 1000 }, { s: "off", lu: (now - 2 * 60e3) / 1000 }],
+      "binary_sensor.c_occ": [{ s: "off", lu: (now - 3 * 86400e3) / 1000 }],
+      "binary_sensor.lr_occ": [{ s: "on", lu: (now - 9 * 60e3) / 1000 }],
+    };
+  }
+  if (m.type === "lovelace/config") {
+    return { views: [{ path: "living-room", sections: [{ cards: [
+      { type: "custom:mushroom-light-card", entity: "light.lr_ceiling", icon: "mdi:wall-sconce-flat" },
+      { type: "vertical-stack", cards: [{ type: "custom:mushroom-light-card", entity: "light.front_lr_lamp", icon: "mdi:floor-lamp" }] },
+      { type: "custom:mushroom-template-card", entity: "light.lr_ceiling", icon: "{{ 'mdi:x' }}" },
+    ] }] }] };
+  }
+  throw new Error("unexpected " + m.type);
+}
 function hass(over = {}) {
   const base = {
     "group.home_lights": ["on", {}],
@@ -34,18 +56,24 @@ function hass(over = {}) {
     "sensor.c_h1": ["48.52", {}],
     "sensor.c_h2": ["48.81", {}],
     "sensor.c_l": ["unknown", {}],
+    "binary_sensor.lr_occ": ["on", {}],
+    "binary_sensor.k_occ": ["off", {}],
+    "binary_sensor.c_occ": ["off", {}],
   };
   const states = {};
-  for (const [k, [st, attributes]] of Object.entries({ ...base, ...over })) states[k] = { entity_id: k, state: st, attributes };
-  return { states, entities: {}, callService: async (...a) => calls.push(a) };
+  const restart = new Date(now - 2 * 60e3).toISOString();
+  for (const [k, [st, attributes, lc]] of Object.entries({ ...base, ...over }))
+    states[k] = { entity_id: k, state: st, attributes, last_changed: lc || restart };
+  return { states, entities: {}, callService: async (...a) => calls.push(a), callWS: async (m) => ws(m) };
 }
 const cfg = {
   entity: "group.home_lights",
   rooms: [
     { name: "Living Room", icon: "mdi:sofa", entity: "light.living", navigation_path: "/lovelace/living-room",
-      temperature: "sensor.lr_t", humidity: "sensor.lr_h", illuminance: "sensor.lr_l", window: "binary_sensor.lr_window" },
-    { name: "Kitchen", icon: "mdi:silverware", entity: "light.kitchen", navigation_path: "/lovelace/kitchen" },
-    { name: "Corridor", icon: "mdi:door-open", entity: "group.corridor",
+      temperature: "sensor.lr_t", humidity: "sensor.lr_h", illuminance: "sensor.lr_l", window: "binary_sensor.lr_window",
+      occupancy: "binary_sensor.lr_occ" },
+    { name: "Kitchen", icon: "mdi:silverware", entity: "light.kitchen", navigation_path: "/lovelace/kitchen", occupancy: "binary_sensor.k_occ" },
+    { name: "Corridor", icon: "mdi:door-open", entity: "group.corridor", occupancy: "binary_sensor.c_occ",
       temperature: ["sensor.c_t1", "sensor.c_t2"], humidity: ["sensor.c_h1", "sensor.c_h2"], illuminance: "sensor.c_l" },
   ],
 };
@@ -68,7 +96,7 @@ const cfg = {
   eq(sections().map((d) => d.querySelector(".t1").textContent), ["Living Room", "Kitchen", "Corridor"]);
   const roomForm = (i) => sections()[i].querySelector("ha-form");
   const fieldNames = JSON.stringify(roomForm(0).schema);
-  for (const k of ["name", "icon", "entity", "navigation_path", "temperature", "humidity", "illuminance", "window", "lamps"])
+  for (const k of ["name", "icon", "entity", "navigation_path", "temperature", "humidity", "illuminance", "occupancy", "window", "lamps"])
     assert(fieldNames.includes(`"name":"${k}"`), `room editor field ${k}`);
   assert(fieldNames.includes('"multiple":true'), "several sensors per reading");
   // Single sensors are given to the form as lists; two stay two.
@@ -125,6 +153,30 @@ const cfg = {
   assert(rooms()[0].querySelector(".v.t ha-icon[icon='mdi:thermometer']"));
   assert(rooms()[0].querySelector(".v.h ha-icon[icon='mdi:water-percent']"));
   assert(rooms()[0].querySelector(".v.l ha-icon[icon='mdi:white-balance-sunny']"));
+
+  // Presence on the name's line: occupied = teal person; empty = time since last seen, from
+  // history (not the restart); nothing in the history window = "3d+".
+  await tick(10);
+  const pres = (i) => rooms()[i].querySelector(".top .pres");
+  assert(pres(0).classList.contains("here") && pres(0).querySelector("ha-icon[icon='mdi:account']"));
+  eq(pres(1).textContent, "12m");
+  assert(pres(1).classList.contains("empty"), "kitchen lights off → plain");
+  eq(pres(2).textContent, "3d+");
+  assert(wsCalls.filter((t) => t === "history/history_during_period").length === 1, "history read once");
+  // Lights on in a room empty for longer than the threshold → warning.
+  card.hass = hass({ "light.kitchen": ["on", { friendly_name: "Kitchen" }] });
+  assert(pres(1).classList.contains("warn") && pres(1).querySelector("ha-icon[icon='mdi:account-off-outline']"));
+  card.setConfig({ ...cfg, empty_warning: 30 });
+  card.hass = hass({ "light.kitchen": ["on", { friendly_name: "Kitchen" }] });
+  await tick(10);
+  assert(!pres(1).classList.contains("warn"), "12 min < 30 min threshold");
+  card.setConfig(cfg);
+  // Someone leaves the living room now → "0m".
+  card.hass = hass();
+  await tick(10);
+  card.hass = hass({ "binary_sensor.lr_occ": ["off", {}, new Date().toISOString()] });
+  eq(pres(0).textContent, "0m");
+  card.hass = hass();
 
   // Window badge.
   assert(!rooms()[0].querySelector(".badge").classList.contains("on"));
@@ -188,6 +240,9 @@ const cfg = {
   await tick(400);
   assert.strictEqual(sr.querySelector(".title").textContent, "Living Room");
   const lampNames = [...sr.querySelectorAll(".lamp .nm")].map((n) => n.textContent);
+  // Icons mirror the room's own view (template icons ignored); others keep their own.
+  await tick(10);
+  eq([...sr.querySelectorAll(".lamp .glyph ha-icon")].map((i) => i.getAttribute("icon")), ["mdi:wall-sconce-flat", "mdi:floor-lamp"]);
   eq(lampNames, ["Ceiling light", "Front lamp"], "room name stripped from lamp names");
   eq([...sr.querySelectorAll(".lamp")].map((b) => b.getAttribute("aria-checked")), ["true", "false"]);
   // Next tap after a hold works normally (the hold flag must not swallow it).

@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.1.3";
+const RLC_VERSION = "1.2.0";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -21,6 +21,7 @@ const C = {
   teal: "var(--teal-color, #009688)",
 };
 const HOLD_MS = 500;
+const HISTORY_DAYS = 3;
 const MOVE_PX = 10;
 
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
@@ -51,6 +52,31 @@ function lampName(friendly, room) {
   return n.charAt(0).toUpperCase() + n.slice(1);
 }
 
+/* "12m", "3h", "2d" */
+function ago(ms) {
+  const m = Math.max(0, Math.round(ms / 60000));
+  if (m < 60) return `${m}m`;
+  if (m < 1440) return `${Math.floor(m / 60)}h`;
+  return `${Math.floor(m / 1440)}d`;
+}
+
+/*
+ * Who is in the room: occupied → teal person; empty → how long since someone was there.
+ * Lights on in a room that has been empty for a while → amber, so lights left on stand out.
+ */
+function presenceModel(hass, room, lastSeen, warnMin, lightsOn) {
+  const id = room.occupancy;
+  if (!id) return null;
+  const s = hass.states[id];
+  if (!s || s.state === "unavailable" || s.state === "unknown") return { kind: "unknown", text: "" };
+  if (s.state === "on") return { kind: "here", text: "" };
+  const since = lastSeen ?? null;
+  if (since === null) return { kind: "empty", text: "" };
+  const ms = Date.now() - since;
+  const warn = lightsOn && ms >= warnMin * 60000;
+  return { kind: warn ? "warn" : "empty", text: ms > HISTORY_DAYS * 86400000 ? `${HISTORY_DAYS}d+` : ago(ms) };
+}
+
 function roomModel(hass, room) {
   const s = hass.states[room.entity];
   const on = isOn(s);
@@ -68,7 +94,7 @@ function roomModel(hass, room) {
 }
 
 /* The lamps behind a room switch (light groups and old-style groups both list them). */
-function lamps(hass, room) {
+function lamps(hass, room, viewIcons = {}) {
   const s = hass.states[room.entity];
   // Configured lamps, else the group's members, else the room's single light itself.
   const ids = list(room.lamps).length ? list(room.lamps) : list(s?.attributes?.entity_id).length ? list(s.attributes.entity_id) : [room.entity];
@@ -80,9 +106,37 @@ function lamps(hass, room) {
       on,
       missing: !ls,
       name: lampName(ls?.attributes?.friendly_name || id, room.name),
-      icon: ls?.attributes?.icon || hass.entities?.[id]?.icon || (on ? "mdi:lightbulb" : "mdi:lightbulb-outline"),
+      // Same icon as on the room's own dashboard view, else the entity's own icon.
+      icon: viewIcons[id] || ls?.attributes?.icon || hass.entities?.[id]?.icon || (on ? "mdi:lightbulb" : "mdi:lightbulb-outline"),
     };
   });
+}
+
+/* Icons the room's own view uses for each entity ({ "light.tv": "mdi:television", … }). */
+function iconsInView(view) {
+  const map = {};
+  const walk = (node) => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== "object") return;
+    if (typeof node.entity === "string" && typeof node.icon === "string" && !node.icon.includes("{") && !map[node.entity])
+      map[node.entity] = node.icon;
+    Object.values(node).forEach(walk);
+  };
+  walk(view);
+  return map;
+}
+
+/* "/lovelace/living-room" → that view's config (null when it cannot be read). */
+async function loadView(hass, path) {
+  const [dash, view] = String(path || "").split("?")[0].split("/").filter(Boolean);
+  if (!dash) return null;
+  try {
+    const cfg = await hass.callWS({ type: "lovelace/config", url_path: dash === "lovelace" ? null : dash });
+    const views = cfg?.views || [];
+    return views.find((v) => v.path === view) || (/^\d+$/.test(view || "0") ? views[Number(view || 0)] : null) || null;
+  } catch (e) {
+    return null;
+  }
 }
 
 /* ------------------------------------------------------------------------ */
@@ -106,6 +160,8 @@ const SHEET_CSS = `
   .glyph ha-icon { --mdc-icon-size: 24px; }
   .title { font-size: 20px; line-height: 26px; font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .list, .buttons { margin-top: 20px; display: grid; gap: 8px; }
+  /* The actions are set apart from the lamp list by a divider and extra space. */
+  .buttons { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
   button { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; height: 56px;
     padding: 0 12px 0 10px; border-radius: 28px; cursor: pointer; font-size: 16px; line-height: 24px; font-weight: 600;
     letter-spacing: .1px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color);
@@ -203,7 +259,7 @@ class RoomLampsSheet {
     }
     root.querySelector(".dialog").setAttribute("aria-label", m.name);
 
-    const items = lamps(hass, this._room);
+    const items = lamps(hass, this._room, this._card._viewIcons?.[this._room.navigation_path]?.map || {});
     const box = root.querySelector(".list");
     const keys = items.map((l) => l.id).join();
     if (box.dataset.keys !== keys) {
@@ -270,8 +326,16 @@ const CSS = `
   .badge ha-icon { --mdc-icon-size: 11px; color: #fff; }
   .badge.on { display: flex; }
   .txt { flex: 1; min-width: 0; }
-  .room .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+  .room .nm { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Presence sits on the name's own line, so it always lines up with the room title. */
+  .top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .pres { flex: 0 0 auto; display: none; align-items: center; gap: 2px; height: 20px; font-size: 12px; line-height: 20px;
+    font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .pres.show { display: inline-flex; }
+  .pres ha-icon { --mdc-icon-size: 16px; }
+  .pres.here { color: ${C.teal}; }
+  .pres.warn { color: var(--warning-color, #ffa600); }
   .m { display: flex; column-gap: 9px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; }
   .g { display: flex; column-gap: 9px; min-width: 0; }
@@ -317,12 +381,14 @@ class RoomLightsCard extends HTMLElement {
     if (!config) throw new Error("Missing configuration");
     if (config.rooms !== undefined && !Array.isArray(config.rooms)) throw new Error("rooms must be a list");
     this._config = { ...config, rooms: (config.rooms || []).filter((r) => r && r.entity) };
+    this._presenceSig = undefined;
     this._built = false;
     if (this._hass) this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
+    if (this._config) this._trackPresence();
     this._render();
     this._sheet?.update(hass);
   }
@@ -338,6 +404,7 @@ class RoomLightsCard extends HTMLElement {
   disconnectedCallback() {
     this._sheet?.close();
     this._ro?.disconnect();
+    clearInterval(this._tick);
   }
 
   _build() {
@@ -353,7 +420,8 @@ class RoomLightsCard extends HTMLElement {
           .map(
             (r, i) => `<div class="room" role="button" tabindex="0" data-i="${i}"><div class="tile">
               <div class="shape"><ha-icon></ha-icon><span class="badge"><ha-icon icon="mdi:window-open-variant"></ha-icon></span></div>
-              <div class="txt"><div class="nm"></div><div class="m"><span class="g"></span><span class="g"></span></div></div>
+              <div class="txt"><div class="top"><div class="nm"></div><span class="pres"></span></div>
+                <div class="m"><span class="g"></span><span class="g"></span></div></div>
             </div></div>`,
           )
           .join("")}
@@ -448,6 +516,18 @@ class RoomLightsCard extends HTMLElement {
       icon.style.color = color;
       el.querySelector(".badge").classList.toggle("on", m.window);
       set(el.querySelector(".nm"), m.name);
+      const pr = presenceModel(hass, room, this._lastSeen?.[room.occupancy], this._warnMin(), m.on);
+      const pel = el.querySelector(".pres");
+      const phtml = !pr || pr.kind === "unknown" ? ""
+        : pr.kind === "here" ? `<ha-icon icon="mdi:account"></ha-icon>`
+        : `${pr.kind === "warn" ? `<ha-icon icon="mdi:account-off-outline"></ha-icon>` : ""}${esc(pr.text)}`;
+      if (pel.dataset.h !== phtml) {
+        pel.innerHTML = phtml;
+        pel.dataset.h = phtml;
+      }
+      pel.className = `pres${phtml ? " show" : ""}${pr ? ` ${pr.kind}` : ""}`;
+      pel.title = !pr ? "" : pr.kind === "here" ? "Someone is here"
+        : pr.kind === "warn" ? `Lights on, nobody here for ${pr.text}` : pr.text ? `Last seen ${pr.text} ago` : "";
       el.setAttribute("aria-label", `${m.name}: ${m.missing ? "not found" : m.on ? "on" : "off"}`);
       const [g1, g2] = el.querySelectorAll(".g");
       const html1 = m.temp ? this._v("t", "mdi:thermometer", m.temp) : "";
@@ -482,6 +562,9 @@ class RoomLightsCard extends HTMLElement {
   }
 
   connectedCallback() {
+    // Keeps the "12m" counters moving.
+    clearInterval(this._tick);
+    if (this._config?.rooms?.some((r) => r.occupancy)) this._tick = setInterval(() => this._hass && this._render(), 60000);
     if (typeof ResizeObserver === "undefined") return;
     // Only width matters; the height changes this causes must not trigger another pass.
     this._ro =
@@ -496,6 +579,69 @@ class RoomLightsCard extends HTMLElement {
     if (card) this._ro.observe(card);
   }
 
+  _warnMin() {
+    const n = Number(this._config.empty_warning);
+    return isFinite(n) && n > 0 ? n : 10;
+  }
+
+  /*
+   * When did each room last have someone in it? A live switch to "off" gives it directly; after a
+   * restart the sensor's last change is the restart, so the answer comes from the history instead
+   * (the end of the last "on" period in the past few days).
+   */
+  _trackPresence() {
+    const ids = [...new Set(this._config.rooms.map((r) => r.occupancy).filter(Boolean))];
+    if (!ids.length || !this._hass) return;
+    this._lastSeen = this._lastSeen || {};
+    const sig = ids.map((id) => `${id}:${this._hass.states[id]?.state}`).join();
+    if (sig === this._presenceSig) return;
+    const first = this._presenceSig === undefined;
+    const prev = this._presenceStates || {};
+    this._presenceSig = sig;
+    this._presenceStates = Object.fromEntries(ids.map((id) => [id, this._hass.states[id]?.state]));
+    if (!first) {
+      // Someone just left a room: that moment is the "last seen".
+      for (const id of ids) {
+        if (prev[id] === "on" && this._presenceStates[id] === "off") this._lastSeen[id] = Date.parse(this._hass.states[id].last_changed);
+      }
+      return;
+    }
+    this._loadHistory(ids);
+  }
+
+  async _loadHistory(ids) {
+    const hass = this._hass;
+    if (!hass?.callWS) return;
+    const start = new Date(Date.now() - HISTORY_DAYS * 86400000).toISOString();
+    try {
+      const h = await hass.callWS({
+        type: "history/history_during_period",
+        start_time: start,
+        entity_ids: ids,
+        minimal_response: true,
+        no_attributes: true,
+        significant_changes_only: false,
+      });
+      for (const id of ids) {
+        const rows = h?.[id] || [];
+        const t = (r) => (r.lu ?? r.lc ?? 0) * 1000 || Date.parse(r.last_changed || r.last_updated || 0);
+        let last = -1;
+        rows.forEach((r, i) => {
+          if ((r.s ?? r.state) === "on") last = i;
+        });
+        if (last >= 0 && last < rows.length - 1) this._lastSeen[id] = t(rows[last + 1]);
+        else if (last < 0) this._lastSeen[id] = Date.now() - HISTORY_DAYS * 86400000 - 1;
+      }
+    } catch (e) {
+      // History not available: fall back to the sensor's own last change.
+      for (const id of ids) {
+        const s = hass.states[id];
+        if (s && s.state === "off") this._lastSeen[id] = Date.parse(s.last_changed);
+      }
+    }
+    this._render();
+  }
+
   _v(cls, icon, text) {
     return `<span class="v ${cls}"><ha-icon icon="${icon}"></ha-icon>${esc(text)}</span>`;
   }
@@ -504,6 +650,19 @@ class RoomLightsCard extends HTMLElement {
     this._sheet?.close();
     this._sheet = new RoomLampsSheet();
     this._sheet.open(this, room);
+    this._mirrorIcons(room);
+  }
+
+  /* Read the lamp icons from the room's own view (cached for 5 minutes), then redraw. */
+  async _mirrorIcons(room) {
+    const path = room.navigation_path;
+    if (!path || !this._hass) return;
+    this._viewIcons = this._viewIcons || {};
+    const cached = this._viewIcons[path];
+    if (cached && Date.now() - cached.at < 300000) return;
+    const view = await loadView(this._hass, path);
+    this._viewIcons[path] = { at: Date.now(), map: view ? iconsInView(view) : {} };
+    this._sheet?.update(this._hass);
   }
 
   /* Header: anything on → everything off; all off → everything on. No confirmation. */
@@ -555,6 +714,7 @@ const HEADER_SCHEMA = [
     { name: "entity", selector: { entity: { domain: ["group", "light", "switch"] } } },
     { name: "name", selector: { text: {} } },
   ] },
+  { name: "empty_warning", selector: { number: { min: 1, max: 240, step: 1, mode: "box", unit_of_measurement: "min" } } },
 ];
 const ROOM_SCHEMA = [
   { type: "grid", name: "", schema: [
@@ -566,6 +726,7 @@ const ROOM_SCHEMA = [
   { name: "temperature", selector: { entity: { domain: "sensor", multiple: true } } },
   { name: "humidity", selector: { entity: { domain: "sensor", multiple: true } } },
   { name: "illuminance", selector: { entity: { domain: "sensor", multiple: true } } },
+  { name: "occupancy", selector: { entity: { domain: "binary_sensor" } } },
   { name: "window", selector: { entity: { domain: "binary_sensor" } } },
   { name: "lamps", selector: { entity: { domain: ["light", "switch"], multiple: true } } },
 ];
@@ -578,11 +739,14 @@ const EDITOR_LABELS = {
   humidity: "Humidity sensors",
   illuminance: "Light level sensors",
   window: "Window sensor (red badge when open)",
+  occupancy: "Occupancy sensor",
+  empty_warning: "Flag lights left on in an empty room after (minutes)",
   lamps: "Lamps for the long-press list (optional)",
 };
 const EDITOR_HELPERS = {
   temperature: "Add more than one to show them all, in order (e.g. 21.1/21.8°).",
   lamps: "Leave empty to use the members of the room's group.",
+  occupancy: "Teal person while someone is here, otherwise how long since they were.",
 };
 
 const EDITOR_CSS = `
@@ -653,7 +817,7 @@ class RoomLightsCardEditor extends HTMLElement {
       <button class="add"><ha-icon icon="mdi:plus"></ha-icon>Add room</button>`;
     this._header = this._form(HEADER_SCHEMA, this._config, (v) => {
       const next = { ...this._config, ...v };
-      for (const k of ["entity", "name"]) if (!next[k]) delete next[k];
+      for (const k of ["entity", "name", "empty_warning"]) if (next[k] === "" || next[k] === undefined || next[k] === null) delete next[k];
       this._commit(next);
     }, { entity: "All lights switch (group)", name: "Header label (default: All lights)" });
     root.querySelector(".header").appendChild(this._header);
