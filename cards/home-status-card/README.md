@@ -15,6 +15,9 @@ remotely.
 
 ## Configuration
 
+Everything below can be set in the visual editor (Add card → Home status
+card); nested options sit in collapsible Presence, TV and Climate sections.
+
 ```yaml
 type: custom:home-status-card
 name: Greece

@@ -8,7 +8,7 @@
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.1.0";
+const HSC_VERSION = "1.2.0";
 const HSC_TAG = "home-status-card";
 
 const C = {
@@ -161,7 +161,7 @@ const DIALOG_CSS = `
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
-  button:active { transform: scale(.98); }
+  button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
@@ -225,7 +225,9 @@ const CSS = `
   .alarm ha-icon { --mdc-icon-size: 16px; color: var(--grey-color, #9e9e9e); }
   .alarm.on { background: color-mix(in srgb, var(--red-color, #f44336) 20%, transparent); color: var(--red-color, #f44336); }
   .alarm.on ha-icon { color: var(--red-color, #f44336); }
-  .alarm:active, .tile:active { transform: scale(.96); }
+  /* Press feedback without moving the button: a scale-down shrinks the target under the finger
+     and taps near the edge would be lost. */
+  .alarm:active, .tile:active, .msg:active, .shape.who:active { filter: brightness(.9); }
   .alarm:focus-visible, .tile:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .tiles { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 6px; }
   .tile { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -241,7 +243,6 @@ const CSS = `
   /* Long ePaper messages wrap in full; nothing is cut off. */
   .msg span { min-width: 0; white-space: pre-line; overflow-wrap: anywhere; }
   .msg span.empty { color: var(--secondary-text-color); }
-  .msg:active { transform: scale(.98); }
   .msg:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   /* Wide cards: status buttons and the ePaper line share one row. */
   @container (min-width: 600px) {
@@ -257,7 +258,61 @@ const CSS = `
 
 class HomeStatusCard extends HTMLElement {
   static getStubConfig() {
-    return { name: "Home", presence: { occupied: "" }, alarm: "", door: "", tv: { entity: "" }, climate: { temperature: "", state: "" } };
+    return { name: "Home" };
+  }
+
+  // Visual editor (Home Assistant builds it from this schema). Nested options get their own
+  // collapsible section; anything left empty is simply not shown on the card.
+  static getConfigForm() {
+    const entity = (domain) => ({ entity: domain ? { domain } : {} });
+    return {
+      schema: [
+        { type: "grid", name: "", schema: [
+          { name: "name", selector: { text: {} } },
+          { name: "icon", selector: { icon: {} } },
+        ] },
+        { type: "expandable", name: "presence", title: "Presence", icon: "mdi:home-account", expanded: true, schema: [
+          { name: "occupied", selector: entity() },
+          { name: "last_room", selector: entity() },
+          { name: "last_seen", selector: entity(["input_datetime", "sensor"]) },
+          { name: "navigation_path", selector: { navigation: {} } },
+        ] },
+        { name: "alarm", selector: entity(["input_boolean", "switch"]) },
+        { name: "door", selector: entity() },
+        { type: "expandable", name: "tv", title: "TV", icon: "mdi:television", schema: [
+          { name: "entity", selector: entity() },
+          { name: "navigation_path", selector: { navigation: {} } },
+        ] },
+        { type: "expandable", name: "climate", title: "Climate", icon: "mdi:air-conditioner", schema: [
+          { name: "temperature", selector: entity("sensor") },
+          { name: "state", selector: entity() },
+          { name: "navigation_path", selector: { navigation: {} } },
+        ] },
+        { name: "message", selector: entity() },
+      ],
+      computeLabel: (s) =>
+        ({
+          name: "Name",
+          icon: "Icon (optional)",
+          occupied: "Occupied rooms (text)",
+          last_room: "Last room (text)",
+          last_seen: "Last seen (date and time)",
+          navigation_path: "Tap goes to",
+          alarm: "Alarm switch",
+          door: "Door sensor",
+          entity: "TV on/off entity",
+          temperature: "Temperature sensor",
+          state: "AC state (text)",
+          message: "ePaper message",
+        })[s.name] ?? s.name,
+      computeHelper: (s) =>
+        ({
+          occupied: "Shown as it is stored. Empty means nobody is home.",
+          state: "Text containing “cool” or “heat” colours the button; “off” shows Off.",
+          alarm: "Arming and disarming always asks for confirmation.",
+          door: "Any state containing “open” turns the button red.",
+        })[s.name],
+    };
   }
 
   setConfig(config) {
@@ -327,8 +382,11 @@ class HomeStatusCard extends HTMLElement {
     e.icon.setAttribute("icon", this._config.icon || m.presence.icon);
     e.icon.style.color = m.presence.color;
     e.shape.style.backgroundColor = tint(m.presence.color, 20);
-    e.name.innerHTML = `${esc(this._config.name || "Home")} <span class="state">· ${esc(m.presence.label)}</span>`;
-    e.detail.textContent = m.presence.detail;
+    // Only touch the DOM when something changed: replacing an element while a finger is on it
+    // swallows the tap, and Home Assistant pushes state updates several times a second.
+    const nameHtml = `${esc(this._config.name || "Home")} <span class="state">· ${esc(m.presence.label)}</span>`;
+    if (e.name.innerHTML !== nameHtml) e.name.innerHTML = nameHtml;
+    if (e.detail.textContent !== m.presence.detail) e.detail.textContent = m.presence.detail;
 
     e.alarm.style.display = m.alarm ? "" : "none";
     if (m.alarm) {
@@ -354,14 +412,16 @@ class HomeStatusCard extends HTMLElement {
       b.querySelector("ha-icon").setAttribute("icon", t.icon);
       b.querySelector("ha-icon").style.color = t.color || "";
       b.style.backgroundColor = t.color ? tint(t.color, 20) : "";
-      b.querySelector("span").textContent = t.label;
+      const span = b.querySelector("span");
+      if (span.textContent !== t.label) span.textContent = t.label;
       b.title = `${t.title}: ${t.label}`;
     });
     e.tiles.style.display = m.tiles.length ? "" : "none";
 
     // Always shown (it is the way into the ePaper's history); says so when the screen is blank.
     e.msg.style.display = this._config.message ? "" : "none";
-    e.msgTxt.textContent = m.message ? `“${m.message}”` : "ePaper screen is blank";
+    const msgText = m.message ? `“${m.message}”` : "ePaper screen is blank";
+    if (e.msgTxt.textContent !== msgText) e.msgTxt.textContent = msgText;
     e.msgTxt.classList.toggle("empty", !m.message);
   }
 

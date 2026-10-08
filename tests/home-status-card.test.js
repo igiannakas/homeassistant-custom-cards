@@ -42,6 +42,14 @@ const cfg = {
 (async () => {
   await tick();
   assert(window.customElements.get("home-status-card"), "defined after home-assistant");
+  // Visual editor schema: every option the card reads is editable.
+  const Card = window.customElements.get("home-status-card");
+  const form = Card.getConfigForm();
+  const names = JSON.stringify(form.schema);
+  for (const k of ["name", "presence", "occupied", "last_room", "last_seen", "alarm", "door", "tv", "climate", "temperature", "state", "message", "navigation_path"])
+    assert(names.includes(`"name":"${k}"`), `editor field ${k}`);
+  assert.strictEqual(form.computeLabel({ name: "alarm" }), "Alarm switch");
+
   const card = document.createElement("home-status-card");
   document.body.appendChild(card);
   card.setConfig(cfg);
