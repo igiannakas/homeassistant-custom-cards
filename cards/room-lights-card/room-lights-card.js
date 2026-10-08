@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.0";
+const RLC_VERSION = "1.3.1";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -586,7 +586,9 @@ class RoomLightsCard extends HTMLElement {
 
   _warnMin() {
     const n = Number(this._config.empty_warning);
-    return isFinite(n) && n > 0 ? n : 10;
+    // Short by default: automations often switch empty rooms off within minutes, and a few
+    // minutes is still long enough to ride out a presence sensor's brief drop-outs.
+    return isFinite(n) && n >= 0 && this._config.empty_warning !== "" && this._config.empty_warning != null ? n : 2;
   }
 
   /*
@@ -719,7 +721,7 @@ const HEADER_SCHEMA = [
     { name: "entity", selector: { entity: { domain: ["group", "light", "switch"] } } },
     { name: "name", selector: { text: {} } },
   ] },
-  { name: "empty_warning", selector: { number: { min: 1, max: 240, step: 1, mode: "box", unit_of_measurement: "min" } } },
+  { name: "empty_warning", selector: { number: { min: 0, max: 240, step: 1, mode: "box", unit_of_measurement: "min" } } },
 ];
 const ROOM_SCHEMA = [
   { type: "grid", name: "", schema: [
@@ -751,7 +753,8 @@ const EDITOR_LABELS = {
 const EDITOR_HELPERS = {
   temperature: "Add more than one to show them all, in order (e.g. 21.1/21.8°).",
   lamps: "Leave empty to use the members of the room's group.",
-  occupancy: "Teal person while someone is here, otherwise how long since they were.",
+  occupancy: "Teal icon while someone is here, otherwise how long since they were.",
+  empty_warning: "Default 2. Lights on in a room empty this long turn its time amber.",
 };
 
 const EDITOR_CSS = `

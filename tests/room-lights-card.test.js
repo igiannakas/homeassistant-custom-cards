@@ -172,6 +172,16 @@ const cfg = {
   await tick(10);
   assert(!pres(1).classList.contains("warn"), "12 min < 30 min threshold");
   card.setConfig(cfg);
+  // Default threshold is 2 minutes: lit and empty for 3 minutes is already flagged.
+  const h3 = { ...hass({ "light.kitchen": ["on", { friendly_name: "Kitchen" }] }) };
+  card.setConfig(cfg);
+  card._lastSeen["binary_sensor.k_occ"] = Date.now() - 3 * 60e3;
+  card.hass = h3;
+  assert(pres(1).classList.contains("warn"), "3 min empty with lights on → amber");
+  card._lastSeen["binary_sensor.k_occ"] = Date.now() - 60e3;
+  card.hass = h3;
+  assert(!pres(1).classList.contains("warn"), "1 min → not yet");
+  card._lastSeen["binary_sensor.k_occ"] = now - 12 * 60e3;
   // Someone leaves the living room now → "0m".
   card.hass = hass();
   await tick(10);
