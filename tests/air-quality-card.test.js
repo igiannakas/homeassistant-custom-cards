@@ -58,15 +58,15 @@ const cfg = {
   eq(tiles().map((t) => t.querySelector(".nm").textContent), ["Living Room", "Study", "Bedroom", "Second Bedroom"]);
   // Living room: CO₂ 956 and VOC 166 elevated (amber), PM2.5 fine.
   assert.strictEqual(st(0), "Elevated");
-  eq(vals(0), ["*956 ppm", "5.0", "*166"]);
+  eq(vals(0), ["*956 ppm", "*166", "PM12.3", "PM2.55.0", "PM47.1", "PM108.1"]);
   assert.strictEqual(tiles()[0].querySelector(".shape ha-icon").getAttribute("icon"), "mdi:information-outline");
   // Study all good: leaf, Excellent, nothing highlighted.
   assert.strictEqual(st(1), "Excellent");
-  eq(vals(1), ["612 ppm", "1.1", "96"]);
+  eq(vals(1), ["612 ppm", "96", "PM10.5", "PM2.51.1", "PM41.6", "PM101.9"]);
   assert.strictEqual(tiles()[1].querySelector(".shape ha-icon").getAttribute("icon"), "mdi:leaf");
   // Second bedroom: VOC 268 → Poor (orange, alert).
   assert.strictEqual(st(3), "Poor");
-  eq(vals(3), ["702 ppm", "1.0", "*268"]);
+  eq(vals(3), ["702 ppm", "*268", "PM10.5", "PM2.51.0", "PM41.5", "PM101.7"]);
   assert.strictEqual(tiles()[3].querySelector(".shape ha-icon").getAttribute("icon"), "mdi:alert-outline");
   assert.strictEqual(r.querySelector(".sum").textContent, "Poor in Second Bedroom");
   assert(!tiles().some((t) => t.classList.contains("alarm")), "no glow below ventilate");
@@ -81,8 +81,12 @@ const cfg = {
   // Particles alone at the top level → "Poor air" (not ventilate) and the cause (PM10) is added.
   card.hass = hass({ "sensor.bedroom_air_quality_pm10": { state: "60", attributes: {} } });
   assert.strictEqual(st(2), "Poor air");
-  eq(vals(2), ["*841 ppm", "0.4", "124", "*PM10 60.0"]);
+  eq(vals(2), ["*841 ppm", "124", "PM10.2", "PM2.50.4", "PM40.6", "*PM1060.0"]);
   assert.strictEqual(tiles()[2].querySelector(".shape ha-icon").getAttribute("icon"), "mdi:alert-circle-outline");
+
+  // Both kinds at once: each named for what it is.
+  card.hass = hass({ "sensor.living_room_air_quality_co2": { state: "1240", attributes: {} }, "sensor.study_air_quality_pm2_5": { state: "53", attributes: {} } });
+  assert.strictEqual(r.querySelector(".sum").textContent, "Ventilate Living Room · Poor air in Study");
 
   // Only elevated rooms → count.
   card.hass = hass({ "sensor.second_bedroom_air_quality_voc_index": { state: "90", attributes: {} } });
@@ -96,9 +100,14 @@ const cfg = {
   });
   assert.strictEqual(r.querySelector(".sum").textContent, "All excellent");
 
+  // Particles sit on their own line, each labelled with its size class.
+  const pmRow = tiles()[1].querySelector(".row.pm");
+  assert(pmRow);
+  [...pmRow.querySelectorAll(".k")].forEach((k, i) => assert.strictEqual(k.textContent, ["PM1", "PM2.5", "PM4", "PM10"][i]));
+
   // Unavailable sensor shows "–" and does not raise the level; unchanged values are not rewritten.
   card.hass = hass({ "sensor.study_air_quality_co2": { state: "unavailable", attributes: {} } });
-  eq(vals(1), ["– ppm", "1.1", "96"]);
+  eq(vals(1), ["– ppm", "96", "PM10.5", "PM2.51.1", "PM41.6", "PM101.9"]);
   const node = tiles()[1].querySelector(".m").firstChild;
   card.hass = hass({ "sensor.study_air_quality_co2": { state: "unavailable", attributes: {} } });
   assert.strictEqual(tiles()[1].querySelector(".m").firstChild, node);
@@ -118,7 +127,7 @@ const cfg = {
   card.setConfig({ ...cfg, thresholds: { co2: [1000, null, 1500] } });
   card.hass = hass();
   assert.strictEqual(st(0), "Elevated", "VOC 166 still elevated");
-  eq(vals(0), ["956 ppm", "5.0", "*166"], "CO₂ 956 fine with a 1000 threshold");
+  eq(vals(0), ["956 ppm", "*166", "PM12.3", "PM2.55.0", "PM47.1", "PM108.1"], "CO₂ 956 fine with a 1000 threshold");
 
   console.log("ALL AIR-QUALITY TESTS PASSED");
   process.exit(0);

@@ -3,21 +3,22 @@
 `custom:air-quality-card` – every room's air in one card.
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ (leaf) Air quality                     Ventilate Living Room │
-│ ┌──────────────────────────┐ ┌──────────────────────────┐ │
-│ │ (window) Living Room     │ │ (leaf) Study             │ │
-│ │ Ventilate CO2 1240 ppm   │ │ Excellent CO2 612 ppm    │ │
-│ │ PM 5.0  VOC 166          │ │ PM 1.1  VOC 96           │ │
-│ └──────────────────────────┘ └──────────────────────────┘ │
-└──────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│ (!) Air quality                         Ventilate Living Room │
+│ ┌────────────────────────────┐ ┌────────────────────────────┐ │
+│ │ (window) Living Room       │ │ (leaf) Study               │ │
+│ │ Ventilate  CO2 1041 ppm  VOC 173 │ Excellent  CO2 612 ppm  VOC 96 │
+│ │ PM1 3.1 PM2.5 4.7 PM4 6.2 PM10 7.0 │ PM1 0.5 PM2.5 1.1 PM4 1.6 PM10 1.9 │
+│ └────────────────────────────┘ └────────────────────────────┘ │
+└────────────────────────────────────────────────────────────┘
 ```
 
 - **Label row**: the house in a few words – "All excellent", "2 rooms elevated",
   "Poor in Second Bedroom" or "Ventilate Living Room".
 - **Room tile**: status in its colour (Excellent / Elevated / Poor / Ventilate),
-  then CO₂, PM2.5 and VOC – always shown. PM1, PM4, PM10 and NOx appear only
-  while they are the cause. Out-of-range readings take their level's colour.
+  CO₂ and VOC, and on a line of their own every particle size – PM1, PM2.5,
+  PM4 and PM10, each labelled. NOx appears only while it is the cause.
+  Out-of-range readings take their level's colour.
 - Icons and colours: leaf green, info amber, alert orange; at the top level an
   open window in red when CO₂, VOC or NOx are the cause ("Ventilate"), or an
   alert in red for particles ("Poor air").

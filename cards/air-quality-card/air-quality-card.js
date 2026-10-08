@@ -9,7 +9,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.0.0";
+const AQC_VERSION = "1.1.2";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -39,14 +39,15 @@ const TEXT = [
  */
 const POLLUTANTS = {
   co2: { suffix: "co2", t: [800, null, 1000], label: "CO₂", icon: "mdi:molecule-co2", digits: 0, unit: "ppm", always: true, gas: true },
-  pm2_5: { suffix: "pm2_5", t: [12, null, 36], label: "PM2.5", icon: "mdi:grain", digits: 1, always: true },
   voc: { suffix: "voc_index", t: [150, 250, 400], label: "VOC", icon: "mdi:spray", digits: 0, always: true, gas: true },
-  pm1: { suffix: "pm1", t: [12, null, 36], label: "PM1", digits: 1 },
-  pm4: { suffix: "pm4", t: [17, null, 51], label: "PM4", digits: 1 },
-  pm10: { suffix: "pm10", t: [17, null, 51], label: "PM10", digits: 1 },
+  // Particles: always shown, each with its size class as the label, on a line of their own.
+  pm1: { suffix: "pm1", t: [12, null, 36], label: "PM1", digits: 1, always: true, pm: true },
+  pm2_5: { suffix: "pm2_5", t: [12, null, 36], label: "PM2.5", digits: 1, always: true, pm: true },
+  pm4: { suffix: "pm4", t: [17, null, 51], label: "PM4", digits: 1, always: true, pm: true },
+  pm10: { suffix: "pm10", t: [17, null, 51], label: "PM10", digits: 1, always: true, pm: true },
   nox: { suffix: "nox_index", t: [20, 150, 300], label: "NOx", digits: 0, gas: true },
 };
-const ORDER = ["co2", "pm2_5", "voc", "pm1", "pm4", "pm10", "nox"];
+const ORDER = ["co2", "voc", "nox", "pm1", "pm2_5", "pm4", "pm10"];
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -77,7 +78,7 @@ function roomModel(hass, room, thresholds = {}) {
     tier.word = "Ventilate";
     tier.icon = "mdi:window-open-variant";
   }
-  // Always CO₂ / PM2.5 / VOC; any other pollutant only while it is the cause.
+  // Always CO₂, VOC and every PM size; NOx only while it is the cause.
   const shown = readings.filter((r) => r.always || (worst > 0 && r.level === worst));
   return { name: room.name || "Room", worst, tier, readings: shown, missing: !readings.length };
 }
@@ -102,16 +103,24 @@ const CSS = `
   .txt { flex: 1; min-width: 0; }
   .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .m { display: flex; flex-wrap: wrap; column-gap: 7px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
-    color: var(--secondary-text-color); }
+  .m { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .row { display: flex; flex-wrap: wrap; column-gap: 7px; }
+  /* Particle sizes as a tidy 2×2 (PM1 PM2.5 / PM4 PM10); four across when the tile is wide. */
+  .row.pm { display: grid; grid-template-columns: repeat(2, max-content); column-gap: 10px; }
+  @container (min-width: 300px) { .row.pm { grid-template-columns: repeat(4, max-content); } }
+  /* Particle size class as a small label in front of each PM value. */
+  /* Labels and units are the same size as the values, only lighter. */
+  .k { margin-right: 3px; color: color-mix(in srgb, var(--secondary-text-color) 70%, transparent); }
+  .v.hot .k { color: inherit; }
   .st { font-weight: 500; white-space: nowrap; }
   .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
-  .v small { font-size: 10px; }
+  .v small { font-size: inherit; color: color-mix(in srgb, var(--secondary-text-color) 70%, transparent); }
+  .v.hot small { color: inherit; }
   .v.hot { font-weight: 600; }
   .room:active { filter: brightness(.94); }
   .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  @container (max-width: 175px) { .room { padding: 9px 6px; gap: 6px; } .m { column-gap: 5px; font-size: 11.5px; } }
+  @container (max-width: 175px) { .room { padding: 9px 6px; gap: 6px; } .row { column-gap: 5px; } .m { font-size: 11.5px; } }
 `;
 
 class AirQualityCard extends HTMLElement {
@@ -214,16 +223,17 @@ class AirQualityCard extends HTMLElement {
       if (nm.textContent !== m.name) nm.textContent = m.name;
       el.setAttribute("aria-label", `${m.name}: ${m.tier.word}`);
       // Only touch the DOM when something changed, so a tap is never lost mid-update.
-      const html =
-        `<span class="st" style="color:${TEXT[m.worst]}">${m.missing ? "No sensors" : esc(m.tier.word)}</span>` +
-        m.readings
-          .map((r) => {
+      const one = (r) => {
             const v = r.value === null ? "–" : r.value.toFixed(r.digits);
             const hot = r.level > 0;
-            const head = r.icon ? `<ha-icon icon="${r.icon}"${hot ? ` style="color:${TIERS[r.level].color}"` : ""}></ha-icon>` : `${r.label} `;
+            const head = r.icon ? `<ha-icon icon="${r.icon}"${hot ? ` style="color:${TIERS[r.level].color}"` : ""}></ha-icon>` : `<span class="k">${r.label}</span>`;
             return `<span class="v${hot ? " hot" : ""}" title="${esc(r.label)}"${hot ? ` style="color:${TEXT[r.level]}"` : ""}>${head}${v}${r.unit ? `<small> ${r.unit}</small>` : ""}</span>`;
-          })
-          .join("");
+      };
+      const gases = m.readings.filter((r) => !r.pm).map(one).join("");
+      const pms = m.readings.filter((r) => r.pm).map(one).join("");
+      const html =
+        `<div class="row"><span class="st" style="color:${TEXT[m.worst]}">${m.missing ? "No sensors" : esc(m.tier.word)}</span>${gases}</div>` +
+        (pms ? `<div class="row pm">${pms}</div>` : "");
       const mEl = el.querySelector(".m");
       if (mEl.dataset.h !== html) {
         mEl.innerHTML = html;
@@ -235,8 +245,11 @@ class AirQualityCard extends HTMLElement {
     const worst = models.reduce((a, m) => Math.max(a, m.worst), 0);
     let sum = "All excellent";
     if (worst === 3) {
-      const rooms = models.filter((m) => m.worst === 3);
-      sum = `${rooms.some((m) => m.tier.word === "Ventilate") ? "Ventilate" : "Poor air in"} ${rooms.map((m) => m.name).join(", ")}`;
+      // Each problem by name: rooms to air out, and rooms with too many particles.
+      const names = (word) => models.filter((m) => m.worst === 3 && m.tier.word === word).map((m) => m.name).join(", ");
+      sum = [names("Ventilate") && `Ventilate ${names("Ventilate")}`, names("Poor air") && `Poor air in ${names("Poor air")}`]
+        .filter(Boolean)
+        .join(" · ");
     } else if (worst === 2) {
       sum = `Poor in ${models.filter((m) => m.worst === 2).map((m) => m.name).join(", ")}`;
     } else if (worst === 1) {
