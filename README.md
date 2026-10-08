@@ -15,6 +15,7 @@ first in a confirmation dialog.
 | [Energy summary](cards/energy-summary-card/README.md) | Power now, today, yesterday and this month, each with its cost, in one compact row. |
 | [Weather & presence](cards/weather-presence-card/README.md) | Weather with your own outdoor temperature, a presence pill and a link pill – the top of a climate section. |
 | [Climate modes](cards/climate-modes-card/README.md) | Whole-house mode tiles (heating presets, aircon speeds…) with the active one highlighted. |
+| [Air quality](cards/air-quality-card/README.md) | Every room's air in one card: status, CO₂ / PM2.5 / VOC, and a red glow when a room needs ventilating. |
 
 Related: the Tado X room card (`custom:tadox-room-card`) ships with the
 [Tado X Proxy integration](https://github.com/igiannakas/ha-tadox-proxy), because it reads
