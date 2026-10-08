@@ -22,10 +22,10 @@
 - Icon orange when the room's lights are on, grey when off. A red badge shows
   an open window.
 - **Presence** (with `occupancy`), on the same line as the room name: a teal
-  person while someone is there, otherwise how long since someone was (`12m`,
+  motion-sensor icon while someone is there, otherwise how long since someone was (`12m`,
   `6h`, `3d+`). This comes from the sensor's history, so a Home Assistant
   restart does not reset it. If the lights are on and the room has been empty
-  for `empty_warning` minutes (default 10), it turns amber with a person-off
+  for `empty_warning` minutes (default 10), it turns amber with a motion-sensor-off
   icon – lights left on in an empty room.
 - In the long-press list each lamp has the same icon as on the room's own
   dashboard view (`navigation_path`), so the two always match.

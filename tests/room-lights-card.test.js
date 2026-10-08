@@ -158,14 +158,14 @@ const cfg = {
   // history (not the restart); nothing in the history window = "3d+".
   await tick(10);
   const pres = (i) => rooms()[i].querySelector(".top .pres");
-  assert(pres(0).classList.contains("here") && pres(0).querySelector("ha-icon[icon='mdi:account']"));
+  assert(pres(0).classList.contains("here") && pres(0).querySelector("ha-icon[icon='mdi:motion-sensor']"));
   eq(pres(1).textContent, "12m");
   assert(pres(1).classList.contains("empty"), "kitchen lights off → plain");
   eq(pres(2).textContent, "3d+");
   assert(wsCalls.filter((t) => t === "history/history_during_period").length === 1, "history read once");
   // Lights on in a room empty for longer than the threshold → warning.
   card.hass = hass({ "light.kitchen": ["on", { friendly_name: "Kitchen" }] });
-  assert(pres(1).classList.contains("warn") && pres(1).querySelector("ha-icon[icon='mdi:account-off-outline']"));
+  assert(pres(1).classList.contains("warn") && pres(1).querySelector("ha-icon[icon='mdi:motion-sensor-off']"));
   card.setConfig({ ...cfg, empty_warning: 30 });
   card.hass = hass({ "light.kitchen": ["on", { friendly_name: "Kitchen" }] });
   await tick(10);

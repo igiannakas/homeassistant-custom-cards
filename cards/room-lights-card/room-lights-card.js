@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.2.0";
+const RLC_VERSION = "1.2.1";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -61,7 +61,7 @@ function ago(ms) {
 }
 
 /*
- * Who is in the room: occupied → teal person; empty → how long since someone was there.
+ * Who is in the room: occupied → teal motion sensor; empty → how long since someone was there.
  * Lights on in a room that has been empty for a while → amber, so lights left on stand out.
  */
 function presenceModel(hass, room, lastSeen, warnMin, lightsOn) {
@@ -519,8 +519,8 @@ class RoomLightsCard extends HTMLElement {
       const pr = presenceModel(hass, room, this._lastSeen?.[room.occupancy], this._warnMin(), m.on);
       const pel = el.querySelector(".pres");
       const phtml = !pr || pr.kind === "unknown" ? ""
-        : pr.kind === "here" ? `<ha-icon icon="mdi:account"></ha-icon>`
-        : `${pr.kind === "warn" ? `<ha-icon icon="mdi:account-off-outline"></ha-icon>` : ""}${esc(pr.text)}`;
+        : pr.kind === "here" ? `<ha-icon icon="mdi:motion-sensor"></ha-icon>`
+        : `${pr.kind === "warn" ? `<ha-icon icon="mdi:motion-sensor-off"></ha-icon>` : ""}${esc(pr.text)}`;
       if (pel.dataset.h !== phtml) {
         pel.innerHTML = phtml;
         pel.dataset.h = phtml;
