@@ -33,6 +33,7 @@ Most of these generalise to any dashboard.
 | "All lights icon is tappable. Breaking design convention by removing the circle around it" | A filled circle signals a tap target. Keep it on tappable icons even inside a compact header; decorative header icons get none. |
 | "The headers need a bit more padding top/bottom as the switch is too large for the space" / "the words are not aligned to the icons (slightly higher)" | Size the row for its tallest control (40px for a 24px switch) and check vertical alignment by measuring rects, then nudge text 1px for optical centring. |
 | "the non circled icons are not aligned at the same X offset" / "Review again all alignments" / "the dashboard feels a bit cramped" → "keep it consistent with Mushroom cards" | Icons share a left edge, not a centre line. Measure every card's insets; adopt the insets of the stock cards on the same dashboard (Mushroom: 10px) and add air vertically instead. |
+| "the icon needs to be the same size as the mushroom card icon and nudged a bit to the right" | Header icons use Mushroom's 24px glyph in a 36px slot, so glyph and title positions match Mushroom cards exactly. Compare glyph rects (svg), not element boxes. |
 | "it breaks the card height uniformity" | Tiles in a grid are equal height (`grid-auto-rows: 1fr`). Add content by wrapping inside the tile, not by growing one tile. |
 
 ## Interaction

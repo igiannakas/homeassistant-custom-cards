@@ -63,9 +63,12 @@ Everything inherits `var(--ha-font-family-body, Roboto, sans-serif)`.
   tile edges, pills, switches – starts and ends on that edge. Gap between tiles 8px; tile
   padding 11px 10px (8px horizontal when narrow).
 - **Label row:** `min-height: 40px; padding: 0 0 8px; gap: 8px` inside the 10px card padding.
-  The icon's left edge sits on the content edge: an 18px plain icon in the card's colour, or –
-  only when the icon is tappable (All lights) – a filled 36px circle with a 24px icon. (Tried
-  centring plain icons in a 36px slot so titles line up: rejected, icons must share a left edge.) Title 14px / 500
+  The icon is Mushroom-sized: a 36px slot on the content edge (`flex: 0 0 36px`, centred) holding
+  a 24px glyph – plain in the card's colour, or a filled circle only when tappable (All lights).
+  Every glyph on the page then sits at the same x as Mushroom's (content edge + 6px) and every
+  title starts at content edge + 44px. (Tried an 18px icon flush left and an 18px icon centred:
+  both read as misaligned next to Mushroom icons.) Verify by measuring the svg rects, not the
+  host elements. Title 14px / 500
   with `position: relative; top: 1px` (a 20px line box reads ~1px high next to an icon),
   `margin-left: auto` summary. A header switch (All lights, Summer) is 40×24 with a 20px
   knob and lives in the label row, so every card's header looks the same.

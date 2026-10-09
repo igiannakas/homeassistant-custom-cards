@@ -8,7 +8,7 @@
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.4";
+const PTC_VERSION = "1.1.5";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -73,11 +73,12 @@ function fans(hass, cfg) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; }
-  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
-     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
-     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
+     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
+     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
+     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
   .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
-  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; color: ${C.orange}; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; color: ${C.orange}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }

@@ -4,7 +4,7 @@
  * air-quality-card, climate-modes-card, enclosure-filter-card, energy-summary-card, home-status-card, mmu-lanes-card, printer-status-card, printer-temps-card, room-lights-card, weather-presence-card
  */
 
-/* ===== air-quality-card 1.1.7 ===== */
+/* ===== air-quality-card 1.1.8 ===== */
 (() => {
 /*
  * Air quality card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -17,7 +17,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.1.7";
+const AQC_VERSION = "1.1.8";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -94,11 +94,12 @@ function roomModel(hass, room, thresholds = {}) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; }
-  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
-     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
-     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
+     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
+     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
+     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
   .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
-  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
@@ -301,7 +302,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== climate-modes-card 1.1.3 ===== */
+/* ===== climate-modes-card 1.1.4 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -313,7 +314,7 @@ registerAirQualityCard();
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.1.3";
+const CMC_VERSION = "1.1.4";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -345,11 +346,12 @@ function activeIndex(hass, cfg) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; }
-  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
-     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
-     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
+     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
+     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
+     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
   .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
-  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
@@ -549,7 +551,7 @@ async function registerClimateModesCard() {
 registerClimateModesCard();
 })();
 
-/* ===== enclosure-filter-card 1.1.3 ===== */
+/* ===== enclosure-filter-card 1.1.4 ===== */
 (() => {
 /*
  * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -561,7 +563,7 @@ registerClimateModesCard();
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.1.3";
+const EFC_VERSION = "1.1.4";
 const EFC_TAG = "enclosure-filter-card";
 
 const C = {
@@ -595,11 +597,12 @@ function optionLabel(o) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; }
-  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
-     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
-     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
+     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
+     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
+     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
   .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
-  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; color: ${C.teal}; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; color: ${C.teal}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
@@ -1572,7 +1575,7 @@ async function registerHomeStatusCard() {
 registerHomeStatusCard();
 })();
 
-/* ===== mmu-lanes-card 1.1.3 ===== */
+/* ===== mmu-lanes-card 1.1.4 ===== */
 (() => {
 /*
  * MMU lanes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1585,7 +1588,7 @@ registerHomeStatusCard();
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.1.3";
+const MLC_VERSION = "1.1.4";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
@@ -1651,11 +1654,12 @@ function lanes(hass, cfg) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; container-type: inline-size; }
-  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
-     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
-     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
+     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
+     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
+     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
   .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
-  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; color: ${C.teal}; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; color: ${C.teal}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
@@ -2394,7 +2398,7 @@ async function registerPrinterStatusCard() {
 registerPrinterStatusCard();
 })();
 
-/* ===== printer-temps-card 1.1.4 ===== */
+/* ===== printer-temps-card 1.1.5 ===== */
 (() => {
 /*
  * Printer temperatures card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2406,7 +2410,7 @@ registerPrinterStatusCard();
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.4";
+const PTC_VERSION = "1.1.5";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -2471,11 +2475,12 @@ function fans(hass, cfg) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; }
-  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
-     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
-     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
+     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
+     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
+     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
   .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
-  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; color: ${C.orange}; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; color: ${C.orange}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }

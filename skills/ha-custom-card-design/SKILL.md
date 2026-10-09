@@ -64,9 +64,10 @@ exactly rather than "close enough".
 - **Type scale:**
   - Names 14px / 500 / .1px, primary text colour.
   - Secondary text and readings 12px / 400 / .4px, secondary text colour.
-  - Card label row (every card's header, including one that holds a switch): 40px high, icon flush
-    with the content edge (18px plain icon, or a filled 36px circle with a 24px icon when the icon
-    is tappable), title 14px / 500 nudged down 1px for optical centring, status 12px / 500 right
+  - Card label row (every card's header, including one that holds a switch): 40px high. The icon is
+    Mushroom-sized: a 24px glyph centred in a 36px slot on the content edge, so its glyph sits
+    exactly where a Mushroom shape's glyph does (filled circle only when tappable); titles then
+    start at the same x on every card, title 14px / 500 nudged down 1px for optical centring, status 12px / 500 right
     aligned, switch 40×24. Never mix a tile-style header on one card with a label row on the next.
   - Mode and segment labels 12px.
   - One weight family per card. A status word ("Excellent") and the readings beside it
