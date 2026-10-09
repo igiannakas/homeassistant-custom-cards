@@ -29,6 +29,7 @@ Most of these generalise to any dashboard.
 | "The font on off/away/night etc is larger than the fonts on the other elements… especially in mobile" | Mode labels are 12px. Check on a phone, where differences are most visible. |
 | "temp, humidity and lux icons are too bright… drown out the purpose" → tried dark grey → "no revert. The room name gets lost as its too grey" → chose "lit rooms glow + softer colours and quiet grey on the secondary information" | Hierarchy: primary state gets colour and glow, names stay strong, secondary information is quiet. When a fix overshoots, revert and offer options. |
 | "lx suffix is missing" | Every reading carries its unit. |
+| "All lights toggle and heating summer mode toggle are different sizes. Same for the all lights, heating, air quality header text" | One header style for every card (label row: 18px icon, 14px title, 40×24 switch). Compare cards side by side on the dashboard, not one at a time. |
 | "it breaks the card height uniformity" | Tiles in a grid are equal height (`grid-auto-rows: 1fr`). Add content by wrapping inside the tile, not by growing one tile. |
 
 ## Interaction

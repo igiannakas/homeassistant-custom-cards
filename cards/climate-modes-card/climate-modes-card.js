@@ -8,7 +8,7 @@
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.1.0";
+const CMC_VERSION = "1.1.1";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -42,7 +42,8 @@ const CSS = `
   ha-card { padding: 6px; }
   .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
   .label ha-icon { --mdc-icon-size: 18px; }
-  .title { font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
+  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .status { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Switch next to the status; padded so the whole label + switch is an easy tap target. */
@@ -50,11 +51,12 @@ const CSS = `
     cursor: pointer; border-radius: 16px; font-size: 12px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     -webkit-tap-highlight-color: transparent; }
   .status:empty { display: none; }
-  .sw { width: 34px; height: 20px; border-radius: 10px; position: relative; background: var(--disabled-color, #bdbdbd); transition: background-color 160ms; }
-  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff;
+  /* Label-row switch: 40×24, the same on every card. */
+  .sw { flex: none; width: 40px; height: 24px; border-radius: 12px; position: relative; background: var(--disabled-color, #bdbdbd); transition: background-color 160ms; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .switch.on .sw { background: var(--sw-color); }
-  .switch.on .sw::after { transform: translateX(14px); }
+  .switch.on .sw::after { transform: translateX(16px); }
   .modes { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 6px; }
   .mode { all: unset; box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
     padding: 10px 2px 9px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);

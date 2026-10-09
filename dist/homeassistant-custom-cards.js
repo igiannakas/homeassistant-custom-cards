@@ -4,7 +4,7 @@
  * air-quality-card, climate-modes-card, enclosure-filter-card, energy-summary-card, home-status-card, mmu-lanes-card, printer-status-card, printer-temps-card, room-lights-card, weather-presence-card
  */
 
-/* ===== air-quality-card 1.1.4 ===== */
+/* ===== air-quality-card 1.1.5 ===== */
 (() => {
 /*
  * Air quality card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -17,7 +17,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.1.4";
+const AQC_VERSION = "1.1.5";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -96,7 +96,8 @@ const CSS = `
   ha-card { padding: 6px; }
   .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
   .label ha-icon { --mdc-icon-size: 18px; }
-  .title { font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
+  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
@@ -296,7 +297,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== climate-modes-card 1.1.0 ===== */
+/* ===== climate-modes-card 1.1.1 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -308,7 +309,7 @@ registerAirQualityCard();
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.1.0";
+const CMC_VERSION = "1.1.1";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -342,7 +343,8 @@ const CSS = `
   ha-card { padding: 6px; }
   .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
   .label ha-icon { --mdc-icon-size: 18px; }
-  .title { font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
+  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .status { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Switch next to the status; padded so the whole label + switch is an easy tap target. */
@@ -350,11 +352,12 @@ const CSS = `
     cursor: pointer; border-radius: 16px; font-size: 12px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     -webkit-tap-highlight-color: transparent; }
   .status:empty { display: none; }
-  .sw { width: 34px; height: 20px; border-radius: 10px; position: relative; background: var(--disabled-color, #bdbdbd); transition: background-color 160ms; }
-  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff;
+  /* Label-row switch: 40×24, the same on every card. */
+  .sw { flex: none; width: 40px; height: 24px; border-radius: 12px; position: relative; background: var(--disabled-color, #bdbdbd); transition: background-color 160ms; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .switch.on .sw { background: var(--sw-color); }
-  .switch.on .sw::after { transform: translateX(14px); }
+  .switch.on .sw::after { transform: translateX(16px); }
   .modes { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 6px; }
   .mode { all: unset; box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
     padding: 10px 2px 9px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
@@ -538,7 +541,7 @@ async function registerClimateModesCard() {
 registerClimateModesCard();
 })();
 
-/* ===== enclosure-filter-card 1.1.0 ===== */
+/* ===== enclosure-filter-card 1.1.1 ===== */
 (() => {
 /*
  * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -550,7 +553,7 @@ registerClimateModesCard();
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.1.0";
+const EFC_VERSION = "1.1.1";
 const EFC_TAG = "enclosure-filter-card";
 
 const C = {
@@ -586,7 +589,8 @@ const CSS = `
   ha-card { padding: 6px; }
   .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
   .label ha-icon { --mdc-icon-size: 18px; color: ${C.teal}; }
-  .title { font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
+  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; }
   .vent { display: flex; align-items: center; gap: 10px; margin: 0 2px 8px 6px; }
@@ -1554,7 +1558,7 @@ async function registerHomeStatusCard() {
 registerHomeStatusCard();
 })();
 
-/* ===== mmu-lanes-card 1.1.0 ===== */
+/* ===== mmu-lanes-card 1.1.1 ===== */
 (() => {
 /*
  * MMU lanes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1567,7 +1571,7 @@ registerHomeStatusCard();
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.1.0";
+const MLC_VERSION = "1.1.1";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
@@ -1635,7 +1639,8 @@ const CSS = `
   ha-card { padding: 6px; container-type: inline-size; }
   .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
   .label ha-icon { --mdc-icon-size: 18px; color: ${C.teal}; }
-  .title { font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
+  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lanes { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
@@ -2370,7 +2375,7 @@ async function registerPrinterStatusCard() {
 registerPrinterStatusCard();
 })();
 
-/* ===== printer-temps-card 1.1.1 ===== */
+/* ===== printer-temps-card 1.1.2 ===== */
 (() => {
 /*
  * Printer temperatures card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2382,7 +2387,7 @@ registerPrinterStatusCard();
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.1";
+const PTC_VERSION = "1.1.2";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -2449,7 +2454,8 @@ const CSS = `
   ha-card { padding: 6px; }
   .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
   .label ha-icon { --mdc-icon-size: 18px; color: ${C.orange}; }
-  .title { font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
+  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; }
   .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
@@ -2634,7 +2640,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== room-lights-card 1.3.1 ===== */
+/* ===== room-lights-card 1.3.2 ===== */
 (() => {
 /*
  * Room lights card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2647,7 +2653,7 @@ registerPrinterTempsCard();
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.1";
+const RLC_VERSION = "1.3.2";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -2938,8 +2944,12 @@ class RoomLampsSheet {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 6px; }
-  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; padding: 4px 8px 10px 4px;
+  /* The All lights switch is the card's label row – same as the heading of every other card
+     (18px icon, 14px / 500 title, 40×24 switch) – and the whole row is the tap target. */
+  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px;
     cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: 10px; }
+  .all .hi { --mdc-icon-size: 18px; color: ${C.grey}; transition: color 180ms; }
+  .all.on .hi { color: ${C.orange}; }
   .shape { position: relative; flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
     justify-content: center; transition: background-color 180ms; }
   /* Same size as Mushroom / tile card icons: 36 px circle, 24 px icon. */
@@ -2947,12 +2957,12 @@ const CSS = `
   /* Text matches Mushroom / tile cards: names 14px medium, readings 12px regular, same colour. */
   .all .nm { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
+  .all .sw { flex: 0 0 auto; width: 40px; height: 24px; border-radius: 12px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
-  .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  .all .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .all.on .sw { background: ${C.orange}; }
-  .all.on .sw::after { transform: translateX(18px); }
+  .all.on .sw::after { transform: translateX(16px); }
   .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
   .room { position: relative; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
@@ -3053,8 +3063,8 @@ class RoomLightsCard extends HTMLElement {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const rooms = this._config.rooms;
     const header = this._config.entity
-      ? `<button class="all" role="switch"><div class="shape"><ha-icon icon="mdi:home-lightbulb"></ha-icon></div>
-          <div class="nm"></div><div class="sw"></div></button>`
+      ? `<button class="all" role="switch"><ha-icon class="hi" icon="mdi:home-lightbulb"></ha-icon>
+          <span class="nm"></span><span class="sw"></span></button>`
       : "";
     root.innerHTML = `<style>${CSS}</style><ha-card>${header}
       <div class="rooms" style="--cols:${Math.max(1, Math.min(4, Number(this._config.columns) || 2))}">
@@ -3137,12 +3147,8 @@ class RoomLightsCard extends HTMLElement {
     if (this._el.all) {
       const s = hass.states[this._config.entity];
       const on = isOn(s);
-      const color = on ? C.orange : C.grey;
       this._el.all.classList.toggle("on", on);
       this._el.all.setAttribute("aria-checked", String(on));
-      const shape = this._el.all.querySelector(".shape");
-      shape.style.backgroundColor = tint(color, 20);
-      shape.querySelector("ha-icon").style.color = color;
       set(this._el.all.querySelector(".nm"), this._config.name || "All lights");
     }
 

@@ -47,7 +47,7 @@ Tiers used for readings, so the same number gets the same colour everywhere:
 | Item name (room, lane, heater) | 14px / 500 / .1px, line 20px | primary text |
 | Reading, status, secondary line | 12px / 400 / .4px, line 16px | secondary text |
 | Bold value inside a reading line | 14px / 500 | primary text |
-| Label-row title | 13px / 500 / .1px | primary text |
+| Label-row title (every card header) | 14px / 500 / .1px | primary text |
 | Label-row summary (right) | 12px / 500 / .4px | secondary text |
 | Mode tile / segment label | 12px / 500 | primary or secondary |
 | Pill text | 13px / 600 / .2px | state colour or secondary |
@@ -60,7 +60,8 @@ Everything inherits `var(--ha-font-family-body, Roboto, sans-serif)`.
 
 - Card padding: 6–8px. Gap between tiles: 6px.
 - **Label row:** `min-height: 28px; padding: 2px 6px 6px`, 18px icon in the card's
-  colour, title, `margin-left: auto` summary.
+  colour, title, `margin-left: auto` summary. A header switch (All lights, Summer) is 40×24
+  with a 20px knob and lives in the label row, so every card's header looks the same.
 - **Icon shape:** 36×36 circle, 24px icon (`--mdc-icon-size: 24px`).
 - **Tile:** radius 10, padding 8–10, a 36px shape and text block with a 10px gap.
   `grid-auto-rows: 1fr` keeps rows level.

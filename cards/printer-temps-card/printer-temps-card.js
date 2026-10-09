@@ -8,7 +8,7 @@
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.1";
+const PTC_VERSION = "1.1.2";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -75,7 +75,8 @@ const CSS = `
   ha-card { padding: 6px; }
   .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
   .label ha-icon { --mdc-icon-size: 18px; color: ${C.orange}; }
-  .title { font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
+  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; }
   .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }

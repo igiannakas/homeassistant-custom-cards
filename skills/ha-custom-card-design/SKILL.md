@@ -64,8 +64,9 @@ exactly rather than "close enough".
 - **Type scale:**
   - Names 14px / 500 / .1px, primary text colour.
   - Secondary text and readings 12px / 400 / .4px, secondary text colour.
-  - Label-row title 13px / 500.
-  - Label-row summary 12px / 500, right aligned.
+  - Card label row (every card's header, including one that holds a switch): 18px icon, title
+    14px / 500, status 12px / 500 right aligned, switch 40×24. Never mix a tile-style header
+    on one card with a label row on the next.
   - Mode and segment labels 12px.
   - One weight family per card. A status word ("Excellent") and the readings beside it
     are the same size.

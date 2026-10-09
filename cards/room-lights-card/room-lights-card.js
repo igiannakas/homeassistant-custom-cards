@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.1";
+const RLC_VERSION = "1.3.2";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -300,8 +300,12 @@ class RoomLampsSheet {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 6px; }
-  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; padding: 4px 8px 10px 4px;
+  /* The All lights switch is the card's label row – same as the heading of every other card
+     (18px icon, 14px / 500 title, 40×24 switch) – and the whole row is the tap target. */
+  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px;
     cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: 10px; }
+  .all .hi { --mdc-icon-size: 18px; color: ${C.grey}; transition: color 180ms; }
+  .all.on .hi { color: ${C.orange}; }
   .shape { position: relative; flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
     justify-content: center; transition: background-color 180ms; }
   /* Same size as Mushroom / tile card icons: 36 px circle, 24 px icon. */
@@ -309,12 +313,12 @@ const CSS = `
   /* Text matches Mushroom / tile cards: names 14px medium, readings 12px regular, same colour. */
   .all .nm { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
+  .all .sw { flex: 0 0 auto; width: 40px; height: 24px; border-radius: 12px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
-  .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  .all .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .all.on .sw { background: ${C.orange}; }
-  .all.on .sw::after { transform: translateX(18px); }
+  .all.on .sw::after { transform: translateX(16px); }
   .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
   .room { position: relative; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
@@ -415,8 +419,8 @@ class RoomLightsCard extends HTMLElement {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const rooms = this._config.rooms;
     const header = this._config.entity
-      ? `<button class="all" role="switch"><div class="shape"><ha-icon icon="mdi:home-lightbulb"></ha-icon></div>
-          <div class="nm"></div><div class="sw"></div></button>`
+      ? `<button class="all" role="switch"><ha-icon class="hi" icon="mdi:home-lightbulb"></ha-icon>
+          <span class="nm"></span><span class="sw"></span></button>`
       : "";
     root.innerHTML = `<style>${CSS}</style><ha-card>${header}
       <div class="rooms" style="--cols:${Math.max(1, Math.min(4, Number(this._config.columns) || 2))}">
@@ -499,12 +503,8 @@ class RoomLightsCard extends HTMLElement {
     if (this._el.all) {
       const s = hass.states[this._config.entity];
       const on = isOn(s);
-      const color = on ? C.orange : C.grey;
       this._el.all.classList.toggle("on", on);
       this._el.all.setAttribute("aria-checked", String(on));
-      const shape = this._el.all.querySelector(".shape");
-      shape.style.backgroundColor = tint(color, 20);
-      shape.querySelector("ha-icon").style.color = color;
       set(this._el.all.querySelector(".nm"), this._config.name || "All lights");
     }
 
