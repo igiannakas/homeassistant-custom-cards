@@ -21,30 +21,39 @@ Related: the Tado X room card (`custom:tadox-room-card`) ships with the
 [Tado X Proxy integration](https://github.com/igiannakas/ha-tadox-proxy), because it reads
 that integration's thermostat attributes.
 
-## Installing a card
+## Installing (HACS)
 
-1. Copy the card's `.js` file to your Home Assistant `config/www/` folder, for
-   example `config/www/home-status-card.js`.
-2. Add it as a dashboard resource: **Settings → Dashboards → ⋮ → Resources →
-   Add resource**, URL `/local/home-status-card.js?v=1`, type **JavaScript module**.
+All cards come as one file, `dist/homeassistant-custom-cards.js`.
+
+1. **HACS → ⋮ → Custom repositories**: add
+   `https://github.com/igiannakas/homeassistant-custom-cards`, type **Dashboard**.
+2. Open **Home Assistant custom cards** in HACS and **Download**. HACS adds the
+   dashboard resource (`/hacsfiles/homeassistant-custom-cards/homeassistant-custom-cards.js`)
+   for you.
 3. Reload the browser tab (or pull down to refresh in the app).
 
-When you update a card, change the `?v=` part of the resource URL (any new
-value) so browsers and the app fetch the new file instead of a cached one.
+Updates show up in HACS like any other card once new commits are pushed.
+
+Without HACS: copy `dist/homeassistant-custom-cards.js` to `config/www/` and add
+it as a **JavaScript module** resource (`/local/homeassistant-custom-cards.js?v=1`,
+changing `?v=` on every update).
 
 ## Repository layout
 
 ```
-cards/<card-name>/<card-name>.js   the card – the only file Home Assistant needs
+cards/<card-name>/<card-name>.js   the card's source
 cards/<card-name>/README.md        options and behaviour
 tests/<card-name>.test.js          behaviour tests (real card code in jsdom)
+dist/homeassistant-custom-cards.js all cards in one file, for HACS (npm run build)
+hacs.json                          tells HACS which file to install
 ```
 
 ## Development
 
 ```bash
-npm install   # jsdom, for the tests
-npm test      # syntax check of every card, then every test
+npm install     # jsdom, for the tests
+npm run build   # rebuild dist/ after changing a card (commit it too)
+npm test        # syntax check, every card's tests, and a check that dist/ is up to date
 ```
 
 Conventions for new cards:
