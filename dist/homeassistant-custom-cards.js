@@ -1,7 +1,7 @@
 /*
  * Home Assistant custom cards – https://github.com/igiannakas/homeassistant-custom-cards
  * Built from the cards folder by scripts/build.js – edit the cards, not this file.
- * air-quality-card, climate-modes-card, energy-summary-card, home-status-card, room-lights-card, weather-presence-card
+ * air-quality-card, climate-modes-card, enclosure-filter-card, energy-summary-card, home-status-card, mmu-lanes-card, printer-status-card, printer-temps-card, room-lights-card, weather-presence-card
  */
 
 /* ===== air-quality-card 1.1.4 ===== */
@@ -536,6 +536,226 @@ async function registerClimateModesCard() {
 }
 
 registerClimateModesCard();
+})();
+
+/* ===== enclosure-filter-card 1.0.0 ===== */
+(() => {
+/*
+ * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
+ *
+ * A printer enclosure's filter / vent (e.g. a StealthMax): the vent position as a
+ * segmented selector, intake and exhaust side by side (temperature, humidity, VOC),
+ * and any extra readings (delta, calibration values) as a small line.
+ * See cards/enclosure-filter-card/README.md for every option.
+ */
+
+const EFC_VERSION = "1.0.0";
+const EFC_TAG = "enclosure-filter-card";
+
+const C = {
+  grey: "var(--grey-color, #9e9e9e)",
+  teal: "var(--teal-color, #009688)",
+  green: "var(--green-color, #4caf50)",
+  amber: "var(--amber-color, #ffc107)",
+  orange: "var(--orange-color, #ff9800)",
+  red: "var(--red-color, #f44336)",
+};
+// VOC index tiers (Sensirion), same as the air quality card: [colour, readable text colour].
+const VOC = [
+  [C.green, "color-mix(in srgb, var(--green-color, #4caf50) 75%, var(--primary-text-color))"],
+  [C.amber, "color-mix(in srgb, var(--amber-color, #ffc107) 70%, var(--primary-text-color))"],
+  [C.orange, "color-mix(in srgb, var(--orange-color, #ff9800) 80%, var(--primary-text-color))"],
+  [C.red, "color-mix(in srgb, var(--red-color, #f44336) 85%, var(--primary-text-color))"],
+];
+const vocLevel = (v) => (v === null ? 0 : v >= 400 ? 3 : v >= 250 ? 2 : v >= 150 ? 1 : 0);
+const esc = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
+const fmt = (n, d = 0) => (n === null ? "–" : n.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d }));
+
+/* "0" → Closed, "100" → Open, numbers as they are. */
+function optionLabel(o) {
+  if (String(o) === "0") return "Closed";
+  if (String(o) === "100") return "Open";
+  return String(o);
+}
+
+const CSS = `
+  :host { display: block; }
+  ha-card { padding: 6px; }
+  .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
+  .label ha-icon { --mdc-icon-size: 18px; color: ${C.teal}; }
+  .title { font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
+    white-space: nowrap; }
+  .vent { display: flex; align-items: center; gap: 10px; margin: 0 2px 8px 6px; }
+  .vl { font-size: 12px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .seg { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 2px; padding: 3px;
+    border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
+  .opt { all: unset; box-sizing: border-box; min-width: 0; height: 32px; border-radius: 9px; cursor: pointer; text-align: center;
+    font-size: 12px; line-height: 32px; font-weight: 500; letter-spacing: .2px; color: var(--secondary-text-color);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
+  .opt.on { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+  .io { display: flex; align-items: stretch; gap: 6px; }
+  .side { all: unset; box-sizing: border-box; flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; cursor: pointer;
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); display: grid; gap: 1px; -webkit-tap-highlight-color: transparent; }
+  .h { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  .v { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
+    color: var(--secondary-text-color); white-space: nowrap; }
+  .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
+  .arrow { align-self: center; --mdc-icon-size: 20px; color: color-mix(in srgb, var(--secondary-text-color) 45%, transparent); }
+  .extra { padding: 8px 6px 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .extra:empty { display: none; }
+  .opt:active, .side:active { filter: brightness(.94); }
+  .opt:focus-visible, .side:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+`;
+
+class EnclosureFilterCard extends HTMLElement {
+  static getStubConfig() {
+    return { title: "Filter", intake: {}, exhaust: {} };
+  }
+
+  static getConfigForm() {
+    const side = (name, title) => ({
+      type: "expandable", name, title, schema: [
+        { name: "temperature", selector: { entity: { domain: "sensor" } } },
+        { name: "humidity", selector: { entity: { domain: "sensor" } } },
+        { name: "voc", selector: { entity: { domain: "sensor" } } },
+      ],
+    });
+    return {
+      schema: [
+        { name: "title", selector: { text: {} } },
+        { name: "vent", selector: { entity: { domain: ["select", "input_select"] } } },
+        side("intake", "Intake"),
+        side("exhaust", "Exhaust"),
+        { name: "details", selector: { object: {} } },
+      ],
+      computeLabel: (s) =>
+        ({ title: "Title", vent: "Vent position (select)", temperature: "Temperature", humidity: "Humidity", voc: "VOC index", details: "Extra readings (optional)" })[s.name] ?? s.name,
+      computeHelper: (s) => ({ details: "List of {entity, name}, shown as one small line." })[s.name],
+    };
+  }
+
+  setConfig(config) {
+    if (!config) throw new Error("Missing configuration");
+    this._config = { intake: {}, exhaust: {}, ...config };
+    this._built = false;
+    if (this._hass) this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  getCardSize() {
+    return 3;
+  }
+
+  getGridOptions() {
+    return { columns: "full", rows: "auto" };
+  }
+
+  _options() {
+    const s = this._hass.states[this._config.vent];
+    return (s?.attributes?.options || []).filter((o) => isFinite(Number(o)));
+  }
+
+  _build() {
+    const root = this.shadowRoot || this.attachShadow({ mode: "open" });
+    const opts = this._config.vent ? this._options() : [];
+    const side = (k, title) => `<button class="side ${k}"><div class="h">${esc(title)}</div><div class="vals"></div></button>`;
+    root.innerHTML = `<style>${CSS}</style><ha-card>
+      <div class="label"><ha-icon icon="mdi:air-filter"></ha-icon><span class="title">${esc(this._config.title ?? "Filter")}</span><span class="sum"></span></div>
+      ${opts.length ? `<div class="vent"><span class="vl">Vent</span><div class="seg" style="--n:${opts.length}">
+        ${opts.map((o) => `<button class="opt" data-o="${esc(o)}">${esc(optionLabel(o))}</button>`).join("")}</div></div>` : ""}
+      <div class="io">${side("in", this._config.intake_name || "Intake")}<ha-icon class="arrow" icon="mdi:arrow-right-thick"></ha-icon>${side("out", this._config.exhaust_name || "Exhaust")}</div>
+      <div class="extra"></div></ha-card>`;
+    root.querySelectorAll(".opt").forEach((b) => b.addEventListener("click", () => this._select(b.dataset.o)));
+    root.querySelector(".side.in").addEventListener("click", () => this._more(this._config.intake.voc || this._config.intake.temperature));
+    root.querySelector(".side.out").addEventListener("click", () => this._more(this._config.exhaust.voc || this._config.exhaust.temperature));
+    this._built = true;
+  }
+
+  _side(cfg) {
+    const st = (id) => (id ? num(this._hass.states[id]?.state) : undefined);
+    const t = st(cfg.temperature);
+    const h = st(cfg.humidity);
+    const v = st(cfg.voc);
+    const parts = [];
+    if (t !== undefined) parts.push(`<span class="v"><ha-icon icon="mdi:thermometer"></ha-icon>${t === null ? "–" : `${t.toFixed(1)}°`}</span>`);
+    if (h !== undefined) parts.push(`<span class="v"><ha-icon icon="mdi:water-percent"></ha-icon>${h === null ? "–" : `${Math.round(h)}%`}</span>`);
+    if (v !== undefined) {
+      const [c, tc] = VOC[vocLevel(v)];
+      parts.push(`<span class="v" style="color:${tc}"><ha-icon icon="mdi:spray" style="color:${c}"></ha-icon>VOC ${fmt(v)}</span>`);
+    }
+    return { html: parts.join(""), voc: v };
+  }
+
+  _render() {
+    if (!this._config || !this._hass) return;
+    if (!this._built) this._build();
+    const root = this.shadowRoot;
+    // Only touch the DOM when something changed, so a tap is never lost mid-update.
+    const set = (n, v) => {
+      if (n && n.innerHTML !== v) n.innerHTML = v;
+    };
+    const vent = this._hass.states[this._config.vent]?.state;
+    root.querySelectorAll(".opt").forEach((b) => b.classList.toggle("on", b.dataset.o === vent));
+    const a = this._side(this._config.intake);
+    const b = this._side(this._config.exhaust);
+    set(root.querySelector(".side.in .vals"), a.html);
+    set(root.querySelector(".side.out .vals"), b.html);
+    const sum = [
+      vent && !isFinite(Number(vent)) ? `Vent: ${vent}` : "",
+      a.voc != null && b.voc != null ? `VOC ${fmt(a.voc)} → ${fmt(b.voc)}` : "",
+    ].filter(Boolean).join(" · ");
+    const s = root.querySelector(".sum");
+    if (s.textContent !== sum) s.textContent = sum;
+    const extra = (this._config.details || [])
+      .map((d) => (typeof d === "string" ? { entity: d } : d))
+      .filter((d) => this._hass.states[d.entity])
+      .map((d) => {
+        const st = this._hass.states[d.entity];
+        const n = num(st.state);
+        const name = d.name || st.attributes.friendly_name || d.entity;
+        return `${esc(name)} ${n === null ? esc(st.state) : fmt(n, Math.abs(n) < 100 && n % 1 ? 1 : 0)}`;
+      })
+      .join(" · ");
+    set(root.querySelector(".extra"), extra);
+  }
+
+  async _select(option) {
+    const id = this._config.vent;
+    const [domain] = id.split(".");
+    try {
+      await this._hass.callService(domain === "input_select" ? "input_select" : "select", "select_option", { entity_id: id, option });
+    } catch (err) {
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "Could not move the vent" }, bubbles: true, composed: true }));
+    }
+  }
+
+  _more(entityId) {
+    if (entityId) this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true }));
+  }
+}
+
+async function registerEnclosureFilterCard() {
+  await window.customElements.whenDefined("home-assistant");
+  const registry = window.customElements;
+  if (registry.get(EFC_TAG)) return;
+  registry.define(EFC_TAG, EnclosureFilterCard);
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: EFC_TAG,
+    name: "Enclosure filter",
+    description: "Printer enclosure filter / vent: vent position, intake vs exhaust temperature, humidity and VOC.",
+  });
+  console.info(`%c ENCLOSURE-FILTER-CARD %c ${EFC_VERSION} `, "background:#009688;color:#fff", "");
+}
+
+registerEnclosureFilterCard();
 })();
 
 /* ===== energy-summary-card 1.0.1 ===== */
@@ -1305,6 +1525,929 @@ async function registerHomeStatusCard() {
 }
 
 registerHomeStatusCard();
+})();
+
+/* ===== mmu-lanes-card 1.0.0 ===== */
+(() => {
+/*
+ * MMU lanes card – https://github.com/igiannakas/homeassistant-custom-cards
+ *
+ * Every lane of a Happy Hare MMU (e.g. an EMU) at a glance: whether filament is
+ * loaded, the lane's humidity (coloured: dry / OK / humid) and temperature, and a
+ * fan icon while the lane is drying. The label row counts the loaded lanes and
+ * shows the filament buffer (tension / compression). Sensors are found from the
+ * Moonraker prefix; lanes are counted automatically.
+ * See cards/mmu-lanes-card/README.md for every option.
+ */
+
+const MLC_VERSION = "1.0.0";
+const MLC_TAG = "mmu-lanes-card";
+
+const C = {
+  grey: "var(--grey-color, #9e9e9e)",
+  teal: "var(--teal-color, #009688)",
+  green: "var(--green-color, #4caf50)",
+  amber: "var(--amber-color, #ffc107)",
+  orange: "var(--orange-color, #ff9800)",
+};
+const TEXT = {
+  green: "color-mix(in srgb, var(--green-color, #4caf50) 75%, var(--primary-text-color))",
+  amber: "color-mix(in srgb, var(--amber-color, #ffc107) 70%, var(--primary-text-color))",
+  orange: "color-mix(in srgb, var(--orange-color, #ff9800) 80%, var(--primary-text-color))",
+};
+const esc = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
+
+/* Entity names Happy Hare / Moonraker use, per lane n. */
+function ids(cfg, n) {
+  const p = cfg.prefix;
+  const u = cfg.unit ?? 0;
+  return {
+    entry: `binary_sensor.${p}_mmu_entry_${n}`,
+    humidity: `sensor.${p}_unit${u}_env${n}_humidity`,
+    temp: `sensor.${p}_unit${u}_env${n}_temp`,
+    fan: `sensor.${p}_unit${u}_fan${n}`,
+  };
+}
+
+function laneCount(hass, cfg) {
+  if (cfg.lanes) return Number(cfg.lanes);
+  let n = 0;
+  while (n < 32 && (hass.states[ids(cfg, n).entry] || hass.states[ids(cfg, n).humidity])) n++;
+  return n;
+}
+
+function lanes(hass, cfg) {
+  const [dry, humid] = cfg.humidity_thresholds || [40, 50];
+  const names = cfg.names || [];
+  return Array.from({ length: laneCount(hass, cfg) }, (_, n) => {
+    const e = ids(cfg, n);
+    const entry = hass.states[e.entry];
+    const h = num(hass.states[e.humidity]?.state);
+    const t = num(hass.states[e.temp]?.state);
+    const fan = num(hass.states[e.fan]?.state);
+    const tone = h === null ? null : h < dry ? "green" : h < humid ? "amber" : "orange";
+    return {
+      n,
+      name: names[n] || `Lane ${n}`,
+      loaded: entry ? entry.state === "on" : null,
+      h,
+      t,
+      drying: (fan || 0) > 0,
+      fan,
+      tone,
+      more: hass.states[e.humidity] ? e.humidity : entry ? e.entry : null,
+    };
+  });
+}
+
+function buffer(hass, cfg) {
+  const p = cfg.prefix;
+  const u = cfg.unit ?? 0;
+  const ten = hass.states[`binary_sensor.${p}_unit${u}_filament_tension`];
+  const com = hass.states[`binary_sensor.${p}_unit${u}_filament_compression`];
+  if (!ten && !com) return "";
+  if (com?.state === "on") return "compression";
+  if (ten?.state === "on") return "tension";
+  return "neutral";
+}
+
+const CSS = `
+  :host { display: block; }
+  ha-card { padding: 6px; container-type: inline-size; }
+  .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
+  .label ha-icon { --mdc-icon-size: 18px; color: ${C.teal}; }
+  .title { font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
+    color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lanes { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
+  @container (max-width: 300px) { .lanes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .lane { all: unset; box-sizing: border-box; min-width: 0; padding: 8px; border-radius: 10px; cursor: pointer;
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
+  .lt { display: flex; align-items: center; gap: 4px; }
+  .ln { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lane.empty .ln { color: var(--secondary-text-color); }
+  .lt ha-icon { --mdc-icon-size: 18px; color: ${C.teal}; }
+  .lane.empty .lt ha-icon.sp { color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
+  .lt ha-icon.dry { --mdc-icon-size: 16px; color: ${C.orange}; }
+  .lv { display: grid; gap: 1px; margin-top: 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+  .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 6px 2px; font-size: 11px; line-height: 14px; letter-spacing: .4px;
+    color: var(--secondary-text-color); }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .legend em { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .legend ha-icon { --mdc-icon-size: 14px; color: ${C.teal}; }
+  .lane:active { filter: brightness(.94); }
+  .lane:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+`;
+
+class MmuLanesCard extends HTMLElement {
+  static getStubConfig() {
+    return { prefix: "printer" };
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { type: "grid", name: "", schema: [
+          { name: "prefix", required: true, selector: { text: {} } },
+          { name: "title", selector: { text: {} } },
+          { name: "unit", selector: { number: { min: 0, max: 7, mode: "box" } } },
+          { name: "lanes", selector: { number: { min: 1, max: 32, mode: "box" } } },
+        ] },
+        { name: "columns", selector: { number: { min: 1, max: 8, mode: "box" } } },
+        { name: "legend", selector: { boolean: {} } },
+      ],
+      computeLabel: (s) =>
+        ({ prefix: "Moonraker prefix (e.g. voron)", title: "Title", unit: "MMU unit", lanes: "Lanes (default: all found)", columns: "Columns", legend: "Show legend" })[s.name] ?? s.name,
+    };
+  }
+
+  setConfig(config) {
+    if (!config?.prefix) throw new Error("Set the Moonraker prefix (e.g. voron)");
+    this._config = { legend: true, ...config };
+    this._built = false;
+    if (this._hass) this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  getCardSize() {
+    return 4;
+  }
+
+  getGridOptions() {
+    return { columns: "full", rows: "auto" };
+  }
+
+  _build() {
+    const root = this.shadowRoot || this.attachShadow({ mode: "open" });
+    const ls = lanes(this._hass, this._config);
+    const [dry, humid] = this._config.humidity_thresholds || [40, 50];
+    root.innerHTML = `<style>${CSS}</style><ha-card>
+      <div class="label"><ha-icon icon="mdi:tray-full"></ha-icon><span class="title">${esc(this._config.title ?? "MMU lanes")}</span><span class="sum"></span></div>
+      <div class="lanes" style="--cols:${Math.max(1, Math.min(8, Number(this._config.columns) || 4))}">
+        ${ls.map((l) => `<button class="lane" data-n="${l.n}"><div class="lt"><span class="ln">${esc(l.name)}</span>
+          <ha-icon class="dry" icon="mdi:fan" style="display:none"></ha-icon><ha-icon class="sp"></ha-icon></div><div class="lv"></div></button>`).join("")}
+      </div>
+      ${this._config.legend ? `<div class="legend"><span><ha-icon icon="mdi:circle-slice-8"></ha-icon>loaded</span>
+        <span><ha-icon icon="mdi:circle-outline" style="color:${C.grey}"></ha-icon>empty</span>
+        <span><em style="background:${C.green}"></em>&lt;${dry}% dry</span><span><em style="background:${C.amber}"></em>${dry}–${humid}%</span>
+        <span><em style="background:${C.orange}"></em>&gt;${humid}% humid</span></div>` : ""}
+    </ha-card>`;
+    this._lanes = ls;
+    root.querySelectorAll(".lane").forEach((b) =>
+      b.addEventListener("click", () => {
+        const l = this._lanes[Number(b.dataset.n)];
+        if (l?.more) this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: l.more }, bubbles: true, composed: true }));
+      }),
+    );
+    this._built = true;
+  }
+
+  _render() {
+    if (!this._config || !this._hass) return;
+    if (!this._built) this._build();
+    const root = this.shadowRoot;
+    const ls = lanes(this._hass, this._config);
+    this._lanes = ls;
+    ls.forEach((l, i) => {
+      const el = root.querySelectorAll(".lane")[i];
+      if (!el) return;
+      el.classList.toggle("empty", l.loaded === false);
+      const sp = el.querySelector(".sp");
+      const icon = l.loaded === null ? "mdi:help-circle-outline" : l.loaded ? "mdi:circle-slice-8" : "mdi:circle-outline";
+      if (sp.getAttribute("icon") !== icon) sp.setAttribute("icon", icon);
+      el.querySelector(".dry").style.display = l.drying ? "" : "none";
+      el.title = `${l.name}: ${l.loaded ? "loaded" : l.loaded === false ? "empty" : "?"}${l.drying ? `, drying (fan ${Math.round(l.fan)}%)` : ""}`;
+      // Only touch the DOM when something changed, so a tap is never lost mid-update.
+      const hum = l.h === null ? "–" : `${Math.round(l.h)}%`;
+      const html =
+        `<span class="v"${l.tone ? ` style="color:${TEXT[l.tone]}"` : ""}><ha-icon icon="mdi:water-percent"${l.tone ? ` style="color:${C[l.tone]}"` : ""}></ha-icon>${hum}</span>` +
+        `<span class="v"><ha-icon icon="mdi:thermometer"></ha-icon>${l.t === null ? "–" : `${l.t.toFixed(1)}°`}</span>`;
+      const lv = el.querySelector(".lv");
+      if (lv.innerHTML !== html) lv.innerHTML = html;
+    });
+    const loaded = ls.filter((l) => l.loaded).length;
+    const buf = buffer(this._hass, this._config);
+    const sum = [`${loaded} of ${ls.length} loaded`, buf && `Buffer: ${buf}`].filter(Boolean).join(" · ");
+    const s = root.querySelector(".sum");
+    if (s.textContent !== sum) s.textContent = sum;
+  }
+}
+
+async function registerMmuLanesCard() {
+  await window.customElements.whenDefined("home-assistant");
+  const registry = window.customElements;
+  if (registry.get(MLC_TAG)) return;
+  registry.define(MLC_TAG, MmuLanesCard);
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: MLC_TAG,
+    name: "MMU lanes",
+    description: "Happy Hare MMU lanes: filament loaded, humidity and temperature per lane, buffer state.",
+  });
+  console.info(`%c MMU-LANES-CARD %c ${MLC_VERSION} `, "background:#009688;color:#fff", "");
+}
+
+registerMmuLanesCard();
+})();
+
+/* ===== printer-status-card 1.0.0 ===== */
+(() => {
+/*
+ * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
+ *
+ * A Klipper / Moonraker printer at a glance: state and message, a power pill (plug
+ * and live watts), the current job (thumbnail, progress, time left, finish time,
+ * layer, filament, speed) or, when idle, today's energy and lifetime totals, your
+ * camera card, and the buttons that make sense for the state. Cancel and power-off
+ * always ask first. Sensors are found from the Moonraker prefix (e.g. "voron").
+ * See cards/printer-status-card/README.md for every option.
+ */
+
+const PSC_VERSION = "1.0.0";
+const PSC_TAG = "printer-status-card";
+
+const C = {
+  grey: "var(--grey-color, #9e9e9e)",
+  blue: "var(--blue-color, #2196f3)",
+  amber: "var(--amber-color, #ffc107)",
+  green: "var(--green-color, #4caf50)",
+  red: "var(--red-color, #f44336)",
+  orange: "var(--orange-color, #ff9800)",
+};
+const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
+const esc = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
+const fmt = (n, d = 0) => (n === null ? "–" : n.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d }));
+
+/* 1.383 h → "1h 23m" */
+function hm(hours) {
+  if (hours === null) return "–";
+  const m = Math.max(0, Math.round(hours * 60));
+  return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`;
+}
+/* "4825h 49m 38s" → 4826 */
+function hoursFrom(text) {
+  const t = String(text || "");
+  const h = Number((t.match(/(\d+)\s*h/) || [])[1] || 0);
+  const m = Number((t.match(/(\d+)\s*m/) || [])[1] || 0);
+  return t ? Math.round(h + m / 60) : null;
+}
+
+const STATES = {
+  off: { word: "Off", color: C.grey, icon: "mdi:printer-3d-off" },
+  ready: { word: "Ready", color: C.grey, icon: "mdi:printer-3d" },
+  printing: { word: "Printing", color: C.blue, icon: "mdi:printer-3d-nozzle" },
+  paused: { word: "Paused", color: C.amber, icon: "mdi:pause-circle-outline" },
+  complete: { word: "Complete", color: C.green, icon: "mdi:check-circle-outline" },
+  cancelled: { word: "Cancelled", color: C.grey, icon: "mdi:close-circle-outline" },
+  error: { word: "Error", color: C.red, icon: "mdi:alert-circle-outline" },
+  starting: { word: "Starting", color: C.grey, icon: "mdi:printer-3d" },
+};
+
+/* Everything the card shows. */
+function model(hass, cfg) {
+  const p = cfg.prefix || "printer";
+  const st = (id) => (id ? hass.states[id] : undefined);
+  const s = (key) => st(`sensor.${p}_${key}`)?.state;
+  const plug = st(cfg.power_switch);
+  const plugOn = !plug || plug.state === "on";
+  const job = String(s("current_print_state") || "").toLowerCase();
+  const printer = String(s("printer_state") || "").toLowerCase();
+
+  let key = "ready";
+  if (!plugOn) key = "off";
+  else if (["error", "shutdown"].includes(printer) || job === "error") key = "error";
+  else if (["printing", "paused", "complete", "cancelled"].includes(job)) key = job;
+  else if (!printer || printer === "unavailable" || printer === "unknown" || printer === "startup") key = "starting";
+
+  const msg = [s("current_display_message"), s("printer_message")].find((x) => x && !["unknown", "unavailable"].includes(x)) || "";
+  const watts = num(st(cfg.power_sensor)?.state);
+  const eta = st(`sensor.${p}_print_eta`)?.state;
+  const etaDate = eta && !["unknown", "unavailable"].includes(eta) ? new Date(eta) : null;
+  return {
+    key,
+    state: STATES[key],
+    message: !plugOn ? "Power is off" : msg,
+    plug: plug ? { on: plugOn, watts } : null,
+    file: s("filename") && !["unknown", "unavailable"].includes(s("filename")) ? s("filename") : "",
+    progress: num(s("progress")),
+    left: num(s("print_time_left")),
+    eta: etaDate && !isNaN(etaDate) ? etaDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "",
+    layer: num(s("current_layer")),
+    layers: num(s("total_layer")),
+    filament: num(s("filament_used")),
+    speed: num(s("print_speed")),
+    today: num(st(cfg.energy_today)?.state),
+    jobs: num(s("totals_jobs")),
+    hours: hoursFrom(s("totals_print_time")),
+    km: num(s("totals_filament_used")) === null ? null : num(s("totals_filament_used")) / 1000,
+    thumb: st(cfg.thumbnail || `camera.${p}_thumbnail`)?.attributes?.entity_picture || "",
+  };
+}
+
+/* Which buttons fit the state: [key, label, icon, confirm?] */
+function actions(key) {
+  if (key === "printing") return [["pause", "Pause", "mdi:pause"], ["cancel", "Cancel", "mdi:stop", true]];
+  if (key === "paused") return [["resume", "Resume", "mdi:play"], ["cancel", "Cancel", "mdi:stop", true]];
+  if (key === "off" || key === "starting") return [];
+  return [["home", "Home", "mdi:home"], ["poweroff", "Power off", "mdi:power", true]];
+}
+
+/* ------------------------------------------------------------------------ */
+/* Confirmation dialog – same look as the other cards' dialogs              */
+/* ------------------------------------------------------------------------ */
+
+const DIALOG_CSS = `
+  :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
+    font-family: var(--ha-font-family-body, Roboto, sans-serif); }
+  .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px); animation: fade 160ms ease-out; }
+  .dialog { position: relative; box-sizing: border-box; width: min(400px, calc(100vw - 32px)); padding: 25px 18px 18px;
+    border-radius: 32px; color: var(--primary-text-color);
+    background: color-mix(in srgb, var(--card-background-color, #fff) 94%, transparent);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 12px 40px rgba(0,0,0,.25);
+    animation: pop 180ms cubic-bezier(.2,.9,.3,1.2); }
+  .row { display: flex; align-items: center; gap: 6px; padding-left: 8px; }
+  .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+  .glyph ha-icon { --mdc-icon-size: 24px; }
+  .title { font-size: 20px; line-height: 26px; font-weight: 600; }
+  .body { margin-top: 20px; }
+  .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
+  .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; }
+  .buttons { margin-top: 20px; display: grid; gap: 8px; }
+  button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
+    border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
+  button .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
+  button .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
+  button.confirm { color: #fff; }
+  button.confirm .glyph { background: rgba(255,255,255,.2); }
+  button.confirm .glyph ha-icon { color: #fff; }
+  button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+  button:active { filter: brightness(.92); }
+  @keyframes fade { from { opacity: 0; } }
+  @keyframes pop { from { opacity: 0; transform: scale(.94); } }
+`;
+
+function confirmDialog({ title, icon, color, primary, secondary, confirmLabel }) {
+  return new Promise((resolve) => {
+    const host = document.createElement("psc-confirm-dialog");
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>${DIALOG_CSS}</style><div class="backdrop"></div>
+      <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+        <div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(icon)}" style="color:${color}"></ha-icon></div>
+          <div class="title">${esc(title)}</div></div>
+        <div class="row body"><div class="glyph"><ha-icon icon="mdi:printer-3d" style="color:${color}"></ha-icon></div>
+          <div><div class="primary">${esc(primary)}</div><div class="secondary">${esc(secondary)}</div></div></div>
+        <div class="buttons">
+          <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
+          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+        </div></div>`;
+    const done = (ok) => {
+      document.removeEventListener("keydown", onKey, true);
+      host.remove();
+      resolve(ok);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        done(false);
+      }
+    };
+    root.querySelector(".backdrop").addEventListener("click", () => done(false));
+    root.querySelector(".cancel").addEventListener("click", () => done(false));
+    root.querySelector(".confirm").addEventListener("click", () => done(true));
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(host);
+    root.querySelector(".confirm").focus();
+  });
+}
+
+/* ------------------------------------------------------------------------ */
+
+const CSS = `
+  :host { display: block; }
+  ha-card { padding: 8px; container-type: inline-size; }
+  .head { display: flex; align-items: center; gap: 10px; padding: 2px 2px 8px; }
+  .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .shape ha-icon { --mdc-icon-size: 24px; }
+  .txt { flex: 1; min-width: 0; }
+  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nm .st { font-weight: 400; color: var(--secondary-text-color); }
+  .sc { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill { all: unset; box-sizing: border-box; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px;
+    padding: 0 14px 0 10px; border-radius: 18px; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: .2px;
+    white-space: nowrap; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
+    -webkit-tap-highlight-color: transparent; }
+  .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
+  .pill.on { background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
+  .pill.on ha-icon { color: ${C.orange}; }
+  .job { display: flex; gap: 10px; margin: 0 2px 8px; }
+  .thumb { flex: 0 0 64px; height: 64px; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05);
+    display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .thumb img { width: 100%; height: 100%; object-fit: contain; }
+  .thumb ha-icon { --mdc-icon-size: 30px; color: ${C.grey}; }
+  .jt { flex: 1; min-width: 0; }
+  .pct { font-size: 20px; line-height: 26px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; }
+  .pct span { font-size: 12px; font-weight: 400; letter-spacing: .4px; color: var(--secondary-text-color); margin-left: 8px; }
+  .pbar { height: 8px; border-radius: 4px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); margin: 4px 0 6px; overflow: hidden; }
+  .pbar i { display: block; height: 100%; border-radius: 4px; transition: width 400ms; }
+  .camera { margin: 0 0 8px; border-radius: 10px; overflow: hidden; }
+  .camera:empty { display: none; }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 8px; text-align: center; }
+  .stats > div { display: grid; min-width: 0; border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
+  .stats > div:first-child { border-left: none; }
+  .stats b { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--primary-text-color); white-space: nowrap; }
+  .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 6px; }
+  .acts:empty { display: none; }
+  .act { all: unset; box-sizing: border-box; height: 44px; border-radius: 22px; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--primary-text-color);
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
+  .act ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
+  .act.cancel ha-icon, .act.poweroff ha-icon { color: ${C.orange}; }
+  .pill:active, .act:active { filter: brightness(.92); }
+  .pill:focus-visible, .act:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+`;
+
+class PrinterStatusCard extends HTMLElement {
+  static getStubConfig() {
+    return { name: "Printer", prefix: "printer" };
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { type: "grid", name: "", schema: [
+          { name: "name", selector: { text: {} } },
+          { name: "prefix", required: true, selector: { text: {} } },
+        ] },
+        { name: "power_switch", selector: { entity: { domain: ["switch", "input_boolean"] } } },
+        { type: "grid", name: "", schema: [
+          { name: "power_sensor", selector: { entity: { domain: "sensor", device_class: "power" } } },
+          { name: "energy_today", selector: { entity: { domain: "sensor", device_class: "energy" } } },
+        ] },
+        { name: "power_off_script", selector: { entity: { domain: ["script", "button"] } } },
+        { name: "camera_card", selector: { object: {} } },
+      ],
+      computeLabel: (s) =>
+        ({
+          name: "Name",
+          prefix: "Moonraker prefix (e.g. voron)",
+          power_switch: "Power plug",
+          power_sensor: "Power (W)",
+          energy_today: "Energy today (kWh)",
+          power_off_script: "Safe power-off script",
+          camera_card: "Camera card (YAML)",
+        })[s.name] ?? s.name,
+      computeHelper: (s) =>
+        ({
+          prefix: "Finds sensor.<prefix>_current_print_state, _progress, _filename … and button.<prefix>_pause_print etc.",
+          camera_card: "Any card, shown inside this one, e.g. type: custom:frigate-card with your printer camera.",
+        })[s.name],
+    };
+  }
+
+  setConfig(config) {
+    if (!config?.prefix) throw new Error("Set the Moonraker prefix (e.g. voron)");
+    this._config = { ...config };
+    this._built = false;
+    this._cameraEl = null;
+    if (this._hass) this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+    if (this._cameraEl) this._cameraEl.hass = hass;
+  }
+
+  getCardSize() {
+    return 6;
+  }
+
+  getGridOptions() {
+    return { columns: "full", rows: "auto" };
+  }
+
+  _build() {
+    const root = this.shadowRoot || this.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>${CSS}</style><ha-card>
+      <div class="head"><div class="shape"><ha-icon></ha-icon></div>
+        <div class="txt"><div class="nm"></div><div class="sc msg"></div></div>
+        ${this._config.power_switch ? `<button class="pill"><ha-icon icon="mdi:power-plug"></ha-icon><span></span></button>` : ""}</div>
+      <div class="job"><div class="thumb"><ha-icon icon="mdi:cube-outline"></ha-icon></div>
+        <div class="jt"><div class="pct"></div><div class="pbar"><i></i></div><div class="sc l1"></div><div class="sc l2"></div></div></div>
+      <div class="camera"></div>
+      <div class="stats"></div>
+      <div class="acts"></div></ha-card>`;
+    root.querySelector(".pill")?.addEventListener("click", () => this._togglePlug());
+    this._built = true;
+    this._actKeys = null;
+    this._mountCamera();
+  }
+
+  async _mountCamera() {
+    const cfg = this._config.camera_card;
+    if (!cfg) return;
+    try {
+      const helpers = await window.loadCardHelpers?.();
+      if (!helpers) return;
+      const el = helpers.createCardElement(cfg);
+      el.hass = this._hass;
+      this._cameraEl = el;
+      this.shadowRoot.querySelector(".camera").replaceChildren(el);
+    } catch (e) {
+      /* camera card not available – the rest of the card works without it */
+    }
+  }
+
+  _render() {
+    if (!this._config || !this._hass) return;
+    if (!this._built) this._build();
+    const root = this.shadowRoot;
+    const m = model(this._hass, this._config);
+    this._m = m;
+    const set = (sel, v, html = false) => {
+      const n = root.querySelector(sel);
+      if (!n) return;
+      if (html ? n.innerHTML !== v : n.textContent !== v) html ? (n.innerHTML = v) : (n.textContent = v);
+    };
+
+    const shape = root.querySelector(".shape");
+    shape.style.background = tint(m.state.color, 20);
+    const ic = shape.querySelector("ha-icon");
+    if (ic.getAttribute("icon") !== m.state.icon) ic.setAttribute("icon", m.state.icon);
+    ic.style.color = m.state.color;
+    set(".nm", `${esc(this._config.name || "Printer")} <span class="st">· ${esc(m.state.word)}</span>`, true);
+    const active = ["printing", "paused", "complete", "cancelled"].includes(m.key) && m.file;
+    set(".msg", active ? m.file : m.message);
+
+    const pill = root.querySelector(".pill");
+    if (pill && m.plug) {
+      pill.classList.toggle("on", m.plug.on);
+      set(".pill span", m.plug.on ? `On${m.plug.watts === null ? "" : ` · ${fmt(m.plug.watts)} W`}` : "Off");
+      pill.setAttribute("aria-pressed", String(m.plug.on));
+    }
+
+    // Current job (printing, paused, or the last one that finished).
+    const job = root.querySelector(".job");
+    job.style.display = active ? "" : "none";
+    if (active) {
+      const pct = m.progress === null ? 0 : Math.max(0, Math.min(100, m.progress));
+      const when = m.key === "complete" ? "Done" : m.key === "cancelled" ? "Cancelled" : `${hm(m.left)} left${m.eta ? ` · done ${m.eta}` : ""}`;
+      set(".pct", `${fmt(pct)}%<span>${esc(when)}</span>`, true);
+      const bar = root.querySelector(".pbar i");
+      bar.style.width = `${pct}%`;
+      bar.style.background = m.state.color;
+      set(".l1", [m.layers ? `Layer ${fmt(m.layer)} / ${fmt(m.layers)}` : "", m.filament !== null ? `${fmt(m.filament, 1)} m filament` : ""].filter(Boolean).join(" · "));
+      set(".l2", m.key === "printing" && m.speed !== null ? `${fmt(m.speed)} mm/s` : "");
+      const thumb = root.querySelector(".thumb");
+      if (m.thumb && thumb.dataset.src !== m.thumb) {
+        thumb.dataset.src = m.thumb;
+        thumb.innerHTML = `<img alt="" src="${esc(m.thumb)}">`;
+        thumb.querySelector("img").addEventListener("error", () => (thumb.innerHTML = `<ha-icon icon="mdi:cube-outline"></ha-icon>`));
+      }
+    }
+
+    // Idle: today's energy and lifetime totals.
+    const stats = root.querySelector(".stats");
+    stats.style.display = active ? "none" : "";
+    if (!active) {
+      const cells = [];
+      if (this._config.energy_today) cells.push([`${fmt(m.today, 2)} kWh`, "today"]);
+      cells.push([fmt(m.jobs), "prints"], [m.hours === null ? "–" : `${fmt(m.hours)} h`, "printed"], [m.km === null ? "–" : `${fmt(m.km, 1)} km`, "filament"]);
+      stats.style.gridTemplateColumns = `repeat(${cells.length}, minmax(0, 1fr))`;
+      set(".stats", cells.map(([b, s]) => `<div><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join(""), true);
+    }
+
+    // Buttons for this state (rebuilt only when the set changes, so taps are never lost).
+    const acts = actions(m.key).filter(([k]) => k !== "poweroff" || this._config.power_off_script);
+    const keys = acts.map((a) => a[0]).join();
+    if (keys !== this._actKeys) {
+      const box = root.querySelector(".acts");
+      box.style.setProperty("--n", String(acts.length || 1));
+      box.innerHTML = acts.map(([k, label, icon]) => `<button class="act ${k}" data-k="${k}"><ha-icon icon="${icon}"></ha-icon>${esc(label)}</button>`).join("");
+      box.querySelectorAll(".act").forEach((b) => b.addEventListener("click", () => this._action(b.dataset.k)));
+      this._actKeys = keys;
+    }
+  }
+
+  async _action(k) {
+    const p = this._config.prefix;
+    const name = this._config.name || "Printer";
+    const press = (id) => this._call("button", "press", { entity_id: id });
+    if (k === "pause") return press(`button.${p}_pause_print`);
+    if (k === "resume") return press(`button.${p}_resume_print`);
+    if (k === "home") return press(`button.${p}_home_all_axes`);
+    if (k === "cancel") {
+      const ok = await confirmDialog({
+        title: "Cancel print", icon: "mdi:stop", color: C.orange, primary: this._m.file || name,
+        secondary: `The print stops and cannot be resumed.`, confirmLabel: "Cancel print",
+      });
+      if (ok) press(`button.${p}_cancel_print`);
+    }
+    if (k === "poweroff") {
+      const ok = await confirmDialog({
+        title: "Power off", icon: "mdi:power", color: C.orange, primary: name,
+        secondary: `${name} shuts down safely, then its plug turns off.`, confirmLabel: "Power off",
+      });
+      if (ok) {
+        const [domain] = this._config.power_off_script.split(".");
+        domain === "button" ? press(this._config.power_off_script) : this._call("script", "turn_on", { entity_id: this._config.power_off_script });
+      }
+    }
+  }
+
+  /* Plug: on straight away; off asks first (and warns while printing). */
+  async _togglePlug() {
+    const id = this._config.power_switch;
+    const on = this._m?.plug?.on;
+    const [domain] = id.split(".");
+    if (!on) return this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_on", { entity_id: id });
+    const name = this._config.name || "Printer";
+    const busy = ["printing", "paused"].includes(this._m.key);
+    const ok = await confirmDialog({
+      title: "Cut power", icon: "mdi:power-plug-off", color: busy ? C.red : C.orange, primary: name,
+      secondary: busy
+        ? `${name} is printing. Cutting power now ends the print.`
+        : `The plug switches off at once, without a shutdown.${this._config.power_off_script ? " Use Power off for a safe shutdown." : ""}`,
+      confirmLabel: "Turn plug off",
+    });
+    if (ok) this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_off", { entity_id: id });
+  }
+
+  async _call(domain, service, data) {
+    try {
+      await this._hass.callService(domain, service, data);
+    } catch (err) {
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "That did not work" }, bubbles: true, composed: true }));
+    }
+  }
+}
+
+async function registerPrinterStatusCard() {
+  await window.customElements.whenDefined("home-assistant");
+  const registry = window.customElements;
+  if (registry.get(PSC_TAG)) return;
+  registry.define(PSC_TAG, PrinterStatusCard);
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: PSC_TAG,
+    name: "Printer status",
+    description: "Klipper / Moonraker printer: state, power, current job or totals, camera and controls.",
+  });
+  console.info(`%c PRINTER-STATUS-CARD %c ${PSC_VERSION} `, "background:#2196f3;color:#fff", "");
+}
+
+registerPrinterStatusCard();
+})();
+
+/* ===== printer-temps-card 1.0.0 ===== */
+(() => {
+/*
+ * Printer temperatures card – https://github.com/igiannakas/homeassistant-custom-cards
+ *
+ * Heaters (temperature, target, heater power – the tile glows while heating), other
+ * temperature readings, and the fans, for a Klipper / Moonraker printer. Sensors
+ * are found from the Moonraker prefix; every list can be overridden.
+ * See cards/printer-temps-card/README.md for every option.
+ */
+
+const PTC_VERSION = "1.0.0";
+const PTC_TAG = "printer-temps-card";
+
+const C = {
+  grey: "var(--grey-color, #9e9e9e)",
+  orange: "var(--orange-color, #ff9800)",
+  teal: "var(--teal-color, #009688)",
+};
+const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
+const esc = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
+
+/* Moonraker names: sensor.<p>_<heater>_temperature, number.<p>_<heater>_target, sensor.<p>_<heater>_power. */
+const DEFAULT_HEATERS = [
+  { name: "Nozzle", heater: "extruder", icon: "mdi:printer-3d-nozzle-heat" },
+  { name: "Bed", heater: "bed", icon: "mdi:radiator" },
+  { name: "Chamber", heater: "heater_chamber", icon: "mdi:heat-wave" },
+];
+const DEFAULT_READINGS = [
+  { name: "Build plate", sensor: "buildplate_temp", icon: "mdi:layers-outline" },
+  { name: "Stepper body", sensor: "stepper_body_temp", icon: "mdi:engine-outline" },
+  { name: "Toolhead board", sensor: "toolhead_board_temp", icon: "mdi:chip" },
+];
+const DEFAULT_FANS = [
+  { name: "Part", entity: "number.{p}_fan_speed", icon: "mdi:fan" },
+  { name: "Hotend", entity: "sensor.{p}_hotend_fan", icon: "mdi:fan" },
+  { name: "Exhaust", entity: "sensor.{p}_exhaust_fan", icon: "mdi:fan-chevron-up" },
+];
+
+function heaters(hass, cfg) {
+  const p = cfg.prefix;
+  return (cfg.heaters || DEFAULT_HEATERS).map((h) => {
+    const temp = h.temperature || `sensor.${p}_${h.heater}_temperature`;
+    const target = h.target || `number.${p}_${h.heater}_target`;
+    const power = h.power || `sensor.${p}_${h.heater}_power`;
+    const t = num(hass.states[temp]?.state);
+    const tg = num(hass.states[target]?.state);
+    const pw = num(hass.states[power]?.state);
+    const on = tg !== null && tg > 0;
+    return { kind: "heater", name: h.name, icon: h.icon || "mdi:thermometer", entity: temp, t, tg, pw, on, missing: !hass.states[temp] };
+  });
+}
+
+function readings(hass, cfg) {
+  return (cfg.readings || DEFAULT_READINGS)
+    .map((r) => {
+      const id = r.entity || `sensor.${cfg.prefix}_${r.sensor}`;
+      return { kind: "reading", name: r.name, icon: r.icon || "mdi:thermometer", entity: id, t: num(hass.states[id]?.state), missing: !hass.states[id] };
+    })
+    .filter((r) => !r.missing);
+}
+
+function fans(hass, cfg) {
+  return (cfg.fans || DEFAULT_FANS)
+    .map((f) => {
+      const id = String(f.entity).replace("{p}", cfg.prefix);
+      return { name: f.name, icon: f.icon || "mdi:fan", entity: id, v: num(hass.states[id]?.state), missing: !hass.states[id] };
+    })
+    .filter((f) => !f.missing);
+}
+
+const CSS = `
+  :host { display: block; }
+  ha-card { padding: 6px; }
+  .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
+  .label ha-icon { --mdc-icon-size: 18px; color: ${C.orange}; }
+  .title { font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
+    white-space: nowrap; }
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
+  .tile { all: unset; box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px;
+    padding: 8px 10px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
+    -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
+  /* A heater that is on glows, like a lit room on the lights card. */
+  .tile.on { background: ${tint(C.orange, 10)}; }
+  .hh { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: ${tint(C.grey, 20)}; }
+  .shape ha-icon { --mdc-icon-size: 24px; color: ${C.grey}; }
+  .tile.on .shape { background: ${tint(C.orange, 20)}; }
+  .tile.on .shape ha-icon { color: ${C.orange}; }
+  .txt { flex: 1; min-width: 0; }
+  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .val { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; }
+  .val b { font-size: 14px; font-weight: 500; color: var(--primary-text-color); margin-right: 4px; }
+  .bar { height: 4px; border-radius: 2px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: ${C.orange}; border-radius: 2px; transition: width 400ms; }
+  .fans { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 6px 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
+    color: var(--secondary-text-color); }
+  .fan { all: unset; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
+  .fan ha-icon { --mdc-icon-size: 16px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
+  .fan.on ha-icon { color: ${C.teal}; }
+  .tile:active, .fan:active { filter: brightness(.94); }
+  .tile:focus-visible, .fan:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+`;
+
+const deg = (v, d = 1) => (v === null ? "–" : `${v.toFixed(d)}°`);
+
+class PrinterTempsCard extends HTMLElement {
+  static getStubConfig() {
+    return { prefix: "printer" };
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { type: "grid", name: "", schema: [
+          { name: "prefix", required: true, selector: { text: {} } },
+          { name: "title", selector: { text: {} } },
+        ] },
+        { name: "heaters", selector: { object: {} } },
+        { name: "readings", selector: { object: {} } },
+        { name: "fans", selector: { object: {} } },
+      ],
+      computeLabel: (s) =>
+        ({ prefix: "Moonraker prefix (e.g. voron)", title: "Title", heaters: "Heaters (optional)", readings: "Other temperatures (optional)", fans: "Fans (optional)" })[s.name] ?? s.name,
+      computeHelper: (s) =>
+        ({
+          heaters: "Default: Nozzle (extruder), Bed (bed), Chamber (heater_chamber). List of {name, heater, icon} or {name, temperature, target, power}.",
+          readings: "Default: Build plate, Stepper body, Toolhead board. List of {name, sensor} or {name, entity}.",
+          fans: "Default: Part, Hotend, Exhaust. List of {name, entity}.",
+        })[s.name],
+    };
+  }
+
+  setConfig(config) {
+    if (!config?.prefix) throw new Error("Set the Moonraker prefix (e.g. voron)");
+    this._config = { ...config };
+    this._built = false;
+    if (this._hass) this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  getCardSize() {
+    return 5;
+  }
+
+  getGridOptions() {
+    return { columns: "full", rows: "auto" };
+  }
+
+  _build() {
+    const root = this.shadowRoot || this.attachShadow({ mode: "open" });
+    const items = [...heaters(this._hass, this._config).filter((h) => !h.missing), ...readings(this._hass, this._config)];
+    const fl = fans(this._hass, this._config);
+    root.innerHTML = `<style>${CSS}</style><ha-card>
+      <div class="label"><ha-icon icon="mdi:thermometer"></ha-icon><span class="title">${esc(this._config.title ?? "Temperatures")}</span><span class="sum"></span></div>
+      <div class="tiles">${items
+        .map((it, i) => `<button class="tile ${it.kind}" data-i="${i}"><div class="hh"><span class="shape"><ha-icon icon="${esc(it.icon)}"></ha-icon></span>
+          <span class="txt"><div class="nm">${esc(it.name)}</div><div class="val"></div></span></div>${it.kind === "heater" ? `<div class="bar"><i></i></div>` : ""}</button>`)
+        .join("")}</div>
+      <div class="fans">${fl.map((f, i) => `<button class="fan" data-i="${i}"><ha-icon icon="${esc(f.icon)}"></ha-icon><span></span></button>`).join("")}</div>
+    </ha-card>`;
+    this._items = items.map((it) => it.entity);
+    this._fans = fl.map((f) => f.entity);
+    root.querySelectorAll(".tile").forEach((b) => b.addEventListener("click", () => this._more(this._items[Number(b.dataset.i)])));
+    root.querySelectorAll(".fan").forEach((b) => b.addEventListener("click", () => this._more(this._fans[Number(b.dataset.i)])));
+    if (!fl.length) root.querySelector(".fans").style.display = "none";
+    this._built = true;
+  }
+
+  _render() {
+    if (!this._config || !this._hass) return;
+    if (!this._built) this._build();
+    const root = this.shadowRoot;
+    const items = [...heaters(this._hass, this._config).filter((h) => !h.missing), ...readings(this._hass, this._config)];
+    // Only touch the DOM when something changed, so a tap is never lost mid-update.
+    const set = (n, v) => {
+      if (n.innerHTML !== v) n.innerHTML = v;
+    };
+    root.querySelectorAll(".tile").forEach((el, i) => {
+      const it = items[i];
+      if (!it) return;
+      el.classList.toggle("on", !!it.on);
+      if (it.kind === "heater") {
+        set(el.querySelector(".val"), `<b>${deg(it.t)}</b>${it.on ? `→ ${deg(it.tg, 0)}` : "Off"}${it.on && it.pw !== null ? ` · ${Math.round(it.pw)}%` : ""}`);
+        el.querySelector(".bar i").style.width = `${it.on && it.pw !== null ? Math.max(0, Math.min(100, it.pw)) : 0}%`;
+      } else {
+        set(el.querySelector(".val"), `<b>${deg(it.t)}</b>`);
+      }
+    });
+    fans(this._hass, this._config).forEach((f, i) => {
+      const el = root.querySelectorAll(".fan")[i];
+      if (!el) return;
+      el.classList.toggle("on", (f.v || 0) > 0);
+      const text = `${f.name} ${f.v === null ? "–" : Math.round(f.v)}%`;
+      const sp = el.querySelector("span");
+      if (sp.textContent !== text) sp.textContent = text;
+    });
+    const hs = items.filter((it) => it.kind === "heater");
+    const on = hs.filter((h) => h.on);
+    const sum = !on.length ? "All heaters off" : on.every((h) => h.t !== null && Math.abs(h.t - h.tg) <= 2) ? "At temperature" : "Heating";
+    const sumEl = root.querySelector(".sum");
+    if (sumEl.textContent !== sum) sumEl.textContent = sum;
+  }
+
+  _more(entityId) {
+    if (entityId) this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true }));
+  }
+}
+
+async function registerPrinterTempsCard() {
+  await window.customElements.whenDefined("home-assistant");
+  const registry = window.customElements;
+  if (registry.get(PTC_TAG)) return;
+  registry.define(PTC_TAG, PrinterTempsCard);
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: PTC_TAG,
+    name: "Printer temperatures",
+    description: "Klipper / Moonraker heaters (temperature, target, power), other temperatures and fans.",
+  });
+  console.info(`%c PRINTER-TEMPS-CARD %c ${PTC_VERSION} `, "background:#ff9800;color:#fff", "");
+}
+
+registerPrinterTempsCard();
 })();
 
 /* ===== room-lights-card 1.3.1 ===== */
