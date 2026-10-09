@@ -8,7 +8,7 @@
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.2.1";
+const HSC_VERSION = "1.2.2";
 const HSC_TAG = "home-status-card";
 
 const C = {
@@ -204,7 +204,8 @@ function confirmDialog({ title, icon, color, bodyIcon, primary, secondary, confi
 
 const CSS = `
   :host { display: block; }
-  ha-card { container-type: inline-size; padding: 10px 12px; display: grid; gap: 8px; }
+  /* Spacing follows Mushroom: content starts 10px from the card edge; a little more air vertically. */
+  ha-card { container-type: inline-size; padding: 12px 10px; display: grid; gap: 10px; }
   /* Icon on the left across both lines; title and alarm switch share the first line, so the
      presence text below gets the full width. */
   .head { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "s n a" "s d d";

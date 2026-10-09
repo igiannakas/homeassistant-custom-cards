@@ -4,7 +4,7 @@
  * air-quality-card, climate-modes-card, enclosure-filter-card, energy-summary-card, home-status-card, mmu-lanes-card, printer-status-card, printer-temps-card, room-lights-card, weather-presence-card
  */
 
-/* ===== air-quality-card 1.1.6 ===== */
+/* ===== air-quality-card 1.1.7 ===== */
 (() => {
 /*
  * Air quality card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -17,7 +17,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.1.6";
+const AQC_VERSION = "1.1.7";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -93,19 +93,19 @@ function roomModel(hass, room, thresholds = {}) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 6px; }
-  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
-     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
-     you can tap gets a filled circle (e.g. All lights). */
-  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; }
+  ha-card { padding: 10px; }
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
+     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
+     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
+  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
-  .room { all: unset; box-sizing: border-box; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 9px 10px;
+  .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
+  .room { all: unset; box-sizing: border-box; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 11px 10px;
     min-height: 58px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; container-type: inline-size; }
   /* A room that needs a window opened glows red, like a lit room glows on the lights card. */
@@ -135,7 +135,7 @@ const CSS = `
   .v.hot small { color: inherit; }
   .room:active { filter: brightness(.94); }
   .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  @container (max-width: 175px) { .room { padding: 9px 6px; gap: 6px; } .row { column-gap: 5px; } .m { font-size: 11.5px; } }
+  @container (max-width: 175px) { .room { padding: 11px 6px; gap: 6px; } .row { column-gap: 5px; } .m { font-size: 11.5px; } }
 `;
 
 class AirQualityCard extends HTMLElement {
@@ -301,7 +301,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== climate-modes-card 1.1.2 ===== */
+/* ===== climate-modes-card 1.1.3 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -313,7 +313,7 @@ registerAirQualityCard();
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.1.2";
+const CMC_VERSION = "1.1.3";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -344,12 +344,12 @@ function activeIndex(hass, cfg) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 6px; }
-  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
-     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
-     you can tap gets a filled circle (e.g. All lights). */
-  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; }
+  ha-card { padding: 10px; }
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
+     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
+     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
+  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
@@ -366,9 +366,9 @@ const CSS = `
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .switch.on .sw { background: var(--sw-color); }
   .switch.on .sw::after { transform: translateX(16px); }
-  .modes { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 6px; }
+  .modes { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 8px; }
   .mode { all: unset; box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 10px 2px 9px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
+    padding: 12px 2px 11px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
   .shape { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     background: ${tint(GREY, 20)}; transition: background-color 180ms; }
@@ -549,7 +549,7 @@ async function registerClimateModesCard() {
 registerClimateModesCard();
 })();
 
-/* ===== enclosure-filter-card 1.1.2 ===== */
+/* ===== enclosure-filter-card 1.1.3 ===== */
 (() => {
 /*
  * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -561,7 +561,7 @@ registerClimateModesCard();
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.1.2";
+const EFC_VERSION = "1.1.3";
 const EFC_TAG = "enclosure-filter-card";
 
 const C = {
@@ -594,18 +594,18 @@ function optionLabel(o) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 6px; }
-  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
-     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
-     you can tap gets a filled circle (e.g. All lights). */
-  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; color: ${C.teal}; }
+  ha-card { padding: 10px; }
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
+     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
+     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
+  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; color: ${C.teal}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; }
-  .vent { display: flex; align-items: center; gap: 10px; margin: 0 2px 8px 6px; }
+  .vent { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
   .vl { font-size: 12px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .seg { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 2px; padding: 3px;
     border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
@@ -613,8 +613,8 @@ const CSS = `
     font-size: 12px; line-height: 32px; font-weight: 500; letter-spacing: .2px; color: var(--secondary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
   .opt.on { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
-  .io { display: flex; align-items: stretch; gap: 6px; }
-  .side { box-sizing: border-box; flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; cursor: pointer;
+  .io { display: flex; align-items: stretch; gap: 8px; }
+  .side { box-sizing: border-box; flex: 1; min-width: 0; padding: 10px; border-radius: 10px; cursor: pointer;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); display: grid; gap: 1px; -webkit-tap-highlight-color: transparent; }
   .vals { display: flex; flex-wrap: wrap; gap: 1px 10px; }
   .h { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
@@ -625,7 +625,7 @@ const CSS = `
   .v:focus-visible, .x:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .arrow { align-self: center; --mdc-icon-size: 20px; color: color-mix(in srgb, var(--secondary-text-color) 45%, transparent); }
-  .extra { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 8px 6px 2px; }
+  .extra { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 10px 0 0; }
   .extra:empty { display: none; }
   .opt:active, .side:active { filter: brightness(.94); }
   .opt:focus-visible, .side:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
@@ -801,7 +801,7 @@ async function registerEnclosureFilterCard() {
 registerEnclosureFilterCard();
 })();
 
-/* ===== energy-summary-card 1.0.1 ===== */
+/* ===== energy-summary-card 1.0.2 ===== */
 (() => {
 /*
  * Energy summary card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -813,7 +813,7 @@ registerEnclosureFilterCard();
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.0.1";
+const ESC_VERSION = "1.0.2";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -877,7 +877,8 @@ async function findPrice(hass, cfg) {
 const CSS = `
   :host { display: block; }
   ha-card { container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .row { display: flex; align-items: center; gap: 6px; padding: 10px 12px; }
+  /* Spacing follows Mushroom: content starts 10px from the card edge. */
+  .row { display: flex; align-items: center; gap: 6px; padding: 12px 10px; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .shape ha-icon { --mdc-icon-size: 24px; } /* same as Mushroom / tile card icons */
   .stats { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -896,7 +897,7 @@ const CSS = `
   /* Phone width: the icon gives its space to the numbers. */
   @container (max-width: 400px) {
     .shape { display: none; }
-    .row { padding: 10px 8px; }
+    .row { padding: 12px 8px; }
     .stat { padding: 0 4px 0 8px; }
     .stat:first-child { padding-left: 2px; }
     .v small { font-size: 10px; margin-left: 1px; }
@@ -1080,7 +1081,7 @@ async function registerEnergySummaryCard() {
 registerEnergySummaryCard();
 })();
 
-/* ===== home-status-card 1.2.1 ===== */
+/* ===== home-status-card 1.2.2 ===== */
 (() => {
 /*
  * Home status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1092,7 +1093,7 @@ registerEnergySummaryCard();
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.2.1";
+const HSC_VERSION = "1.2.2";
 const HSC_TAG = "home-status-card";
 
 const C = {
@@ -1288,7 +1289,8 @@ function confirmDialog({ title, icon, color, bodyIcon, primary, secondary, confi
 
 const CSS = `
   :host { display: block; }
-  ha-card { container-type: inline-size; padding: 10px 12px; display: grid; gap: 8px; }
+  /* Spacing follows Mushroom: content starts 10px from the card edge; a little more air vertically. */
+  ha-card { container-type: inline-size; padding: 12px 10px; display: grid; gap: 10px; }
   /* Icon on the left across both lines; title and alarm switch share the first line, so the
      presence text below gets the full width. */
   .head { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "s n a" "s d d";
@@ -1570,7 +1572,7 @@ async function registerHomeStatusCard() {
 registerHomeStatusCard();
 })();
 
-/* ===== mmu-lanes-card 1.1.2 ===== */
+/* ===== mmu-lanes-card 1.1.3 ===== */
 (() => {
 /*
  * MMU lanes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1583,7 +1585,7 @@ registerHomeStatusCard();
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.1.2";
+const MLC_VERSION = "1.1.3";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
@@ -1648,20 +1650,20 @@ function lanes(hass, cfg) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 6px; container-type: inline-size; }
-  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
-     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
-     you can tap gets a filled circle (e.g. All lights). */
-  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; color: ${C.teal}; }
+  ha-card { padding: 10px; container-type: inline-size; }
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
+     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
+     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
+  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; color: ${C.teal}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .lanes { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
+  .lanes { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
   @container (max-width: 300px) { .lanes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .lane { box-sizing: border-box; min-width: 0; padding: 8px; border-radius: 10px; cursor: pointer;
+  .lane { box-sizing: border-box; min-width: 0; padding: 10px 8px; border-radius: 10px; cursor: pointer;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
   .lt { display: flex; align-items: center; gap: 4px; }
   .ln { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
@@ -1676,7 +1678,7 @@ const CSS = `
   .v:active { filter: brightness(.85); }
   .v:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
-  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 6px 2px; font-size: 11px; line-height: 14px; letter-spacing: .4px;
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 10px 0 0; font-size: 11px; line-height: 14px; letter-spacing: .4px;
     color: var(--secondary-text-color); }
   .legend span { display: inline-flex; align-items: center; gap: 4px; }
   .legend em { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -1807,7 +1809,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.2.0 ===== */
+/* ===== printer-status-card 1.2.1 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1822,7 +1824,7 @@ registerMmuLanesCard();
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.2.0";
+const PSC_VERSION = "1.2.1";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -2001,8 +2003,9 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 8px; container-type: inline-size; }
-  .head { display: flex; align-items: center; gap: 10px; padding: 2px 2px 8px; }
+  /* Spacing follows Mushroom: content starts 10px from the card edge. */
+  ha-card { padding: 10px; container-type: inline-size; }
+  .head { display: flex; align-items: center; gap: 10px; padding: 0 0 10px; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .shape ha-icon { --mdc-icon-size: 24px; }
   .txt { flex: 1; min-width: 0; }
@@ -2026,7 +2029,7 @@ const CSS = `
   [data-e] { cursor: pointer; }
   .jt [data-e], .stats [data-e], .txt [data-e] { border-radius: 4px; -webkit-tap-highlight-color: transparent; }
   [data-e]:active { filter: brightness(.85); }
-  .job { display: flex; gap: 10px; margin: 0 2px 8px; }
+  .job { display: flex; gap: 10px; margin: 0 0 10px; }
   .thumb { flex: 0 0 64px; height: 64px; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05);
     display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .thumb img { width: 100%; height: 100%; object-fit: contain; }
@@ -2036,15 +2039,15 @@ const CSS = `
   .pct .when { font-size: 12px; font-weight: 400; letter-spacing: .4px; color: var(--secondary-text-color); margin-left: 8px; }
   .pbar { height: 8px; border-radius: 4px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); margin: 4px 0 6px; overflow: hidden; }
   .pbar i { display: block; height: 100%; border-radius: 4px; transition: width 400ms; }
-  .camera { margin: 0 0 8px; border-radius: 10px; overflow: hidden; }
+  .camera { margin: 0 0 10px; border-radius: 10px; overflow: hidden; }
   .camera:empty { display: none; }
-  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 8px; text-align: center; }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 10px; text-align: center; }
   .stats > button { all: unset; box-sizing: border-box; display: grid; min-width: 0; cursor: pointer; text-align: center;
     border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); -webkit-tap-highlight-color: transparent; }
   .stats > button:first-child { border-left: none; }
   .stats b { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--primary-text-color); white-space: nowrap; }
   .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); }
-  .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 6px; }
+  .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; }
   .acts:empty { display: none; }
   .act { all: unset; box-sizing: border-box; height: 44px; border-radius: 22px; cursor: pointer; display: flex; align-items: center;
     justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--primary-text-color);
@@ -2391,7 +2394,7 @@ async function registerPrinterStatusCard() {
 registerPrinterStatusCard();
 })();
 
-/* ===== printer-temps-card 1.1.3 ===== */
+/* ===== printer-temps-card 1.1.4 ===== */
 (() => {
 /*
  * Printer temperatures card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2403,7 +2406,7 @@ registerPrinterStatusCard();
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.3";
+const PTC_VERSION = "1.1.4";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -2467,20 +2470,20 @@ function fans(hass, cfg) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 6px; }
-  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
-     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
-     you can tap gets a filled circle (e.g. All lights). */
-  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; color: ${C.orange}; }
+  ha-card { padding: 10px; }
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
+     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
+     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
+  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; color: ${C.orange}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; }
-  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
   .tile { box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px;
-    padding: 8px 10px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
+    padding: 10px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
   /* A heater that is on glows, like a lit room on the lights card. */
   .tile.on { background: ${tint(C.orange, 10)}; }
@@ -2508,7 +2511,7 @@ const CSS = `
   .pw:empty { display: none; }
   .bar { height: 4px; border-radius: 2px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
   .bar i { display: block; height: 100%; background: ${C.orange}; border-radius: 2px; transition: width 400ms; }
-  .fans { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 6px 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
+  .fans { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 10px 0 0; font-size: 12px; line-height: 16px; letter-spacing: .4px;
     color: var(--secondary-text-color); }
   .fan { all: unset; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
   .fan ha-icon { --mdc-icon-size: 16px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
@@ -2660,7 +2663,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== room-lights-card 1.3.3 ===== */
+/* ===== room-lights-card 1.3.4 ===== */
 (() => {
 /*
  * Room lights card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2673,7 +2676,7 @@ registerPrinterTempsCard();
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.3";
+const RLC_VERSION = "1.3.4";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -2963,11 +2966,12 @@ class RoomLampsSheet {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 6px; }
+  /* Spacing follows Mushroom: everything inside starts 10px from the card edge. */
+  ha-card { padding: 10px; }
   /* The All lights switch is the card's label row – same height, title and switch as the label row
      of every other card (40px row, 14px / 500 title, 40×24 switch), and the whole row toggles.
      Its icon is tappable, so it sits in a filled 36px circle like every other tappable icon. */
-  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px;
+  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px;
     cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: 10px; }
   .all .hi { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     --mdc-icon-size: 24px; color: ${C.grey}; background: ${tint(C.grey, 20)}; transition: color 180ms, background-color 180ms; }
@@ -2985,11 +2989,11 @@ const CSS = `
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .all.on .sw { background: ${C.orange}; }
   .all.on .sw::after { transform: translateX(16px); }
-  .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
+  .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
   .room { position: relative; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
     -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
-  .tile { display: flex; align-items: center; gap: 10px; height: 100%; box-sizing: border-box; padding: 9px 10px; min-height: 58px; }
+  .tile { display: flex; align-items: center; gap: 10px; height: 100%; box-sizing: border-box; padding: 11px 10px; min-height: 58px; }
   .room .shape { cursor: pointer; }
   .badge { position: absolute; top: -3px; right: -3px; width: 16px; height: 16px; border-radius: 50%; display: none;
     align-items: center; justify-content: center; background: ${C.red}; }
@@ -3029,9 +3033,9 @@ const CSS = `
      keep the same height (grid-auto-rows: 1fr) even if one room has more sensors. */
   .stack .m { flex-direction: column; }
   .stack .g { flex-wrap: wrap; column-gap: 7px; }
-  .stack .tile { padding: 9px 8px; gap: 8px; }
+  .stack .tile { padding: 11px 8px; gap: 8px; }
   @container (max-width: 175px) {
-    .tile { padding: 9px 6px; gap: 6px; }
+    .tile { padding: 11px 6px; gap: 6px; }
     .stack .g { column-gap: 5px; }
     .v { gap: 1px; }
     .m { font-size: 11.5px; }
@@ -3615,7 +3619,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== weather-presence-card 1.1.0 ===== */
+/* ===== weather-presence-card 1.1.1 ===== */
 (() => {
 /*
  * Weather & presence card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3627,7 +3631,7 @@ registerRoomLightsCard();
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.1.0";
+const WPC_VERSION = "1.1.1";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -3671,7 +3675,8 @@ function ago(ms) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 8px 10px 8px 8px; container-type: inline-size; }
+  /* Spacing follows Mushroom: content starts 10px from the card edge. */
+  ha-card { padding: 12px 10px; container-type: inline-size; }
   .wrap { display: flex; align-items: center; gap: 10px; }
   .wx { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; border-radius: 10px; }

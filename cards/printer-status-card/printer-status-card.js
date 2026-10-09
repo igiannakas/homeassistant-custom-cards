@@ -11,7 +11,7 @@
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.2.0";
+const PSC_VERSION = "1.2.1";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -190,8 +190,9 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 8px; container-type: inline-size; }
-  .head { display: flex; align-items: center; gap: 10px; padding: 2px 2px 8px; }
+  /* Spacing follows Mushroom: content starts 10px from the card edge. */
+  ha-card { padding: 10px; container-type: inline-size; }
+  .head { display: flex; align-items: center; gap: 10px; padding: 0 0 10px; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .shape ha-icon { --mdc-icon-size: 24px; }
   .txt { flex: 1; min-width: 0; }
@@ -215,7 +216,7 @@ const CSS = `
   [data-e] { cursor: pointer; }
   .jt [data-e], .stats [data-e], .txt [data-e] { border-radius: 4px; -webkit-tap-highlight-color: transparent; }
   [data-e]:active { filter: brightness(.85); }
-  .job { display: flex; gap: 10px; margin: 0 2px 8px; }
+  .job { display: flex; gap: 10px; margin: 0 0 10px; }
   .thumb { flex: 0 0 64px; height: 64px; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05);
     display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .thumb img { width: 100%; height: 100%; object-fit: contain; }
@@ -225,15 +226,15 @@ const CSS = `
   .pct .when { font-size: 12px; font-weight: 400; letter-spacing: .4px; color: var(--secondary-text-color); margin-left: 8px; }
   .pbar { height: 8px; border-radius: 4px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); margin: 4px 0 6px; overflow: hidden; }
   .pbar i { display: block; height: 100%; border-radius: 4px; transition: width 400ms; }
-  .camera { margin: 0 0 8px; border-radius: 10px; overflow: hidden; }
+  .camera { margin: 0 0 10px; border-radius: 10px; overflow: hidden; }
   .camera:empty { display: none; }
-  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 8px; text-align: center; }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 10px; text-align: center; }
   .stats > button { all: unset; box-sizing: border-box; display: grid; min-width: 0; cursor: pointer; text-align: center;
     border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); -webkit-tap-highlight-color: transparent; }
   .stats > button:first-child { border-left: none; }
   .stats b { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--primary-text-color); white-space: nowrap; }
   .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); }
-  .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 6px; }
+  .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; }
   .acts:empty { display: none; }
   .act { all: unset; box-sizing: border-box; height: 44px; border-radius: 22px; cursor: pointer; display: flex; align-items: center;
     justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--primary-text-color);

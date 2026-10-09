@@ -8,7 +8,7 @@
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.1.2";
+const EFC_VERSION = "1.1.3";
 const EFC_TAG = "enclosure-filter-card";
 
 const C = {
@@ -41,18 +41,18 @@ function optionLabel(o) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 6px; }
-  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
-     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
-     you can tap gets a filled circle (e.g. All lights). */
-  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; color: ${C.teal}; }
+  ha-card { padding: 10px; }
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
+     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
+     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
+  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; color: ${C.teal}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; }
-  .vent { display: flex; align-items: center; gap: 10px; margin: 0 2px 8px 6px; }
+  .vent { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
   .vl { font-size: 12px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .seg { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 2px; padding: 3px;
     border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
@@ -60,8 +60,8 @@ const CSS = `
     font-size: 12px; line-height: 32px; font-weight: 500; letter-spacing: .2px; color: var(--secondary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
   .opt.on { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
-  .io { display: flex; align-items: stretch; gap: 6px; }
-  .side { box-sizing: border-box; flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; cursor: pointer;
+  .io { display: flex; align-items: stretch; gap: 8px; }
+  .side { box-sizing: border-box; flex: 1; min-width: 0; padding: 10px; border-radius: 10px; cursor: pointer;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); display: grid; gap: 1px; -webkit-tap-highlight-color: transparent; }
   .vals { display: flex; flex-wrap: wrap; gap: 1px 10px; }
   .h { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
@@ -72,7 +72,7 @@ const CSS = `
   .v:focus-visible, .x:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .arrow { align-self: center; --mdc-icon-size: 20px; color: color-mix(in srgb, var(--secondary-text-color) 45%, transparent); }
-  .extra { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 8px 6px 2px; }
+  .extra { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 10px 0 0; }
   .extra:empty { display: none; }
   .opt:active, .side:active { filter: brightness(.94); }
   .opt:focus-visible, .side:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }

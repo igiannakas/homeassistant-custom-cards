@@ -8,7 +8,7 @@
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.1.0";
+const WPC_VERSION = "1.1.1";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -52,7 +52,8 @@ function ago(ms) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 8px 10px 8px 8px; container-type: inline-size; }
+  /* Spacing follows Mushroom: content starts 10px from the card edge. */
+  ha-card { padding: 12px 10px; container-type: inline-size; }
   .wrap { display: flex; align-items: center; gap: 10px; }
   .wx { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; border-radius: 10px; }

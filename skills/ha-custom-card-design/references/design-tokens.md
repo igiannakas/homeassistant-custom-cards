@@ -58,11 +58,14 @@ Everything inherits `var(--ha-font-family-body, Roboto, sans-serif)`.
 
 ## Shapes and spacing
 
-- Card padding: 6–8px. Gap between tiles: 6px.
-- **Label row:** `min-height: 40px; padding: 2px 6px 8px; gap: 8px`. The icon sits in a
-  36px slot (`flex: 0 0 36px`, centred): an 18px plain icon in the card's colour, or – only
-  when the icon is tappable (All lights) – a filled 36px circle with a 24px icon. The slot
-  keeps titles at the same x on every card and over the tile icons below. Title 14px / 500
+- **Content edge = 10px, like Mushroom** (measured: Mushroom and Tado shapes sit 10px inside the
+  card). Card padding 10px (single-block cards 12px 10px); everything inside – header icons,
+  tile edges, pills, switches – starts and ends on that edge. Gap between tiles 8px; tile
+  padding 11px 10px (8px horizontal when narrow).
+- **Label row:** `min-height: 40px; padding: 0 0 8px; gap: 8px` inside the 10px card padding.
+  The icon's left edge sits on the content edge: an 18px plain icon in the card's colour, or –
+  only when the icon is tappable (All lights) – a filled 36px circle with a 24px icon. (Tried
+  centring plain icons in a 36px slot so titles line up: rejected, icons must share a left edge.) Title 14px / 500
   with `position: relative; top: 1px` (a 20px line box reads ~1px high next to an icon),
   `margin-left: auto` summary. A header switch (All lights, Summer) is 40×24 with a 20px
   knob and lives in the label row, so every card's header looks the same.

@@ -9,7 +9,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.1.6";
+const AQC_VERSION = "1.1.7";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -85,19 +85,19 @@ function roomModel(hass, room, thresholds = {}) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 6px; }
-  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
-     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
-     you can tap gets a filled circle (e.g. All lights). */
-  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; }
+  ha-card { padding: 10px; }
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
+     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
+     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
+  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
-  .room { all: unset; box-sizing: border-box; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 9px 10px;
+  .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
+  .room { all: unset; box-sizing: border-box; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 11px 10px;
     min-height: 58px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; container-type: inline-size; }
   /* A room that needs a window opened glows red, like a lit room glows on the lights card. */
@@ -127,7 +127,7 @@ const CSS = `
   .v.hot small { color: inherit; }
   .room:active { filter: brightness(.94); }
   .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  @container (max-width: 175px) { .room { padding: 9px 6px; gap: 6px; } .row { column-gap: 5px; } .m { font-size: 11.5px; } }
+  @container (max-width: 175px) { .room { padding: 11px 6px; gap: 6px; } .row { column-gap: 5px; } .m { font-size: 11.5px; } }
 `;
 
 class AirQualityCard extends HTMLElement {

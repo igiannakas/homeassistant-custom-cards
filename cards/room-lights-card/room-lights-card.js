@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.3";
+const RLC_VERSION = "1.3.4";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -299,11 +299,12 @@ class RoomLampsSheet {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 6px; }
+  /* Spacing follows Mushroom: everything inside starts 10px from the card edge. */
+  ha-card { padding: 10px; }
   /* The All lights switch is the card's label row – same height, title and switch as the label row
      of every other card (40px row, 14px / 500 title, 40×24 switch), and the whole row toggles.
      Its icon is tappable, so it sits in a filled 36px circle like every other tappable icon. */
-  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px;
+  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px;
     cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: 10px; }
   .all .hi { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     --mdc-icon-size: 24px; color: ${C.grey}; background: ${tint(C.grey, 20)}; transition: color 180ms, background-color 180ms; }
@@ -321,11 +322,11 @@ const CSS = `
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .all.on .sw { background: ${C.orange}; }
   .all.on .sw::after { transform: translateX(16px); }
-  .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
+  .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
   .room { position: relative; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
     -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
-  .tile { display: flex; align-items: center; gap: 10px; height: 100%; box-sizing: border-box; padding: 9px 10px; min-height: 58px; }
+  .tile { display: flex; align-items: center; gap: 10px; height: 100%; box-sizing: border-box; padding: 11px 10px; min-height: 58px; }
   .room .shape { cursor: pointer; }
   .badge { position: absolute; top: -3px; right: -3px; width: 16px; height: 16px; border-radius: 50%; display: none;
     align-items: center; justify-content: center; background: ${C.red}; }
@@ -365,9 +366,9 @@ const CSS = `
      keep the same height (grid-auto-rows: 1fr) even if one room has more sensors. */
   .stack .m { flex-direction: column; }
   .stack .g { flex-wrap: wrap; column-gap: 7px; }
-  .stack .tile { padding: 9px 8px; gap: 8px; }
+  .stack .tile { padding: 11px 8px; gap: 8px; }
   @container (max-width: 175px) {
-    .tile { padding: 9px 6px; gap: 6px; }
+    .tile { padding: 11px 6px; gap: 6px; }
     .stack .g { column-gap: 5px; }
     .v { gap: 1px; }
     .m { font-size: 11.5px; }

@@ -8,7 +8,7 @@
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.0.1";
+const ESC_VERSION = "1.0.2";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -72,7 +72,8 @@ async function findPrice(hass, cfg) {
 const CSS = `
   :host { display: block; }
   ha-card { container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .row { display: flex; align-items: center; gap: 6px; padding: 10px 12px; }
+  /* Spacing follows Mushroom: content starts 10px from the card edge. */
+  .row { display: flex; align-items: center; gap: 6px; padding: 12px 10px; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .shape ha-icon { --mdc-icon-size: 24px; } /* same as Mushroom / tile card icons */
   .stats { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -91,7 +92,7 @@ const CSS = `
   /* Phone width: the icon gives its space to the numbers. */
   @container (max-width: 400px) {
     .shape { display: none; }
-    .row { padding: 10px 8px; }
+    .row { padding: 12px 8px; }
     .stat { padding: 0 4px 0 8px; }
     .stat:first-child { padding-left: 2px; }
     .v small { font-size: 10px; margin-left: 1px; }

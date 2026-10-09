@@ -64,11 +64,10 @@ exactly rather than "close enough".
 - **Type scale:**
   - Names 14px / 500 / .1px, primary text colour.
   - Secondary text and readings 12px / 400 / .4px, secondary text colour.
-  - Card label row (every card's header, including one that holds a switch): 40px high, the icon
-    centred in a 36px slot (18px plain icon, or a filled 36px circle with a 24px icon when the
-    icon is tappable), title 14px / 500 nudged down 1px for optical centring, status 12px / 500
-    right aligned, switch 40×24. Never mix a tile-style header on one card with a label row on
-    the next.
+  - Card label row (every card's header, including one that holds a switch): 40px high, icon flush
+    with the content edge (18px plain icon, or a filled 36px circle with a 24px icon when the icon
+    is tappable), title 14px / 500 nudged down 1px for optical centring, status 12px / 500 right
+    aligned, switch 40×24. Never mix a tile-style header on one card with a label row on the next.
   - Mode and segment labels 12px.
   - One weight family per card. A status word ("Excellent") and the readings beside it
     are the same size.
@@ -87,7 +86,12 @@ exactly rather than "close enough".
 - **Pills:** 36px high (44px on phones), radius 18. Use them for links and toggles
   in a header (presence, climate, power). A split pill does two things: the left half
   toggles and the right half opens the reading.
-- **Tiles:** radius 10, padding 8–10, gap 6, `grid-auto-rows: 1fr` so every tile in a
+- **Spacing follows Mushroom:** every card's content starts 10px from its edges (card padding
+  10px), so leading icons, tile edges, pills and switches line up with Mushroom and tile cards
+  on the same dashboard. Measure the stock cards' insets before choosing; don't invent a grid.
+  For air, add it vertically: 12px card padding top/bottom on single-block cards, 8px between
+  tiles, tiles 11–12px tall padding.
+- **Tiles:** radius 10, padding 11px 10px, gap 8, `grid-auto-rows: 1fr` so every tile in a
   grid has the same height.
 - **Units are always shown** (°, %, lx, W, kWh, ppm), numbers are formatted with
   thousands separators, and the reading's unit is never left to guess.

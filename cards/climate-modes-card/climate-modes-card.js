@@ -8,7 +8,7 @@
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.1.2";
+const CMC_VERSION = "1.1.3";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -39,12 +39,12 @@ function activeIndex(hass, cfg) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 6px; }
-  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
-     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
-     you can tap gets a filled circle (e.g. All lights). */
-  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; }
+  ha-card { padding: 10px; }
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
+     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
+     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
+  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
@@ -61,9 +61,9 @@ const CSS = `
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .switch.on .sw { background: var(--sw-color); }
   .switch.on .sw::after { transform: translateX(16px); }
-  .modes { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 6px; }
+  .modes { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 8px; }
   .mode { all: unset; box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 10px 2px 9px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
+    padding: 12px 2px 11px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
   .shape { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     background: ${tint(GREY, 20)}; transition: background-color 180ms; }

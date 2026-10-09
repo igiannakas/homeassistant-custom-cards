@@ -9,7 +9,7 @@
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.1.2";
+const MLC_VERSION = "1.1.3";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
@@ -74,20 +74,20 @@ function lanes(hass, cfg) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { padding: 6px; container-type: inline-size; }
-  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
-     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
-     you can tap gets a filled circle (e.g. All lights). */
-  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; color: ${C.teal}; }
+  ha-card { padding: 10px; container-type: inline-size; }
+  /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding),
+     so icons line up with Mushroom and Tado cards. Label row: 40px high (room for the 24px switch),
+     icon flush left; only an icon you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
+  .label > ha-icon:first-child { flex: none; display: flex; --mdc-icon-size: 18px; color: ${C.teal}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .lanes { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
+  .lanes { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
   @container (max-width: 300px) { .lanes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .lane { box-sizing: border-box; min-width: 0; padding: 8px; border-radius: 10px; cursor: pointer;
+  .lane { box-sizing: border-box; min-width: 0; padding: 10px 8px; border-radius: 10px; cursor: pointer;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
   .lt { display: flex; align-items: center; gap: 4px; }
   .ln { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
@@ -102,7 +102,7 @@ const CSS = `
   .v:active { filter: brightness(.85); }
   .v:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
-  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 8px 6px 2px; font-size: 11px; line-height: 14px; letter-spacing: .4px;
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 10px 0 0; font-size: 11px; line-height: 14px; letter-spacing: .4px;
     color: var(--secondary-text-color); }
   .legend span { display: inline-flex; align-items: center; gap: 4px; }
   .legend em { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
