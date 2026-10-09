@@ -1,18 +1,18 @@
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
  *
- * A Klipper / Moonraker printer at a glance: state and message, a power pill (plug
- * and live watts), the current job (thumbnail, progress, time left, finish time,
+ * A Klipper / Moonraker printer at a glance: state and message, a power pill while
+ * the plug is on (On and live watts), the current job (thumbnail, progress, time left, finish time,
  * layer, filament, speed) or, when idle, today's energy and lifetime totals, your
  * camera card (only while the printer is reachable and the camera serves a picture), the buttons that make sense for the
  * state (Power on when the plug is off), and an optional chamber light
  * toggle (glows while on; hold it for the light's more-info). Home, Cancel and
- * Power off always ask first. Tap any value for its own more-info (the watts on the power
+ * Power on, Power off and turning the plug off always ask first. Tap any value for its own more-info (the watts on the power
  * pill too). Sensors are found from the Moonraker prefix (e.g. "voron").
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.3.1";
+const PSC_VERSION = "1.3.2";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -210,7 +210,7 @@ const CSS = `
     -webkit-tap-highlight-color: transparent; }
   .pill .tog { padding: 0 12px 0 10px; }
   .pill .w { padding: 0 14px 0 10px; border-left: 1px solid color-mix(in srgb, currentColor 25%, transparent); }
-  .pill .w:empty { display: none; }
+  .pill[hidden], .pill .w:empty { display: none; }
   .pill .tog:has(+ .w:empty) { padding-right: 14px; }
   .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
   .pill.on { background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
@@ -452,6 +452,8 @@ class PrinterStatusCard extends HTMLElement {
 
     const pill = root.querySelector(".pill");
     if (pill && m.plug) {
+      // Only while the plug is on; when it is off the Power on button below takes over.
+      pill.hidden = !m.plug.on;
       pill.classList.toggle("on", m.plug.on);
       set(".pill .tog span", m.plug.on ? "On" : "Off");
       set(".pill .w", m.plug.on && m.plug.watts !== null ? `${fmt(m.plug.watts)} W` : "");
@@ -599,7 +601,11 @@ class PrinterStatusCard extends HTMLElement {
       if (ok) press(`button.${p}_cancel_print`);
     }
     if (k === "poweron") {
-      // Turning the plug on is harmless, so it happens at once (like the pill).
+      const ok = await confirmDialog({
+        title: "Power on", icon: "mdi:power", color: C.green, primary: name,
+        secondary: `The plug turns on and ${name} starts up.`, confirmLabel: "Power on",
+      });
+      if (!ok) return;
       const id = this._config.power_switch;
       const [domain] = id.split(".");
       return this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_on", { entity_id: id });
@@ -616,12 +622,12 @@ class PrinterStatusCard extends HTMLElement {
     }
   }
 
-  /* Plug: on straight away; off asks first (and warns while printing). */
+  /* Plug pill (shown only while on): off asks first and warns while printing. */
   async _togglePlug() {
     const id = this._config.power_switch;
     const on = this._m?.plug?.on;
     const [domain] = id.split(".");
-    if (!on) return this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_on", { entity_id: id });
+    if (!on) return this._action("poweron");
     const name = this._config.name || "Printer";
     const busy = ["printing", "paused"].includes(this._m.key);
     const ok = await confirmDialog({

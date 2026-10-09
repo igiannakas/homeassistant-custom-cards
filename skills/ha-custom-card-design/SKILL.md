@@ -110,7 +110,8 @@ exactly rather than "close enough".
   One delegated click handler uses `closest("[data-e]")`, falling back to the tile's
   main entity. Never nest buttons inside buttons.
 - **Confirmation follows the stakes, so ask the user which actions confirm:**
-  - Immediate: all lights on/off, turning a plug on, choosing a mode.
+  - Immediate: all lights on/off, a light, choosing a mode.
+  - Powering up a machine (a printer plug) also confirms: the user asked for it.
   - Confirm with a dialog: anything that moves hardware, ends a job or cuts power
     (home axes, cancel print, safe power-off, plug off). Warn in red when it would
     interrupt something running.

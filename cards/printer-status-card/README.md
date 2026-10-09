@@ -18,9 +18,10 @@
 
 - **Header**: state in its colour (Off, Ready, Printing, Paused, Complete,
   Cancelled, Error) and the printer's message – or the file name during a job.
-- **Power pill**: the plug and its live watts. Tap On / Off to switch the plug:
-  turning it on is immediate, turning it off asks first, and warns in red while a
-  print is running. Tap the watts for the power sensor.
+- **Power pill**: shown only while the plug is on, with its live watts. Tap On to cut
+  the plug: it asks first, and warns in red while a print is running. Tap the watts for
+  the power sensor. When the plug is off the pill goes away and the Power on button
+  below takes its place.
 - **Job**: thumbnail, progress, time left and finish time, layer, filament used and
   speed. Stays up after the print as "Done" / "Cancelled".
 - **Idle**: energy used today, prints, hours printed and kilometres of filament.
@@ -30,7 +31,7 @@
   small still of the camera (`/api/camera_proxy/…`) every 15 s while hidden and every 60 s while
   shown; an error hides the camera card, so it never sits there trying to connect.
 - **Buttons** follow the state: Pause + Cancel while printing, Resume + Cancel when
-  paused, Home + Power off when idle, Power on when the plug is off (at once, no dialog). Home, Cancel and Power off ask first. There
+  paused, Home + Power off when idle, Power on when the plug is off. Home, Cancel, Power off and Power on ask first. There
   is no emergency stop on purpose.
 - **Chamber light** (optional, `light`): an extra button that glows while the light is
   on and shows its level when dimmed ("Light 25%"). A tap toggles it at once. For a

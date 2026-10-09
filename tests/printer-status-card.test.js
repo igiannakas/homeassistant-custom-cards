@@ -158,25 +158,29 @@ const cfg = {
   assert.strictEqual(q(".nm").textContent, "Voron · Error");
   assert.strictEqual(q(".msg").textContent, "MCU 'mcu' shutdown");
 
-  // Plug off: Off, no buttons; turning on is immediate.
+  // Plug off: the pill hides and the only button is Power on, which asks first.
   card.hass = hass(states({ "switch.voron": { state: "off", attributes: {} }, "sensor.tasmota_energy_power_2": { state: "0", attributes: {} } }));
   assert.strictEqual(q(".nm").textContent, "Voron · Off");
   assert.strictEqual(q(".msg").textContent, "Power is off");
-  assert.strictEqual(q(".pill .tog span").textContent, "Off");
-  assert.strictEqual(q(".pill .w").textContent, "");
-  // Plug off: the only button is Power on, and it works at once (no dialog).
+  assert(q(".pill").hidden, "no pill while the plug is off");
   eq(acts(), ["Power on"]);
   r.querySelector(".act.poweron").click();
   await tick();
-  assert(!document.querySelector("psc-confirm-dialog"), "power on does not ask");
-  eq(calls.pop(), ["switch", "turn_on", { entity_id: "switch.voron" }]);
-  q(".pill .tog").click();
+  dlg = document.querySelector("psc-confirm-dialog");
+  assert(dlg && dlg.shadowRoot.textContent.includes("starts up"), "power on asks first");
+  assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--green-color"));
+  dlg.shadowRoot.querySelector(".cancel").click();
   await tick();
-  assert(!document.querySelector("psc-confirm-dialog"), "turning on does not ask");
+  assert.strictEqual(calls.length, 0, "cancel leaves the plug off");
+  r.querySelector(".act.poweron").click();
+  await tick();
+  document.querySelector("psc-confirm-dialog").shadowRoot.querySelector(".confirm").click();
+  await tick();
   eq(calls.pop(), ["switch", "turn_on", { entity_id: "switch.voron" }]);
 
   // Idle printer: switching the plug off from the pill also asks first; cancel does nothing.
   card.hass = hass(states());
+  assert(!q(".pill").hidden, "pill back once the plug is on");
   q(".pill .tog").click();
   await tick();
   dlg = document.querySelector("psc-confirm-dialog");
