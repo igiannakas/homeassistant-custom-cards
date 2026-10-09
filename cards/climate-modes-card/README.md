@@ -17,6 +17,20 @@
   `navigate` (e.g. `#away-all` to open a confirmation pop-up), `more-info`,
   `toggle`. Errors (e.g. heating locked in summer mode) show as a toast.
 
+**Pop-ups need [Bubble Card](https://github.com/Clooos/Bubble-Card).** The `#away-all`,
+`#boost-all` and `#summer-mode` links in the examples open Bubble Card pop-ups with those
+hashes, which have to sit on the same view as this card:
+
+```yaml
+type: custom:bubble-card
+card_type: pop-up
+hash: "#away-all"
+name: Away mode
+# …then the pop-up's content, e.g. a confirm button that runs script.heating_mode_away
+```
+
+Without Bubble Card, use `perform-action` (no confirmation) or point the tile at a script.
+
 ## Configuration
 
 ```yaml
