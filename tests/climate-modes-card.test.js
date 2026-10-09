@@ -172,6 +172,38 @@ const cfg = {
   await tick();
   eq(calls.pop(), ["homeassistant", "toggle", { entity_id: "input_boolean.summer" }]);
 
+  // status: activity – the label row says what the heating is doing, and the icon follows.
+  const ac = document.createElement("climate-modes-card");
+  document.body.appendChild(ac);
+  ac.setConfig({ ...cfg, title: "Heating controls", status: "activity", switch: "input_boolean.summer", switch_name: "Summer",
+    lock: { entity: "input_boolean.summer", text: "Summer · heating locked", icon: "mdi:weather-sunny", color: "amber" },
+    names: { "climate.d": "Study" } });
+  const th = (actions, summer = "off") => {
+    const h = hass(Array(4).fill("comfort"), { "input_boolean.summer": summer });
+    TH.forEach((id, i) => { h.states[id].attributes.hvac_action = actions[i]; h.states[id].attributes.friendly_name = ["Living Room Thermostat", "Master Bedroom Thermostat", "Second Bedroom Thermostat", "Study Thermostat"][i]; });
+    return h;
+  };
+  ac.hass = th(["heating", "idle", "idle", "heating"]);
+  const ar = ac.shadowRoot;
+  const icon = () => ar.querySelector(".label > ha-icon");
+  assert.strictEqual(ar.querySelector(".title").textContent, "Heating controls");
+  assert.strictEqual(ar.querySelector(".status").textContent, "Heating · Living Room, Study", "friendly names without 'Thermostat'; names override");
+  assert.strictEqual(icon().getAttribute("icon"), "mdi:radiator");
+  assert(icon().style.color.includes("--orange-color"), icon().style.color);
+  assert(ar.querySelector(".modes .mode.on"), "the tiles still show the mode");
+  const keep = ar.querySelector(".status");
+  ac.hass = th(["idle", "idle", "idle", "idle"]);
+  assert.strictEqual(ar.querySelector(".status"), keep, "updated in place");
+  assert.strictEqual(keep.textContent, "Idle");
+  assert(icon().style.color.includes("--grey-color"));
+  ac.hass = th(["heating", "idle", "idle", "idle"], "on");
+  assert.strictEqual(keep.textContent, "Summer · heating locked", "the lock wins");
+  assert.strictEqual(icon().getAttribute("icon"), "mdi:weather-sunny");
+  assert(icon().style.color.includes("--amber-color"));
+  ac.hass = th(["heating", "idle", "idle", "idle"]);
+  assert.strictEqual(icon().getAttribute("icon"), "mdi:radiator", "icon comes back");
+  assert.strictEqual(keep.textContent, "Heating · Living Room");
+
   console.log("ALL CLIMATE-MODES TESTS PASSED");
   process.exit(0);
 })().catch((e) => {

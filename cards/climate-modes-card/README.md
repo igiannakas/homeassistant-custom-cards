@@ -10,6 +10,11 @@
   or "Mixed" when they differ – and optionally a switch next to it (e.g.
   summer mode, or an automatic aircon automation). The switch toggles, or runs
   `switch_tap_action` instead – which can ask first (see below).
+- Or, with `status: activity`, the label row says **what the heating is doing** on a line
+  under the title, and the icon follows: "Heating · Living Room, Study" (orange) while rooms
+  call for heat (`hvac_action: heating`; "Heating · 3 rooms" when the names don't fit),
+  "Idle" (grey) when every room is satisfied, or your `lock` text and icon while a lock such
+  as summer mode is on ("Summer · heating locked"). The tiles below still show the mode.
 - A tile per mode. The active one glows in its own colour.
 - A mode is active when **all** `thermostats` share its `preset`, or when its
   own `active.entity` is in `active.state` (handy for an aircon speed helper).
@@ -91,6 +96,9 @@ modes:
 | `title`, `icon`, `icon_color` | Label row. Colours are Home Assistant colour names (`orange`, `cyan`, …) or any CSS colour. |
 | `thermostats` | Climate entities whose shared preset picks the active mode. |
 | `switch`, `switch_name`, `switch_color` | Optional switch in the label row, after the status. |
+| `status` | `mode` (default) shows the active mode in the label row; `activity` shows what the heating is doing (see above). |
+| `lock` | With `activity`: `{ entity, text, icon, color }` – while `entity` is on, the label row shows this instead, e.g. `{ entity: input_boolean.heating_summer_mode, text: "Summer · heating locked", icon: mdi:weather-sunny, color: amber }`. |
+| `names` | With `activity`: room names per thermostat, e.g. `{ climate.study_thermostat: Study }`. Default: the friendly name without "Thermostat". |
 | `switch_tap_action` | What tapping the switch does instead of toggling, e.g. `{ action: toggle, confirmation: { title: Summer mode } }` to ask first. |
 | `modes[].name`, `icon`, `color` | The tile. |
 | `modes[].preset` | Active when every thermostat has this preset. |

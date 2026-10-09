@@ -309,7 +309,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== climate-modes-card 1.2.0 ===== */
+/* ===== climate-modes-card 1.3.0 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -319,11 +319,13 @@ registerAirQualityCard();
  * the active mode. Made for heating presets across several thermostats, and just
  * as happy with any entity + state (e.g. an aircon speed helper). Any tap action can ask
  * first: add `confirmation` and the card shows its own confirm dialog (Bubble Card look,
- * texts may be templates), so no pop-up card is needed.
+ * texts may be templates), so no pop-up card is needed. With `status: activity` the label
+ * row shows what the heating is doing instead of the mode: which rooms are calling for
+ * heat, Idle, or a lock (e.g. summer mode) – and the icon follows.
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.2.0";
+const CMC_VERSION = "1.3.0";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -424,6 +426,24 @@ function confirmDialog({ title, icon, col, subjectIcon, subject, text, confirmLa
   });
 }
 
+/* What the heating is doing: locked (e.g. summer mode), rooms calling for heat, or idle. */
+function activity(hass, cfg) {
+  const lock = cfg.lock;
+  if (lock?.entity && hass.states[lock.entity]?.state === "on") {
+    return { kind: "locked", text: lock.text || "Locked", icon: lock.icon || cfg.icon, color: color(lock.color || "amber") };
+  }
+  const calling = list(cfg.thermostats).filter((id) => hass.states[id]?.attributes?.hvac_action === "heating");
+  if (calling.length) {
+    const names = calling.map((id) => cfg.names?.[id] || String(hass.states[id]?.attributes?.friendly_name || id).replace(/\s+thermostat$/i, ""));
+    return {
+      kind: "heating", text: `Heating · ${names.join(", ")}`,
+      short: `Heating · ${calling.length} room${calling.length > 1 ? "s" : ""}`,
+      icon: cfg.icon, color: color(cfg.icon_color || "orange"),
+    };
+  }
+  return { kind: "idle", text: "Idle", icon: cfg.icon, color: GREY };
+}
+
 /* Which mode is on? A preset all thermostats share, or a mode's own entity + state. */
 function activeIndex(hass, cfg) {
   const modes = cfg.modes || [];
@@ -458,6 +478,14 @@ const CSS = `
     cursor: pointer; border-radius: 16px; font-size: 12px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     -webkit-tap-highlight-color: transparent; }
   .status:empty { display: none; }
+  /* status: activity – what the heating is doing goes on its own line under the title (like a
+     Mushroom secondary line), so room names fit next to the switch even on a phone. */
+  .label.two { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "icon title sw" "icon status status";
+    column-gap: 8px; row-gap: 0; align-items: center; }
+  .label.two > ha-icon:first-child { grid-area: icon; }
+  .label.two .title { grid-area: title; top: 0; align-self: end; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .label.two .status { grid-area: status; margin-left: 0; align-self: start; font-weight: 400; line-height: 16px; }
+  .label.two .switch { grid-area: sw; margin-top: -8px; margin-bottom: -8px; } /* sits on the title line without pushing the second line down */
   /* Label-row switch: 40×24, the same on every card. */
   .sw { flex: none; width: 40px; height: 24px; border-radius: 12px; position: relative; background: var(--disabled-color, #bdbdbd); transition: background-color 160ms; }
   .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
@@ -502,6 +530,11 @@ class ClimateModesCard extends HTMLElement {
           { name: "switch_name", selector: { text: {} } },
         ] },
         { name: "switch_tap_action", selector: { ui_action: {} } },
+        { name: "status", selector: { select: { mode: "dropdown", options: [
+          { value: "mode", label: "The active mode (All rooms · Day)" },
+          { value: "activity", label: "What the heating is doing (Heating · Study / Idle)" },
+        ] } } },
+        { name: "lock", selector: { object: {} } },
         { name: "modes", selector: { object: {} } },
       ],
       computeLabel: (s) =>
@@ -513,6 +546,7 @@ class ClimateModesCard extends HTMLElement {
           switch: "Switch in the label row (optional)",
           switch_name: "Switch label (default Automatic)",
           switch_tap_action: "Switch tap (default: toggle)",
+          status: "Label row shows",
           modes: "Modes",
         })[s.name] ?? s.name,
       computeHelper: (s) =>
@@ -520,6 +554,7 @@ class ClimateModesCard extends HTMLElement {
           modes: "One entry per tile: name, icon, color, preset (or active: {entity, state}) and tap_action.",
           switch: "Shown after the status, e.g. summer mode or an automatic-aircon automation.",
           switch_tap_action: "Add confirmation: {title, subject, text} in YAML to ask first.",
+          lock: "With activity: {entity, text, icon, color} – e.g. summer mode: Summer · heating locked.",
         })[s.name],
     };
   }
@@ -547,8 +582,10 @@ class ClimateModesCard extends HTMLElement {
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const c = this._config;
+    this._ro?.disconnect();
+    this._ro = null;
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      ${c.title || c.icon ? `<div class="label"><ha-icon icon="${esc(c.icon || "mdi:thermostat")}" style="color:${color(c.icon_color || "orange")}"></ha-icon>
+      ${c.title || c.icon ? `<div class="label${c.status === "activity" ? " two" : ""}"><ha-icon icon="${esc(c.icon || "mdi:thermostat")}" style="color:${color(c.icon_color || "orange")}"></ha-icon>
         <span class="title">${esc(c.title || "")}</span>
         <span class="status"></span>
         ${c.switch ? `<button class="switch" role="switch" style="--sw-color:${color(c.switch_color || "blue")}"><span class="swl"></span><span class="sw"></span></button>` : ""}</div>` : ""}
@@ -575,7 +612,17 @@ class ClimateModesCard extends HTMLElement {
       b.setAttribute("aria-pressed", String(i === active));
     });
     const status = root.querySelector(".status");
-    if (status) {
+    if (status && c.status === "activity") {
+      // The header says what the heating is doing; the tiles below already show the mode.
+      const a = activity(hass, c);
+      const ic = root.querySelector(".label > ha-icon");
+      const icon = a.icon || "mdi:thermostat";
+      if (ic.getAttribute("icon") !== icon) ic.setAttribute("icon", icon);
+      if (ic.style.color !== a.color) ic.style.color = a.color;
+      root.querySelector(".label").dataset.activity = a.kind;
+      this._status = a;
+      this._fitStatus();
+    } else if (status) {
       const n = list(c.thermostats).length;
       const text = !n ? (active >= 0 ? c.modes[active].name : "")
         : active >= 0 ? `${n > 1 ? "All rooms" : "On"} · ${c.modes[active].name}` : "Mixed";
@@ -589,6 +636,19 @@ class ClimateModesCard extends HTMLElement {
       sw.setAttribute("aria-checked", String(on));
       const label = c.switch_name ?? "Automatic";
       if (sw.querySelector(".swl").textContent !== label) sw.querySelector(".swl").textContent = label;
+    }
+  }
+
+  /* Room names when they fit, otherwise "Heating · 3 rooms" (re-checked when the card resizes). */
+  _fitStatus() {
+    const status = this.shadowRoot?.querySelector(".status");
+    const a = this._status;
+    if (!status || !a) return;
+    if (status.textContent !== a.text) status.textContent = a.text;
+    if (a.short && status.clientWidth && status.scrollWidth > status.clientWidth) status.textContent = a.short;
+    if (!this._ro && window.ResizeObserver) {
+      this._ro = new ResizeObserver(() => this._fitStatus());
+      this._ro.observe(this.shadowRoot.querySelector(".label"));
     }
   }
 
