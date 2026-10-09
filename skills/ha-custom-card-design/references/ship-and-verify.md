@@ -41,6 +41,10 @@ const src = await (await fetch("/hacsfiles/<repo>/<repo>.js?x=" + Date.now(), { 
 src.match(/\/\* ===== .* ===== \*\//g);                                     // versions actually served
 ```
 
+- **Check the served version header, not just `installed_version`.** Right after a push, HACS can
+  download a stale file (GitHub's raw cache) yet record the new sha. If the header is old, wait a
+  couple of minutes and download again. Browsers that already loaded the stale copy keep it under
+  the same `?hacstag=`, so add a cache-buster to the resource (`…?hacstag=…&v=131`) to force a reload.
 - First-time add: `hacs/repositories/add {repository: "owner/repo", category: "plugin"}`.
   HACS then creates the `/hacsfiles/...?hacstag=` resource itself.
 - When moving from hand-copied `/local/*.js` files to HACS, remove the old Lovelace
