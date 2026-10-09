@@ -62,17 +62,22 @@ Everything inherits `var(--ha-font-family-body, Roboto, sans-serif)`.
   card). Card padding 10px (single-block cards 12px 10px); everything inside – header icons,
   tile edges, pills, switches – starts and ends on that edge. Gap between tiles 8px; tile
   padding 11px 10px (8px horizontal when narrow).
-- **Label row:** `min-height: 40px; padding: 0 0 8px; gap: 8px` inside the 10px card padding.
+- **Label row:** `min-height: 40px; padding: 0 0 8px; gap: 10px` inside the 10px card padding.
   The icon is Mushroom-sized: a 36px slot on the content edge (`flex: 0 0 36px`, centred) holding
   a 24px glyph – plain in the card's colour, or a filled circle only when tappable (All lights).
   Every glyph on the page then sits at the same x as Mushroom's (content edge + 6px) and every
-  title starts at content edge + 44px. (Tried an 18px icon flush left and an 18px icon centred:
+  title starts at content edge + 46px (36px shape + 10px gap – measured on Mushroom entity and
+  template cards; an 8px gap left titles 2px short of the Mushroom card above). (Tried an 18px icon flush left and an 18px icon centred:
   both read as misaligned next to Mushroom icons.) Verify by measuring the svg rects, not the
   host elements. Title 14px / 500
   with `position: relative; top: 1px` (a 20px line box reads ~1px high next to an icon),
   `margin-left: auto` summary. A header switch (All lights, Summer) is 40×24 with a 20px
   knob and lives in the label row, so every card's header looks the same.
-- **Icon shape:** 36×36 circle, 24px icon (`--mdc-icon-size: 24px`).
+- **Icon shape:** 36×36 circle, 24px icon (`--mdc-icon-size: 24px`). **Anything tappable gets it**,
+  header icons included (e.g. an `icon_tap_action` that opens a view): background
+  `color-mix(in srgb, currentColor 20%, transparent)` so the circle follows the icon's live colour,
+  `border-radius: 50%`, `cursor: pointer`, `role="button"`, `tabindex="0"`, Enter/Space to activate.
+  Decorative icons stay bare – the circle is the tap signal.
 - **Tile:** radius 10, padding 8–10, a 36px shape and text block with a 10px gap.
   `grid-auto-rows: 1fr` keeps rows level.
 - **Pill:** height 36, radius 18, padding `0 14px 0 10px`, 18px icon. On phones (container
@@ -86,6 +91,8 @@ Everything inherits `var(--ha-font-family-body, Roboto, sans-serif)`.
 - **Progress / power bar:** 4px (8px for a job progress bar), radius half the height,
   track `rgba(primary-text-rgb, .08)`.
 - **Switch (in sheets):** 44×26 track, 20px knob, coloured when on.
+- **Two-line label row** (title + a status line under it): a grid `36px | 1fr | auto` with areas
+  `"icon title sw" "icon status sw"`, `row-gap: 0`; icon and switch are centred on both lines.
 
 ## Dialogs and sheets (Bubble Card look)
 

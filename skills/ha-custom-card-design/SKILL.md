@@ -73,8 +73,9 @@ exactly rather than "close enough".
   - One weight family per card. A status word ("Excellent") and the readings beside it
     are the same size.
 - **Icons:**
-  - A filled circle means "you can tap this". Decorative icons (section and card headers) have
-    no circle; a tappable one never loses it.
+  - A filled circle means "you can tap this", exactly like a Mushroom shape: 36px, the icon's colour
+    at 20%. Decorative icons (section and card headers) have no circle; a tappable one – including
+    a header icon given a tap action – always gets it, and never loses it.
   - 24px inside a 36px circle "shape" whose background is the state colour at 20%.
   - Inactive is grey.
   - Small reading icons (thermometer, drop, lux) are 14px at about 55% of the
@@ -102,6 +103,22 @@ exactly rather than "close enough".
   it. Don't show internals the user didn't ask for (e.g. the filament buffer state).
 - **Theme variables only**, with fallbacks (`var(--green-color, #4caf50)`), so dark mode
   just works.
+
+## Alignment is part of "done"
+
+Users spot a 1–2px offset at once ("not aligned", "slightly higher", "nudge it right"), so every
+visual change ends with a measured alignment check – not a look at a screenshot.
+
+- **Measure in the live layout, next to the neighbours.** Render the new version in place on the
+  real view (renamed-tag preview or injected CSS), at 375px and desktop, and read
+  `getBoundingClientRect()` of the *glyph* (`ha-svg-icon` inside the shadow root), not the host.
+- **Horizontal:** every leading glyph at content edge + 6px, every title at content edge + 46px –
+  the same as a stock Mushroom card on that view. Measure one Mushroom card as the reference.
+- **Vertical:** in a row, the icon, the text block (title + status) and any trailing control
+  (switch, pill) share one centre line. Compare the three centres numerically.
+- **Across cards:** stacked cards keep the same insets (a custom card under a Mushroom card must
+  not start its title 2px earlier).
+- Report the numbers ("glyph 16, title 56, centres 30/30/30") and fix before shipping.
 
 ## Interaction rules
 

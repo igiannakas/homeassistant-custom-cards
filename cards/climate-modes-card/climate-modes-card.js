@@ -164,7 +164,7 @@ const CSS = `
      Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
      the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
      All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
-  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; } /* 10px gap: titles at edge + 46, like Mushroom */
   .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; }
   /* A tappable icon (icon_tap_action) keeps a filled circle in its own colour – the tap-target convention. */
   .label > ha-icon.tap { width: 36px; border-radius: 50%; cursor: pointer; background: color-mix(in srgb, currentColor 20%, transparent);
@@ -184,7 +184,7 @@ const CSS = `
   /* status: activity – what the heating is doing goes on its own line under the title (like a
      Mushroom secondary line); icon and switch are centred on both lines. */
   .label.two { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "icon title sw" "icon status sw";
-    column-gap: 8px; row-gap: 0; align-items: center; }
+    column-gap: 10px; row-gap: 0; align-items: center; }
   .label.two > ha-icon:first-child { grid-area: icon; }
   .label.two .title { grid-area: title; top: 0; align-self: end; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .label.two .status { grid-area: status; margin-left: 0; align-self: start; font-weight: 400; line-height: 16px; }

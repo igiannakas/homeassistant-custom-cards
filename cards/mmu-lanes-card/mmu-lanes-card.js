@@ -9,7 +9,7 @@
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.1.4";
+const MLC_VERSION = "1.1.5";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
@@ -79,7 +79,7 @@ const CSS = `
      Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
      the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
      All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
-  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px; }
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; } /* 10px gap: titles at edge + 46, like Mushroom */
   .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; color: ${C.teal}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
   /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */

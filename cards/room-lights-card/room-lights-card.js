@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.4";
+const RLC_VERSION = "1.3.5";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -304,7 +304,7 @@ const CSS = `
   /* The All lights switch is the card's label row – same height, title and switch as the label row
      of every other card (40px row, 14px / 500 title, 40×24 switch), and the whole row toggles.
      Its icon is tappable, so it sits in a filled 36px circle like every other tappable icon. */
-  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 0 8px;
+  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px;
     cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: 10px; }
   .all .hi { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     --mdc-icon-size: 24px; color: ${C.grey}; background: ${tint(C.grey, 20)}; transition: color 180ms, background-color 180ms; }
