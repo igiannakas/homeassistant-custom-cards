@@ -2,19 +2,12 @@
 
 `custom:printer-status-card` – a Klipper / Moonraker printer at a glance.
 
-```
-┌──────────────────────────────────────────────────────┐
-│ (nozzle) Voron · Printing               (plug) On | 142 W │
-│          bracket_v3.gcode                                   │
-│ ┌──────┐ 62%  1h 23m left · done 15:42                      │
-│ │ img  │ ███████████████░░░░░░░░░                           │
-│ └──────┘ Layer 141 / 230 · 12.3 m filament                  │
-│          250 mm/s                                           │
-│ ┌──────────────────── camera card ─────────────────────┐   │
-│ └───────────────────────────────────────────────────────┘   │
-│ (  Pause  )                      (  Cancel  )               │
-└──────────────────────────────────────────────────────┘
-```
+<table>
+  <tr>
+    <td valign="top"><img src="../../docs/screenshots/printer-status-card.png" alt="Idle, with the camera card" width="384"><br><sub>Idle, with the camera card</sub></td>
+    <td valign="top"><img src="../../docs/screenshots/printer-status-card-printing.png" alt="While printing (example values)" width="384"><br><sub>While printing (example values)</sub></td>
+  </tr>
+</table>
 
 - **Header**: state in its colour (Off, Ready, Printing, Paused, Complete,
   Cancelled, Error) and the printer's message – or the file name during a job.

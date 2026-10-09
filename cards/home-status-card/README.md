@@ -3,15 +3,9 @@
 `custom:home-status-card` – one compact card for a home you look after
 remotely.
 
-```
-┌──────────────────────────────────────────────┐
-│ (⌂)  Greece · Occupied             [ Armed ] │
-│      People detected in the Ground floor -   │
-│      LivingRoom.                             │
-│ [ Closed ]   [ TV on ]   [ 25.3° · Off ]     │
-│ [ “Back on Sunday – water the plants” ]      │
-└──────────────────────────────────────────────┘
-```
+<p>
+  <img src="../../docs/screenshots/home-status-card.png" alt="home-status-card" width="384">
+</p>
 
 ## Configuration
 

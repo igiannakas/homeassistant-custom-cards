@@ -25,6 +25,33 @@ Related: the Tado X room card (`custom:tadox-room-card`) ships with the
 [Tado X Proxy integration](https://github.com/igiannakas/ha-tadox-proxy), because it reads
 that integration's thermostat attributes.
 
+## Screenshots
+
+Taken from a live dashboard at phone width, light theme. A few show example values (e.g. a print in progress).
+
+<table>
+  <tr>
+    <td valign="top" width="50%"><a href="cards/home-status-card/README.md"><b>Home status</b></a><br><img src="docs/screenshots/home-status-card.png" alt="Home status" width="384"></td>
+    <td valign="top" width="50%"><a href="cards/energy-summary-card/README.md"><b>Energy summary</b></a><br><img src="docs/screenshots/energy-summary-card.png" alt="Energy summary" width="384"></td>
+  </tr>
+  <tr>
+    <td valign="top" width="50%"><a href="cards/room-lights-card/README.md"><b>Room lights</b></a><br><img src="docs/screenshots/room-lights-card.png" alt="Room lights" width="384"></td>
+    <td valign="top" width="50%"><a href="cards/weather-presence-card/README.md"><b>Weather & presence</b></a><br><img src="docs/screenshots/weather-presence-card.png" alt="Weather & presence" width="384"></td>
+  </tr>
+  <tr>
+    <td valign="top" width="50%"><a href="cards/climate-modes-card/README.md"><b>Climate modes</b></a><br><img src="docs/screenshots/climate-modes-card.png" alt="Climate modes" width="384"></td>
+    <td valign="top" width="50%"><a href="cards/air-quality-card/README.md"><b>Air quality</b></a><br><img src="docs/screenshots/air-quality-card.png" alt="Air quality" width="384"></td>
+  </tr>
+  <tr>
+    <td valign="top" width="50%"><a href="cards/printer-status-card/README.md"><b>Printer status</b></a><br><img src="docs/screenshots/printer-status-card.png" alt="Printer status" width="384"></td>
+    <td valign="top" width="50%"><a href="cards/printer-temps-card/README.md"><b>Printer temperatures</b></a><br><img src="docs/screenshots/printer-temps-card.png" alt="Printer temperatures" width="384"></td>
+  </tr>
+  <tr>
+    <td valign="top" width="50%"><a href="cards/mmu-lanes-card/README.md"><b>MMU lanes</b></a><br><img src="docs/screenshots/mmu-lanes-card.png" alt="MMU lanes" width="384"></td>
+    <td valign="top" width="50%"><a href="cards/enclosure-filter-card/README.md"><b>Enclosure filter</b></a><br><img src="docs/screenshots/enclosure-filter-card.png" alt="Enclosure filter" width="384"></td>
+  </tr>
+</table>
+
 ## Installing (HACS)
 
 All cards come as one file, `dist/homeassistant-custom-cards.js`.

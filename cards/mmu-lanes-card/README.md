@@ -2,17 +2,9 @@
 
 `custom:mmu-lanes-card` – every lane of a Happy Hare MMU (e.g. an EMU) at a glance.
 
-```
-┌──────────────────────────────────────────────────────┐
-│ (tray) EMU lanes                           3 of 4 loaded │
-│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐      │
-│ │ Lane 0 ● │ │ Lane 1 ✻● │ │ Lane 2 ○ │ │ Lane 3 ● │      │
-│ │ 12%      │ │ 32%      │ │ 51%      │ │ 18%      │      │
-│ │ 24.0°    │ │ 24.1°    │ │ 24.2°    │ │ 24.3°    │      │
-│ └──────────┘ └──────────┘ └──────────┘ └──────────┘      │
-│ ● loaded ○ empty  ● <20% dry ● 20–40% medium ● >40% wet   │
-└──────────────────────────────────────────────────────┘
-```
+<p>
+  <img src="../../docs/screenshots/mmu-lanes-card.png" alt="mmu-lanes-card" width="384">
+</p>
 
 - **Lane**: loaded (filled) or empty (outline, name greyed), humidity coloured
   dry (green) / medium (amber) / wet (orange), temperature, and a fan icon while

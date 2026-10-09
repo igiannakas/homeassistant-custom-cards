@@ -2,12 +2,9 @@
 
 `custom:climate-modes-card` – whole-house mode shortcuts in one card.
 
-```
-┌──────────────────────────────────────────────────────┐
-│ (radiator) Heating                    All rooms · Off │
-│ [ Off ]  [ Away ]  [ Night ]  [ Day ]  [ Boost ]       │
-└──────────────────────────────────────────────────────┘
-```
+<p>
+  <img src="../../docs/screenshots/climate-modes-card.png" alt="climate-modes-card" width="384">
+</p>
 
 - A label row (icon, title) with what the rooms are on – "All rooms · Night",
   or "Mixed" when they differ – and optionally a switch next to it (e.g.

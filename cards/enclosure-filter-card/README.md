@@ -3,18 +3,9 @@
 `custom:enclosure-filter-card` – a printer enclosure's filter and vent (e.g. a
 StealthMax).
 
-```
-┌──────────────────────────────────────────────────────┐
-│ (filter) StealthMax                       VOC 312 → 96 │
-│ Vent [ Closed | 25 | 50 | 75 | Open ]                    │
-│ ┌──────────────────────┐   ┌──────────────────────┐      │
-│ │ Intake               │ → │ Exhaust              │      │
-│ │ 31.2° 29% VOC 312    │   │ 30.1° 30% VOC 96     │      │
-│ │ VOC (manual) 500     │   │ VOC (manual) 110     │      │
-│ └──────────────────────┘   └──────────────────────┘      │
-│ VOC delta 216                                            │
-└──────────────────────────────────────────────────────┘
-```
+<p>
+  <img src="../../docs/screenshots/enclosure-filter-card.png" alt="enclosure-filter-card" width="384">
+</p>
 
 - **Vent**: the numeric options of the select as segments (`0` reads Closed,
   `100` Open). Tap one to move the vent. A non-numeric state (e.g. Manual) lights

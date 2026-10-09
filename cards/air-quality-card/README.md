@@ -2,16 +2,12 @@
 
 `custom:air-quality-card` – every room's air in one card.
 
-```
-┌────────────────────────────────────────────────────────────┐
-│ (!) Air quality                         Ventilate Living Room │
-│ ┌────────────────────────────┐ ┌────────────────────────────┐ │
-│ │ (window) Living Room       │ │ (leaf) Study               │ │
-│ │ Ventilate  CO2 1041 ppm  VOC 173 │ Excellent  CO2 612 ppm  VOC 96 │
-│ │ PM1 3.1 PM2.5 4.7 PM4 6.2 PM10 7.0 │ PM1 0.5 PM2.5 1.1 PM4 1.6 PM10 1.9 │
-│ └────────────────────────────┘ └────────────────────────────┘ │
-└────────────────────────────────────────────────────────────┘
-```
+<table>
+  <tr>
+    <td valign="top"><img src="../../docs/screenshots/air-quality-card.png" alt="air-quality-card" width="384"></td>
+    <td valign="top"><img src="../../docs/screenshots/air-quality-card-alert.png" alt="When a room needs air (example values)" width="384"><br><sub>When a room needs air (example values)</sub></td>
+  </tr>
+</table>
 
 - **Label row**: the house in a few words – "All excellent", "2 rooms elevated",
   "Poor in Second Bedroom" or "Ventilate Living Room".

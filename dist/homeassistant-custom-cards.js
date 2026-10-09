@@ -2280,7 +2280,7 @@ async function registerPrinterStatusCard() {
 registerPrinterStatusCard();
 })();
 
-/* ===== printer-temps-card 1.1.0 ===== */
+/* ===== printer-temps-card 1.1.1 ===== */
 (() => {
 /*
  * Printer temperatures card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2292,7 +2292,7 @@ registerPrinterStatusCard();
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.0";
+const PTC_VERSION = "1.1.1";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -2377,11 +2377,19 @@ const CSS = `
   .txt { flex: 1; min-width: 0; }
   .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .val { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; }
-  .val b { font-size: 14px; font-weight: 500; color: var(--primary-text-color); margin-right: 4px; }
-  .val [data-e] { all: unset; cursor: pointer; border-radius: 4px; -webkit-tap-highlight-color: transparent; }
-  .val [data-e]:active { filter: brightness(.85); }
-  .val [data-e]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  /* Wraps rather than overflowing on a narrow tile. */
+  .val { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 4px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
+    color: var(--secondary-text-color); white-space: nowrap; }
+  .val b { font-size: 14px; font-weight: 500; color: var(--primary-text-color); }
+  .val [data-e], .pw { all: unset; cursor: pointer; border-radius: 4px; -webkit-tap-highlight-color: transparent; }
+  .val [data-e]:active, .pw:active { filter: brightness(.85); }
+  .val [data-e]:focus-visible, .pw:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  /* Heater power sits at the end of its bar. */
+  .br { display: flex; align-items: center; gap: 6px; }
+  .br .bar { flex: 1; min-width: 0; }
+  .pw { min-width: 30px; text-align: right; font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color);
+    white-space: nowrap; }
+  .pw:empty { display: none; }
   .bar { height: 4px; border-radius: 2px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
   .bar i { display: block; height: 100%; background: ${C.orange}; border-radius: 2px; transition: width 400ms; }
   .fans { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 6px 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
@@ -2450,7 +2458,7 @@ class PrinterTempsCard extends HTMLElement {
       <div class="label"><ha-icon icon="mdi:thermometer"></ha-icon><span class="title">${esc(this._config.title ?? "Temperatures")}</span><span class="sum"></span></div>
       <div class="tiles">${items
         .map((it, i) => `<div class="tile ${it.kind}" role="button" tabindex="0" data-i="${i}"><div class="hh"><span class="shape"><ha-icon icon="${esc(it.icon)}"></ha-icon></span>
-          <span class="txt"><div class="nm">${esc(it.name)}</div><div class="val"></div></span></div>${it.kind === "heater" ? `<div class="bar"><i></i></div>` : ""}</div>`)
+          <span class="txt"><div class="nm">${esc(it.name)}</div><div class="val"></div></span></div>${it.kind === "heater" ? `<div class="br"><div class="bar"><i></i></div><button class="pw" data-e="${esc(it.power)}"></button></div>` : ""}</div>`)
         .join("")}</div>
       <div class="fans">${fl.map((f, i) => `<button class="fan" data-i="${i}"><ha-icon icon="${esc(f.icon)}"></ha-icon><span></span></button>`).join("")}</div>
     </ha-card>`;
@@ -2490,8 +2498,10 @@ class PrinterTempsCard extends HTMLElement {
       el.classList.toggle("on", !!it.on);
       if (it.kind === "heater") {
         const tg = `<button data-e="${esc(it.target)}">${it.on ? `→ ${deg(it.tg, 0)}` : "Off"}</button>`;
-        const pw = it.on && it.pw !== null ? ` · <button data-e="${esc(it.power)}">${Math.round(it.pw)}%</button>` : "";
-        set(el.querySelector(".val"), `<button data-e="${esc(it.entity)}"><b>${deg(it.t)}</b></button>${tg}${pw}`);
+        set(el.querySelector(".val"), `<button data-e="${esc(it.entity)}"><b>${deg(it.t)}</b></button>${tg}`);
+        const pw = el.querySelector(".pw");
+        const pwText = it.on && it.pw !== null ? `${Math.round(it.pw)}%` : "";
+        if (pw.textContent !== pwText) pw.textContent = pwText;
         el.querySelector(".bar i").style.width = `${it.on && it.pw !== null ? Math.max(0, Math.min(100, it.pw)) : 0}%`;
       } else {
         set(el.querySelector(".val"), `<button data-e="${esc(it.entity)}"><b>${deg(it.t)}</b></button>`);

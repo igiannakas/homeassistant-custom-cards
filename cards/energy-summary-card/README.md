@@ -2,13 +2,9 @@
 
 `custom:energy-summary-card` – electricity use and cost in one compact row.
 
-```
-┌────────────────────────────────────────────────────────────┐
-│ (⚡)  Now      │ Today     │ Yesterday │ October            │
-│       616 W    │ 7.99 kWh  │ 9.07 kWh  │ 86.6 kWh           │
-│       15p/h    │ £1.89     │ £2.15     │ £20.54             │
-└────────────────────────────────────────────────────────────┘
-```
+<p>
+  <img src="../../docs/screenshots/energy-summary-card.png" alt="energy-summary-card" width="384">
+</p>
 
 - **Now** is the live power and what it costs per hour at that rate.
 - **Today, Yesterday and the month so far** come from Home Assistant's

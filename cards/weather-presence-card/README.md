@@ -2,12 +2,9 @@
 
 `custom:weather-presence-card` – a slim block for the top of a climate section.
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│ (cloud) Cloudy                          [ Home ]  [ Climate › ] │
-│         T Real 14.2°C   F Met Office 14.6°C                    │
-└──────────────────────────────────────────────────────────────┘
-```
+<p>
+  <img src="../../docs/screenshots/weather-presence-card.png" alt="weather-presence-card" width="384">
+</p>
 
 - **Weather**: condition with a matching icon and colour (sunny amber, rain
   blue…), your own outdoor sensor's temperature and the weather service's.

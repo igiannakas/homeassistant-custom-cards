@@ -2,17 +2,12 @@
 
 `custom:room-lights-card` – all your rooms' lights in one card.
 
-```
-┌──────────────────────────────────────────────────────────┐
-│ (o) All lights                                    [on]   │
-│                                                          │
-│ (o) Living Room             (o) Kitchen                  │
-│     T 20.4°  H 43%  L 115 lx    T 21.5°  H 49%  L 27 lx  │
-│                                                          │
-│ (o) Corridor                (o) Study                    │
-│     T 21.1/21.8°  H 49/49%      T 21.5°  H 45%  L 442 lx │
-└──────────────────────────────────────────────────────────┘
-```
+<table>
+  <tr>
+    <td valign="top"><img src="../../docs/screenshots/room-lights-card.png" alt="room-lights-card" width="384"></td>
+    <td valign="top"><img src="../../docs/screenshots/room-lights-card-lamps.png" alt="Hold a room for its lamps" width="320"><br><sub>Hold a room for its lamps</sub></td>
+  </tr>
+</table>
 
 - **All lights** (header): one tap turns everything off if anything is on,
   otherwise turns everything on. No confirmation.

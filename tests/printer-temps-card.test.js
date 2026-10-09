@@ -35,7 +35,9 @@ function states(over = {}) {
     "number.voron_bed_target": { state: "110", attributes: {} }, "sensor.voron_bed_power": { state: "100", attributes: {} },
     "sensor.voron_hotend_fan": { state: "100", attributes: {} },
   }));
-  assert.strictEqual(val(0), "180.2°→ 250° · 38%");
+  assert.strictEqual(val(0), "180.2°→ 250°");
+  assert.strictEqual(tiles()[0].querySelector(".pw").textContent, "38%");
+  assert.strictEqual(tiles()[2].querySelector(".pw").textContent, "", "no power while off");
   assert(tiles()[0].classList.contains("on") && tiles()[1].classList.contains("on") && !tiles()[2].classList.contains("on"));
   assert.strictEqual(tiles()[0].querySelector(".bar i").style.width, "38.4%");
   assert.strictEqual(tiles()[2].querySelector(".bar i").style.width, "0%");
@@ -56,7 +58,7 @@ function states(over = {}) {
   eq(events.splice(0), [["more-info", "sensor.voron_bed_temperature"], ["more-info", "sensor.voron_exhaust_fan"]]);
   // Heater values: temperature, target and power each open their own entity.
   card.hass = hass(states({ "number.voron_bed_target": { state: "110", attributes: {} }, "sensor.voron_bed_power": { state: "64", attributes: {} } }));
-  tiles()[1].querySelectorAll(".val [data-e]").forEach((b) => b.click());
+  tiles()[1].querySelectorAll(".val [data-e], .pw").forEach((b) => b.click());
   tiles()[4].querySelector(".val [data-e]").click();
   eq(events.splice(0).map((x) => x[1]), ["sensor.voron_bed_temperature", "number.voron_bed_target", "sensor.voron_bed_power", "sensor.voron_stepper_body_temp"]);
 
