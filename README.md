@@ -77,7 +77,18 @@ cards/<card-name>/README.md        options and behaviour
 tests/<card-name>.test.js          behaviour tests (real card code in jsdom)
 dist/homeassistant-custom-cards.js all cards in one file, for HACS (npm run build)
 hacs.json                          tells HACS which file to install
+docs/screenshots/                  README images
+skills/ha-custom-card-design/      the design and build playbook these cards follow (a Claude skill)
 ```
+
+## Design playbook
+
+[`skills/ha-custom-card-design`](skills/ha-custom-card-design/SKILL.md) is the playbook these cards were built with: the
+Mushroom-matched design tokens, the interaction rules (every value opens its own more-info,
+confirm only what moves hardware or cuts power), the engineering rules that keep taps reliable on
+phones, how to test, ship through HACS and update a dashboard safely, and a log of the feedback each
+rule came from. It is written as a [Claude skill](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview)
+but reads fine as a plain style guide; `references/card-skeleton.js` is a working card to start from.
 
 ## Development
 
