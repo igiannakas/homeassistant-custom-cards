@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.2";
+const RLC_VERSION = "1.3.3";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -300,18 +300,20 @@ class RoomLampsSheet {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 6px; }
-  /* The All lights switch is the card's label row – same as the heading of every other card
-     (18px icon, 14px / 500 title, 40×24 switch) – and the whole row is the tap target. */
-  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px;
+  /* The All lights switch is the card's label row – same height, title and switch as the label row
+     of every other card (40px row, 14px / 500 title, 40×24 switch), and the whole row toggles.
+     Its icon is tappable, so it sits in a filled 36px circle like every other tappable icon. */
+  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px;
     cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: 10px; }
-  .all .hi { --mdc-icon-size: 18px; color: ${C.grey}; transition: color 180ms; }
-  .all.on .hi { color: ${C.orange}; }
+  .all .hi { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    --mdc-icon-size: 24px; color: ${C.grey}; background: ${tint(C.grey, 20)}; transition: color 180ms, background-color 180ms; }
+  .all.on .hi { color: ${C.orange}; background: ${tint(C.orange, 20)}; }
   .shape { position: relative; flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
     justify-content: center; transition: background-color 180ms; }
   /* Same size as Mushroom / tile card icons: 36 px circle, 24 px icon. */
   .shape ha-icon { --mdc-icon-size: 24px; transition: color 180ms; }
   /* Text matches Mushroom / tile cards: names 14px medium, readings 12px regular, same colour. */
-  .all .nm { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+  .all .nm { position: relative; top: 1px; flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .all .sw { flex: 0 0 auto; width: 40px; height: 24px; border-radius: 12px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }

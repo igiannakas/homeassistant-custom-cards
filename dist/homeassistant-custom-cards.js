@@ -4,7 +4,7 @@
  * air-quality-card, climate-modes-card, enclosure-filter-card, energy-summary-card, home-status-card, mmu-lanes-card, printer-status-card, printer-temps-card, room-lights-card, weather-presence-card
  */
 
-/* ===== air-quality-card 1.1.5 ===== */
+/* ===== air-quality-card 1.1.6 ===== */
 (() => {
 /*
  * Air quality card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -17,7 +17,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.1.5";
+const AQC_VERSION = "1.1.6";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -94,10 +94,14 @@ function roomModel(hass, room, thresholds = {}) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 6px; }
-  .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
-  .label ha-icon { --mdc-icon-size: 18px; }
+  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
+     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
+     you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
+  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
@@ -297,7 +301,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== climate-modes-card 1.1.1 ===== */
+/* ===== climate-modes-card 1.1.2 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -309,7 +313,7 @@ registerAirQualityCard();
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.1.1";
+const CMC_VERSION = "1.1.2";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -341,10 +345,14 @@ function activeIndex(hass, cfg) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 6px; }
-  .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
-  .label ha-icon { --mdc-icon-size: 18px; }
+  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
+     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
+     you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
+  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .status { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Switch next to the status; padded so the whole label + switch is an easy tap target. */
@@ -541,7 +549,7 @@ async function registerClimateModesCard() {
 registerClimateModesCard();
 })();
 
-/* ===== enclosure-filter-card 1.1.1 ===== */
+/* ===== enclosure-filter-card 1.1.2 ===== */
 (() => {
 /*
  * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -553,7 +561,7 @@ registerClimateModesCard();
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.1.1";
+const EFC_VERSION = "1.1.2";
 const EFC_TAG = "enclosure-filter-card";
 
 const C = {
@@ -587,10 +595,14 @@ function optionLabel(o) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 6px; }
-  .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
-  .label ha-icon { --mdc-icon-size: 18px; color: ${C.teal}; }
+  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
+     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
+     you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; color: ${C.teal}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
+  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; }
   .vent { display: flex; align-items: center; gap: 10px; margin: 0 2px 8px 6px; }
@@ -1558,7 +1570,7 @@ async function registerHomeStatusCard() {
 registerHomeStatusCard();
 })();
 
-/* ===== mmu-lanes-card 1.1.1 ===== */
+/* ===== mmu-lanes-card 1.1.2 ===== */
 (() => {
 /*
  * MMU lanes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1571,7 +1583,7 @@ registerHomeStatusCard();
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.1.1";
+const MLC_VERSION = "1.1.2";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
@@ -1637,10 +1649,14 @@ function lanes(hass, cfg) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 6px; container-type: inline-size; }
-  .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
-  .label ha-icon { --mdc-icon-size: 18px; color: ${C.teal}; }
+  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
+     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
+     you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; color: ${C.teal}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
+  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lanes { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
@@ -2375,7 +2391,7 @@ async function registerPrinterStatusCard() {
 registerPrinterStatusCard();
 })();
 
-/* ===== printer-temps-card 1.1.2 ===== */
+/* ===== printer-temps-card 1.1.3 ===== */
 (() => {
 /*
  * Printer temperatures card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2387,7 +2403,7 @@ registerPrinterStatusCard();
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.2";
+const PTC_VERSION = "1.1.3";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -2452,10 +2468,14 @@ function fans(hass, cfg) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 6px; }
-  .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
-  .label ha-icon { --mdc-icon-size: 18px; color: ${C.orange}; }
+  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
+     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
+     you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; color: ${C.orange}; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
+  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; }
   .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
@@ -2640,7 +2660,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== room-lights-card 1.3.2 ===== */
+/* ===== room-lights-card 1.3.3 ===== */
 (() => {
 /*
  * Room lights card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2653,7 +2673,7 @@ registerPrinterTempsCard();
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.2";
+const RLC_VERSION = "1.3.3";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -2944,18 +2964,20 @@ class RoomLampsSheet {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 6px; }
-  /* The All lights switch is the card's label row – same as the heading of every other card
-     (18px icon, 14px / 500 title, 40×24 switch) – and the whole row is the tap target. */
-  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px;
+  /* The All lights switch is the card's label row – same height, title and switch as the label row
+     of every other card (40px row, 14px / 500 title, 40×24 switch), and the whole row toggles.
+     Its icon is tappable, so it sits in a filled 36px circle like every other tappable icon. */
+  .all { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px;
     cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: 10px; }
-  .all .hi { --mdc-icon-size: 18px; color: ${C.grey}; transition: color 180ms; }
-  .all.on .hi { color: ${C.orange}; }
+  .all .hi { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    --mdc-icon-size: 24px; color: ${C.grey}; background: ${tint(C.grey, 20)}; transition: color 180ms, background-color 180ms; }
+  .all.on .hi { color: ${C.orange}; background: ${tint(C.orange, 20)}; }
   .shape { position: relative; flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
     justify-content: center; transition: background-color 180ms; }
   /* Same size as Mushroom / tile card icons: 36 px circle, 24 px icon. */
   .shape ha-icon { --mdc-icon-size: 24px; transition: color 180ms; }
   /* Text matches Mushroom / tile cards: names 14px medium, readings 12px regular, same colour. */
-  .all .nm { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+  .all .nm { position: relative; top: 1px; flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .all .sw { flex: 0 0 auto; width: 40px; height: 24px; border-radius: 12px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }

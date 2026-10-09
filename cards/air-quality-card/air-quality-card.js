@@ -9,7 +9,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.1.5";
+const AQC_VERSION = "1.1.6";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -86,10 +86,14 @@ function roomModel(hass, room, thresholds = {}) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 6px; }
-  .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
-  .label ha-icon { --mdc-icon-size: 18px; }
+  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
+     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
+     you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
+  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }

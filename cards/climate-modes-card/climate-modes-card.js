@@ -8,7 +8,7 @@
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.1.1";
+const CMC_VERSION = "1.1.2";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -40,10 +40,14 @@ function activeIndex(hass, cfg) {
 const CSS = `
   :host { display: block; }
   ha-card { padding: 6px; }
-  .label { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 2px 6px 6px; }
-  .label ha-icon { --mdc-icon-size: 18px; }
+  /* Card label row, the same on every card: 40px high (room for the 24px switch), the icon centred
+     in a 36px slot so titles line up across cards and with the tile icons below. Only an icon
+     you can tap gets a filled circle (e.g. All lights). */
+  .label { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 2px 6px 8px; }
+  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 18px; }
   /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  .title { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
+  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .status { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Switch next to the status; padded so the whole label + switch is an easy tap target. */

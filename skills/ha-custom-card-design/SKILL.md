@@ -64,13 +64,17 @@ exactly rather than "close enough".
 - **Type scale:**
   - Names 14px / 500 / .1px, primary text colour.
   - Secondary text and readings 12px / 400 / .4px, secondary text colour.
-  - Card label row (every card's header, including one that holds a switch): 18px icon, title
-    14px / 500, status 12px / 500 right aligned, switch 40×24. Never mix a tile-style header
-    on one card with a label row on the next.
+  - Card label row (every card's header, including one that holds a switch): 40px high, the icon
+    centred in a 36px slot (18px plain icon, or a filled 36px circle with a 24px icon when the
+    icon is tappable), title 14px / 500 nudged down 1px for optical centring, status 12px / 500
+    right aligned, switch 40×24. Never mix a tile-style header on one card with a label row on
+    the next.
   - Mode and segment labels 12px.
   - One weight family per card. A status word ("Excellent") and the readings beside it
     are the same size.
 - **Icons:**
+  - A filled circle means "you can tap this". Decorative icons (section and card headers) have
+    no circle; a tappable one never loses it.
   - 24px inside a 36px circle "shape" whose background is the state colour at 20%.
   - Inactive is grey.
   - Small reading icons (thermometer, drop, lux) are 14px at about 55% of the
