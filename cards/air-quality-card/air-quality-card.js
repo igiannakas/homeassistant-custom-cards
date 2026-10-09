@@ -9,7 +9,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.1.8";
+const AQC_VERSION = "1.1.9";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -97,7 +97,8 @@ const CSS = `
   .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
+  .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px;
+    container: rooms / inline-size; }
   .room { all: unset; box-sizing: border-box; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 11px 10px;
     min-height: 58px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; container-type: inline-size; }
@@ -128,7 +129,13 @@ const CSS = `
   .v.hot small { color: inherit; }
   .room:active { filter: brightness(.94); }
   .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  @container (max-width: 175px) { .room { padding: 11px 6px; gap: 6px; } .row { column-gap: 5px; } .m { font-size: 11.5px; } }
+  /* Phone width: tiles are ~170px, so tighten the tile's sides and the PM grid so the four PM
+     readings never run past the tile edge. (A container can't style itself, so the tile padding
+     keys off the grid's width and the text rules off the tile's.) */
+  @container rooms (max-width: 400px) { .room { padding: 11px 8px; gap: 8px; } }
+  @container (max-width: 175px) { .row { column-gap: 5px; } .row.pm { column-gap: 5px; } .m { font-size: 11.5px; letter-spacing: .2px; } }
+  /* Very small phones: one PM reading per line rather than running past the edge. */
+  @container (max-width: 152px) { .row.pm { grid-template-columns: max-content; } }
 `;
 
 class AirQualityCard extends HTMLElement {
