@@ -4,13 +4,14 @@
  * A Klipper / Moonraker printer at a glance: state and message, a power pill (plug
  * and live watts), the current job (thumbnail, progress, time left, finish time,
  * layer, filament, speed) or, when idle, today's energy and lifetime totals, your
- * camera card, and the buttons that make sense for the state. Home, Cancel and
+ * camera card, the buttons that make sense for the state, and an optional chamber light
+ * toggle (glows while on; hold it for the light's more-info). Home, Cancel and
  * Power off always ask first. Tap any value for its own more-info (the watts on the power
  * pill too). Sensors are found from the Moonraker prefix (e.g. "voron").
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.1.0";
+const PSC_VERSION = "1.2.0";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -90,7 +91,21 @@ function model(hass, cfg) {
     hours: hoursFrom(s("totals_print_time")),
     km: num(s("totals_filament_used")) === null ? null : num(s("totals_filament_used")) / 1000,
     thumb: st(cfg.thumbnail || `camera.${p}_thumbnail`)?.attributes?.entity_picture || "",
+    light: lightModel(st(cfg.light), cfg.light),
   };
+}
+
+/* Chamber light: a light / switch / input_boolean, or a 0–100 number (a Klipper output pin). */
+function lightModel(s, id) {
+  if (!s || ["unavailable", "unknown"].includes(s.state)) return null;
+  const domain = String(id).split(".")[0];
+  if (domain === "number" || domain === "input_number") {
+    const v = num(s.state);
+    const max = num(s.attributes?.max) || 100;
+    return { on: (v || 0) > 0, level: v === null ? null : Math.round((v / max) * 100), value: v, max, numeric: true };
+  }
+  const b = num(s.attributes?.brightness);
+  return { on: s.state === "on", level: s.state === "on" && b !== null ? Math.round((b / 255) * 100) : null, numeric: false };
 }
 
 /* Which buttons fit the state: [key, label, icon, confirm?] */
@@ -225,6 +240,10 @@ const CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
   .act ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
   .act.cancel ha-icon, .act.poweroff ha-icon { color: ${C.orange}; }
+  /* Chamber light: glows while on, like a lit room on the lights card. */
+  .act.light.on { background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
+  .act.light.on ha-icon { color: ${C.orange}; }
+  .act .lvl { font-weight: 400; opacity: .8; }
   .pill button:active, .act:active { filter: brightness(.92); }
   .pill button:focus-visible, .act:focus-visible, [data-e]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
@@ -247,6 +266,10 @@ class PrinterStatusCard extends HTMLElement {
           { name: "energy_today", selector: { entity: { domain: "sensor", device_class: "energy" } } },
         ] },
         { name: "power_off_script", selector: { entity: { domain: ["script", "button"] } } },
+        { type: "grid", name: "", schema: [
+          { name: "light", selector: { entity: { domain: ["light", "switch", "input_boolean", "number", "input_number"] } } },
+          { name: "light_name", selector: { text: {} } },
+        ] },
         { name: "camera_card", selector: { object: {} } },
       ],
       computeLabel: (s) =>
@@ -258,6 +281,8 @@ class PrinterStatusCard extends HTMLElement {
           energy_today: "Energy today (kWh)",
           power_off_script: "Safe power-off script",
           camera_card: "Camera card (YAML)",
+          light: "Chamber light",
+          light_name: "Light button label",
         })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
@@ -404,14 +429,79 @@ class PrinterStatusCard extends HTMLElement {
 
     // Buttons for this state (rebuilt only when the set changes, so taps are never lost).
     const acts = actions(m.key).filter(([k]) => k !== "poweroff" || this._config.power_off_script);
+    if (m.light) acts.push(["light", "", ""]);
     const keys = acts.map((a) => a[0]).join();
     if (keys !== this._actKeys) {
       const box = root.querySelector(".acts");
       box.style.setProperty("--n", String(acts.length || 1));
-      box.innerHTML = acts.map(([k, label, icon]) => `<button class="act ${k}" data-k="${k}"><ha-icon icon="${icon}"></ha-icon>${esc(label)}</button>`).join("");
-      box.querySelectorAll(".act").forEach((b) => b.addEventListener("click", () => this._action(b.dataset.k)));
+      box.innerHTML = acts
+        .map(([k, label, icon]) =>
+          k === "light"
+            ? `<button class="act light" data-k="light"><ha-icon></ha-icon><span class="lbl"></span></button>`
+            : `<button class="act ${k}" data-k="${k}"><ha-icon icon="${icon}"></ha-icon>${esc(label)}</button>`,
+        )
+        .join("");
+      box.querySelectorAll(".act").forEach((b) => (b.dataset.k === "light" ? this._bindLight(b) : b.addEventListener("click", () => this._action(b.dataset.k))));
       this._actKeys = keys;
     }
+
+    // Chamber light: state, icon and label update in place.
+    const lb = root.querySelector(".act.light");
+    if (lb && m.light) {
+      if (m.light.on && m.light.numeric && m.light.value > 0) this._lastLight = m.light.value;
+      lb.classList.toggle("on", m.light.on);
+      lb.setAttribute("aria-pressed", String(m.light.on));
+      const icon = m.light.on ? "mdi:led-strip-variant" : "mdi:led-strip-variant-off";
+      const ic = lb.querySelector("ha-icon");
+      if (ic.getAttribute("icon") !== icon) ic.setAttribute("icon", icon);
+      const name = esc(this._config.light_name || "Light");
+      const lvl = m.light.on && m.light.level !== null && m.light.level < 100 ? ` <span class="lvl">${m.light.level}%</span>` : "";
+      set(".act.light .lbl", `${name}${lvl}`, true);
+    }
+  }
+
+  /* Tap toggles the light at once (no confirmation – it is harmless); hold opens its more-info. */
+  _bindLight(b) {
+    let timer = null;
+    let held = false;
+    const cancel = () => {
+      clearTimeout(timer);
+      timer = null;
+    };
+    b.addEventListener("pointerdown", (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      held = false;
+      cancel();
+      timer = setTimeout(() => {
+        timer = null;
+        held = true;
+        this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: this._config.light }, bubbles: true, composed: true }));
+      }, 500);
+    });
+    ["pointerup", "pointercancel", "pointerleave"].forEach((t) => b.addEventListener(t, cancel));
+    b.addEventListener("contextmenu", (e) => e.preventDefault());
+    b.addEventListener("touchend", (e) => held && e.preventDefault());
+    b.addEventListener("click", () => {
+      if (held) {
+        held = false;
+        return;
+      }
+      this._toggleLight();
+    });
+  }
+
+  _toggleLight() {
+    const id = this._config.light;
+    const l = this._m?.light;
+    if (!id || !l) return;
+    const [domain] = id.split(".");
+    if (l.numeric) {
+      // A Klipper output pin: off is 0; on goes back to the last level seen, or light_on (default: full).
+      const on = this._lastLight || num(this._config.light_on) || l.max;
+      return this._call(domain, "set_value", { entity_id: id, value: l.on ? 0 : on });
+    }
+    const svc = domain === "light" || domain === "switch" || domain === "input_boolean" ? domain : "homeassistant";
+    return this._call(svc, l.on ? "turn_off" : "turn_on", { entity_id: id });
   }
 
   async _action(k) {

@@ -66,8 +66,10 @@ module.exports = async function load(name) {
 
 - **Cross-realm objects:** `assert.deepStrictEqual` fails on arrays created inside the
   jsdom window. Compare `JSON.stringify` instead (the `eq` helper).
-- **Synthetic pointer events** must be `composed: true` to cross shadow roots. Use
-  `new window.PointerEvent("pointerdown", { bubbles: true, composed: true })`.
+- **Synthetic pointer events:** jsdom has no `PointerEvent`. Fire a `MouseEvent` with the
+  pointer type name, and make it `composed: true` so it crosses shadow roots:
+  `new window.MouseEvent("pointerdown", { bubbles: true, composed: true, button: 0 })`.
+  For a hold, wait past the hold time with a real `setTimeout` before `pointerup`.
 - **Overlapping selectors** count elements twice. `.pct [data-e]` already contains
   `.when [data-e]`, so pick one.
 - **`console.info` badges** clutter output; filter them with `grep -v "%c"`.

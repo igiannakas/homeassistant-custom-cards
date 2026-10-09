@@ -2,12 +2,19 @@
 
 `custom:printer-status-card` – a Klipper / Moonraker printer at a glance.
 
-<table>
-  <tr>
-    <td valign="top"><img src="../../docs/screenshots/printer-status-card.png" alt="Idle, with the camera card" width="384"><br><sub>Idle, with the camera card</sub></td>
-    <td valign="top"><img src="../../docs/screenshots/printer-status-card-printing.png" alt="While printing (example values)" width="384"><br><sub>While printing (example values)</sub></td>
-  </tr>
-</table>
+```
+┌──────────────────────────────────────────────────────┐
+│ (nozzle) Voron · Printing               (plug) On | 142 W │
+│          bracket_v3.gcode                                   │
+│ ┌──────┐ 62%  1h 23m left · done 15:42                      │
+│ │ img  │ ███████████████░░░░░░░░░                           │
+│ └──────┘ Layer 141 / 230 · 12.3 m filament                  │
+│          250 mm/s                                           │
+│ ┌──────────────────── camera card ─────────────────────┐   │
+│ └───────────────────────────────────────────────────────┘   │
+│ (  Pause  )                      (  Cancel  )               │
+└──────────────────────────────────────────────────────┘
+```
 
 - **Header**: state in its colour (Off, Ready, Printing, Paused, Complete,
   Cancelled, Error) and the printer's message – or the file name during a job.
@@ -21,6 +28,10 @@
 - **Buttons** follow the state: Pause + Cancel while printing, Resume + Cancel when
   paused, Home + Power off when idle. Home, Cancel and Power off ask first. There
   is no emergency stop on purpose.
+- **Chamber light** (optional, `light`): an extra button that glows while the light is
+  on and shows its level when dimmed ("Light 25%"). A tap toggles it at once. For a
+  Klipper output pin (a 0–100 `number`), on returns to the last level it had, or to
+  `light_on` (default full). Hold the button for the light's more-info.
 - **Tap any value** (progress, time left, finish time, layer, filament, speed,
   today's energy, totals, the state) for its own more-info.
 
@@ -34,6 +45,7 @@ power_switch: switch.voron
 power_sensor: sensor.tasmota_energy_power_2
 energy_today: sensor.tasmota_energy_today_2
 power_off_script: script.power_off_3d_printer
+light: number.voron_output_pin_chamber_leds
 camera_card:
   type: custom:frigate-card
   cameras:
@@ -48,5 +60,8 @@ camera_card:
 | `power_sensor` | Live watts for the pill. |
 | `energy_today` | kWh today, shown when idle. |
 | `power_off_script` | A `script` or `button` that shuts the printer down safely and then cuts the plug. Without it there is no Power off button. |
+| `light` | Chamber light: a `light`, `switch`, `input_boolean`, or a 0–100 `number` / `input_number` (e.g. Moonraker's `number.<prefix>_output_pin_chamber_leds`). Hidden while unavailable. |
+| `light_name` | Button label. Default `Light`. |
+| `light_on` | For a number: the level "on" sets when the card hasn't seen an earlier level. Default the maximum (100). |
 | `camera_card` | Any card config, rendered inside the card. |
 | `thumbnail` | Camera entity with the job thumbnail. Default `camera.<prefix>_thumbnail`. |

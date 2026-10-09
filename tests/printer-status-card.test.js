@@ -177,6 +177,55 @@ const cfg = {
   assert(!bare.shadowRoot.querySelector(".pill"));
   assert.strictEqual(bare.shadowRoot.querySelector(".nm").textContent, "Printer · Ready");
 
+  // Chamber light (a Klipper output pin, 0–100): a third button, glows while on, toggles at once.
+  const LED = "number.voron_output_pin_chamber_leds";
+  const led = (v) => ({ [LED]: { state: String(v), attributes: { min: 0, max: 100, step: 1 } } });
+  calls.length = 0;
+  const lc = mount({ ...cfg, light: LED }, states(led(25)));
+  const lr = lc.shadowRoot;
+  const lacts = () => [...lr.querySelectorAll(".act")].map((x) => x.textContent);
+  eq(lacts(), ["Home", "Power off", "Light 25%"]);
+  const lb = lr.querySelector(".act.light");
+  assert(lb.classList.contains("on"));
+  assert.strictEqual(lb.querySelector("ha-icon").getAttribute("icon"), "mdi:led-strip-variant");
+  assert.strictEqual(lr.querySelector(".acts").style.getPropertyValue("--n"), "3");
+  lb.click();
+  await tick();
+  assert(!document.querySelector("psc-confirm-dialog"), "light toggles without asking");
+  eq(calls.pop(), ["number", "set_value", { entity_id: LED, value: 0 }]);
+  lc.hass = hass(states(led(0)));
+  assert.strictEqual(lr.querySelector(".act.light"), lb, "light button updates in place");
+  assert(!lb.classList.contains("on"));
+  assert.strictEqual(lb.textContent, "Light");
+  assert.strictEqual(lb.querySelector("ha-icon").getAttribute("icon"), "mdi:led-strip-variant-off");
+  lb.click();
+  eq(calls.pop(), ["number", "set_value", { entity_id: LED, value: 25 }], "back to the level it had");
+  lc.hass = hass(states({ ...printing(), ...led(100) }));
+  eq(lacts(), ["Pause", "Cancel", "Light"], "full brightness shows no %");
+  // A fresh card that has never seen it on turns it fully on; light_on overrides.
+  const fresh = mount({ ...cfg, light: LED }, states(led(0)));
+  fresh.shadowRoot.querySelector(".act.light").click();
+  eq(calls.pop(), ["number", "set_value", { entity_id: LED, value: 100 }]);
+  const fixed = mount({ ...cfg, light: LED, light_on: 40, light_name: "LEDs" }, states(led(0)));
+  assert.strictEqual(fixed.shadowRoot.querySelector(".act.light").textContent, "LEDs");
+  fixed.shadowRoot.querySelector(".act.light").click();
+  eq(calls.pop(), ["number", "set_value", { entity_id: LED, value: 40 }]);
+  // Hold opens the light's more-info instead of toggling.
+  t.events.length = 0;
+  const hb = fixed.shadowRoot.querySelector(".act.light");
+  hb.dispatchEvent(new t.window.MouseEvent("pointerdown", { bubbles: true, composed: true, button: 0 }));
+  await tick(600);
+  hb.dispatchEvent(new t.window.MouseEvent("pointerup", { bubbles: true, composed: true }));
+  hb.click();
+  eq(t.events.splice(0), [["more-info", LED]]);
+  assert.strictEqual(calls.length, 0, "a hold does not toggle");
+  // Printer off: the pin is unavailable, so no light button; a light entity toggles with turn_on/off.
+  const off = mount({ ...cfg, light: LED }, states({ "switch.voron": { state: "off", attributes: {} }, [LED]: { state: "unavailable", attributes: {} } }));
+  assert(!off.shadowRoot.querySelector(".act.light"));
+  const ll = mount({ ...cfg, light: "light.chamber" }, states({ "light.chamber": { state: "on", attributes: { brightness: 255 } } }));
+  ll.shadowRoot.querySelector(".act.light").click();
+  eq(calls.pop(), ["light", "turn_off", { entity_id: "light.chamber" }]);
+
   // Camera card is created through the card helpers and gets hass.
   const made = [];
   t.window.loadCardHelpers = async () => ({ createCardElement: (c) => { const el = document.createElement("div"); el.className = "cam"; made.push(c); return el; } });
