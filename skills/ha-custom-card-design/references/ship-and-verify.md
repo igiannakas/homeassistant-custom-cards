@@ -113,6 +113,9 @@ window.__shot = async (cfg, mod) => {
 - **Example values:** label any made-up states (a print in progress, an alert) as
   "example values" in the caption.
 - **Clean up:** remove the overlay and any preview files you served from `/local`.
+- **Measure in place, not in an overlay.** An overlay appended to `<body>` sits outside the view, so
+  theme variables such as the card border don't apply and every inset reads 1px off. Swap the
+  preview in for the real card (hide the original) and measure there.
 - **Unreleased versions:** to preview a version not yet released, serve a copy with a
   renamed tag from `www/` and eval it. A screenshot is also a test: overflow found
   this way (the heater line at 375 px) gets fixed before publishing.

@@ -43,6 +43,33 @@
 - **Tap any value** (progress, time left, finish time, layer, filament, speed,
   today's energy, totals, the state) for its own more-info.
 
+## Compact layout (overview pages)
+
+`layout: compact` turns the card into one row for an overview page – the same states and
+wording as the full card, nothing to operate:
+
+- The icon in its state colour, "Voron · Printing 62%" (or Ready, Off, Please wait, Error…).
+- Underneath, what matters now: the file name (wraps, no `.gcode`) and "1h 23m left · done 15:42"
+  on its own line while printing, with a progress bar; "file · finished 15:41" when complete;
+  "Chamber 24° · 4 of 8 loaded" when ready (chamber sensor and Happy Hare lane sensors, when
+  they exist); "Today 0.25 kWh" when off; the printer's message otherwise.
+- Live watts in a pill while the plug is on.
+- The icon and the watts stay centred on the text, however many lines it wraps to; padding and
+  insets match Mushroom cards (56px high on one line).
+- A tap anywhere opens `navigation_path` (e.g. `/lovelace/voron`), or the printer's state
+  more-info if that isn't set.
+
+```yaml
+type: custom:printer-status-card
+layout: compact
+name: Voron
+prefix: voron
+power_switch: switch.voron
+power_sensor: sensor.tasmota_energy_power_2
+energy_today: sensor.tasmota_energy_today_2
+navigation_path: /lovelace/voron
+```
+
 ## Configuration
 
 ```yaml
@@ -64,6 +91,9 @@ camera_card:
 |---|---|
 | `prefix` | **Required.** The Moonraker integration prefix. The card reads `sensor.<prefix>_current_print_state`, `_printer_state`, `_printer_message`, `_current_display_message`, `_filename`, `_progress`, `_print_time_left`, `_print_eta`, `_current_layer`, `_total_layer`, `_filament_used`, `_print_speed`, `_totals_jobs`, `_totals_print_time`, `_totals_filament_used`. |
 | `name` | Shown in the header. Default `Printer`. |
+| `layout` | `full` (default) or `compact` – one row for an overview page (see above). |
+| `navigation_path` | Compact: where a tap goes, e.g. `/lovelace/voron`. |
+| `chamber_sensor` | Compact: the chamber temperature shown when ready (default `sensor.<prefix>_heater_chamber_temperature`). |
 | `power_switch` | The printer's smart plug (`switch` or `input_boolean`). Without it there is no pill and the printer counts as powered. |
 | `power_sensor` | Live watts for the pill. |
 | `energy_today` | kWh today, shown when idle. |

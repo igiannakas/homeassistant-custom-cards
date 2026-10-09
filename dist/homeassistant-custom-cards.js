@@ -2038,7 +2038,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.4.1 ===== */
+/* ===== printer-status-card 1.5.0 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2052,10 +2052,12 @@ registerMmuLanesCard();
  * cancel – are left to the printer itself on purpose. Power on, Power off and turning the
  * plug off always ask first. Tap any value for its own more-info (the watts on the power
  * pill too). Sensors are found from the Moonraker prefix (e.g. "voron").
+ * `layout: compact` is a one-row summary for an overview page (state, what matters now,
+ * a progress bar while printing, live watts); a tap anywhere opens `navigation_path`.
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.4.1";
+const PSC_VERSION = "1.5.0";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -2141,7 +2143,43 @@ function model(hass, cfg) {
     km: num(s("totals_filament_used")) === null ? null : num(s("totals_filament_used")) / 1000,
     thumb: st(cfg.thumbnail || `camera.${p}_thumbnail`)?.attributes?.entity_picture || "",
     light: lightModel(st(cfg.light), cfg.light),
+    // For the compact layout: when the last job ended, chamber temperature, MMU lanes loaded.
+    ended: (() => {
+      const t = st(`sensor.${p}_current_print_state`)?.last_changed;
+      const d = t ? new Date(t) : null;
+      return d && !isNaN(d) ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+    })(),
+    chamber: num(st(cfg.chamber_sensor || `sensor.${p}_heater_chamber_temperature`)?.state),
+    lanes: (() => {
+      const entries = [];
+      for (let n = 0; n < 32 && hass.states[`binary_sensor.${p}_mmu_entry_${n}`]; n++) entries.push(hass.states[`binary_sensor.${p}_mmu_entry_${n}`]);
+      const known = entries.filter((e) => ["on", "off"].includes(e.state));
+      return known.length ? { loaded: known.filter((e) => e.state === "on").length, total: entries.length } : null;
+    })(),
   };
+}
+
+/* Compact layout: the state word, the line under it, and whether to show a progress bar. */
+function compactText(m, cfg) {
+  const file = m.file.replace(/\.gcode$/i, "");
+  const pct = m.progress === null ? "" : ` ${Math.round(m.progress)}%`;
+  if (m.key === "printing" || m.key === "paused") {
+    // The file gets its own line (it may wrap); the times stay together on the next one.
+    return {
+      word: `${m.state.word}${pct}`,
+      line: file,
+      line2: [m.left === null ? "" : `${hm(m.left)} left`, m.eta ? `done ${m.eta}` : ""].filter(Boolean).join(" · "),
+      bar: true,
+    };
+  }
+  if (m.key === "complete") return { word: m.state.word, line: [file, m.ended ? `finished ${m.ended}` : ""].filter(Boolean).join(" · ") };
+  if (m.key === "cancelled") return { word: m.state.word, line: file };
+  if (m.key === "off") return { word: m.state.word, line: cfg.energy_today && m.today !== null ? `Today ${fmt(m.today, 2)} kWh` : m.message };
+  if (m.key === "ready") {
+    const bits = [m.chamber === null ? "" : `Chamber ${fmt(m.chamber)}°`, m.lanes ? `${m.lanes.loaded} of ${m.lanes.total} loaded` : ""].filter(Boolean);
+    return { word: m.state.word, line: bits.join(" · ") || m.message };
+  }
+  return { word: m.state.word, line: m.message };
 }
 
 /* Chamber light: a light / switch / input_boolean, or a 0–100 number (a Klipper output pin). */
@@ -2239,6 +2277,20 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
 
 const CSS = `
   :host { display: block; }
+  /* Compact layout (overview page): one row, icon and watts centred on the whole text block
+     (which may wrap to two lines and carry a progress bar). The whole card is one tap target. */
+  ha-card.compact { padding: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  ha-card.compact:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
+  .crow { display: flex; align-items: center; gap: 10px; }
+  .crow .sc { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+  .cbar { height: 4px; border-radius: 2px; margin-top: 6px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
+  .cbar[hidden], .sc:empty { display: none; }
+  .cbar i { display: block; height: 100%; border-radius: 2px; background: var(--c, ${C.blue}); transition: width 300ms; }
+  .watts { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 10px; border-radius: 18px;
+    font-size: 13px; font-weight: 600; letter-spacing: .2px; white-space: nowrap;
+    background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
+  .watts[hidden] { display: none; }
+  .watts ha-icon { --mdc-icon-size: 18px; color: ${C.orange}; }
   /* Spacing follows Mushroom: content starts 10px from the card edge. */
   ha-card { padding: 10px; container-type: inline-size; }
   .head { display: flex; align-items: center; gap: 10px; padding: 0 0 10px; }
@@ -2311,6 +2363,11 @@ class PrinterStatusCard extends HTMLElement {
           { name: "name", selector: { text: {} } },
           { name: "prefix", required: true, selector: { text: {} } },
         ] },
+        { type: "grid", name: "", schema: [
+          { name: "layout", selector: { select: { mode: "dropdown", options: [
+            { value: "full", label: "Full (job, camera, buttons)" }, { value: "compact", label: "Compact (one row for an overview)" }] } } },
+          { name: "navigation_path", selector: { text: {} } },
+        ] },
         { name: "power_switch", selector: { entity: { domain: ["switch", "input_boolean"] } } },
         { type: "grid", name: "", schema: [
           { name: "power_sensor", selector: { entity: { domain: "sensor", device_class: "power" } } },
@@ -2328,6 +2385,8 @@ class PrinterStatusCard extends HTMLElement {
         ({
           name: "Name",
           prefix: "Moonraker prefix (e.g. voron)",
+          layout: "Layout",
+          navigation_path: "Compact: tap opens (e.g. /lovelace/voron)",
           power_switch: "Power plug",
           power_sensor: "Power (W)",
           energy_today: "Energy today (kWh)",
@@ -2367,7 +2426,57 @@ class PrinterStatusCard extends HTMLElement {
     return { columns: "full", rows: "auto" };
   }
 
+  _buildCompact() {
+    const root = this.shadowRoot || this.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>${CSS}</style><ha-card class="compact" role="button" tabindex="0">
+      <div class="crow"><div class="shape"><ha-icon></ha-icon></div>
+        <div class="txt"><div class="nm"></div><div class="sc"></div><div class="sc sc2"></div><div class="cbar" hidden><i></i></div></div>
+        <span class="watts" hidden><ha-icon icon="mdi:power-plug"></ha-icon><span></span></span></div></ha-card>`;
+    const card = root.querySelector("ha-card");
+    const go = () => {
+      const path = this._config.navigation_path;
+      if (path) {
+        history.pushState(null, "", path);
+        this.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false }, bubbles: true, composed: true }));
+      } else {
+        this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: `sensor.${this._config.prefix}_current_print_state` }, bubbles: true, composed: true }));
+      }
+    };
+    card.addEventListener("click", go);
+    card.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), go()));
+    this._built = true;
+  }
+
+  _renderCompact(m) {
+    const root = this.shadowRoot;
+    const set = (sel, v, html = false) => {
+      const n = root.querySelector(sel);
+      if (n && (html ? n.innerHTML !== v : n.textContent !== v)) html ? (n.innerHTML = v) : (n.textContent = v);
+    };
+    const shape = root.querySelector(".shape");
+    shape.style.background = tint(m.state.color, 20);
+    const ic = shape.querySelector("ha-icon");
+    if (ic.getAttribute("icon") !== m.state.icon) ic.setAttribute("icon", m.state.icon);
+    ic.style.color = m.state.color;
+    const t = compactText(m, this._config);
+    set(".nm", `${esc(this._config.name || "Printer")} <span class="st">· ${esc(t.word)}</span>`, true);
+    set(".sc:not(.sc2)", t.line);
+    set(".sc2", t.line2 || "");
+    const bar = root.querySelector(".cbar");
+    bar.hidden = !t.bar;
+    if (t.bar) {
+      const w = `${Math.max(0, Math.min(100, m.progress || 0))}%`;
+      if (bar.firstElementChild.style.width !== w) bar.firstElementChild.style.width = w;
+      bar.style.setProperty("--c", m.state.color);
+    }
+    const watts = root.querySelector(".watts");
+    const showW = !!(m.plug?.on && m.plug.watts !== null);
+    watts.hidden = !showW;
+    if (showW) set(".watts span", `${fmt(m.plug.watts)} W`);
+  }
+
   _build() {
+    if (this._config.layout === "compact") return this._buildCompact();
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${CSS}</style><ha-card>
       <div class="head"><div class="shape"><ha-icon></ha-icon></div>
@@ -2482,6 +2591,7 @@ class PrinterStatusCard extends HTMLElement {
     const root = this.shadowRoot;
     const m = model(this._hass, this._config);
     this._m = m;
+    if (this._config.layout === "compact") return this._renderCompact(m);
     const set = (sel, v, html = false) => {
       const n = root.querySelector(sel);
       if (!n) return;

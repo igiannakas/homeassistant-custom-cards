@@ -295,7 +295,38 @@ const cfg = {
   const noPlug = mount({ prefix: "voron" }, states({ "sensor.voron_printer_state": { state: "unavailable", attributes: {} } }));
   eq([...noPlug.shadowRoot.querySelectorAll(".act")].map((x) => x.textContent), []);
 
-  console.log("printer-status-card: all tests passed");
+    // Compact layout: one row, wrapping text, progress bar while printing, the whole card navigates.
+  {
+    const cc = mount({ ...cfg, layout: "compact", navigation_path: "/lovelace/voron" }, states(printing()));
+    const cr = cc.shadowRoot;
+    assert(cr.querySelector("ha-card.compact"));
+    assert(!cr.querySelector(".act") && !cr.querySelector(".camera"), "no buttons or camera in compact");
+    assert.strictEqual(cr.querySelector(".nm").textContent, "Voron · Printing 62%");
+    assert.strictEqual(cr.querySelector(".sc").textContent, "bracket_v3", "file on its own line, without .gcode");
+    assert(/^1h 23m left · done \d\d:\d\d$/.test(cr.querySelector(".sc2").textContent), cr.querySelector(".sc2").textContent);
+    assert(!cr.querySelector(".cbar").hidden);
+    assert.strictEqual(cr.querySelector(".cbar i").style.width, "62%");
+    assert.strictEqual(cr.querySelector(".watts span").textContent, "142 W");
+    const before = calls.length;
+    cr.querySelector(".watts").click();
+    await tick();
+    assert.strictEqual(t.window.location.pathname, "/lovelace/voron", "a tap anywhere opens the Voron view");
+    assert.strictEqual(calls.length, before, "and calls nothing");
+    t.window.history.replaceState(null, "", "/lovelace/0");
+    cr.querySelector(".sc").click();
+    assert.strictEqual(t.window.location.pathname, "/lovelace/voron");
+    const shape = cr.querySelector(".shape");
+    cc.hass = hass(states());
+    assert.strictEqual(cr.querySelector(".shape"), shape, "updated in place");
+    assert.strictEqual(cr.querySelector(".nm").textContent, "Voron · Ready");
+    assert(cr.querySelector(".cbar").hidden);
+    assert.strictEqual(cr.querySelector(".sc2").textContent, "", "second line only while printing");
+    cc.hass = hass(states({ "switch.voron": { state: "off", attributes: {} }, "sensor.tasmota_energy_power_2": { state: "0", attributes: {} } }));
+    assert.strictEqual(cr.querySelector(".nm").textContent, "Voron · Off");
+    assert.strictEqual(cr.querySelector(".sc").textContent, "Today 0.84 kWh");
+    assert(cr.querySelector(".watts").hidden, "no watts while the plug is off");
+  }
+console.log("printer-status-card: all tests passed");
   process.exit(0); // feed checks leave timers running
 })().catch((e) => {
   console.error(e);
