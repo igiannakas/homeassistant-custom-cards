@@ -17,7 +17,10 @@
 ```
 
 - **Header**: state in its colour (Off, Ready, Printing, Paused, Complete,
-  Cancelled, Error) and the printer's message – or the file name during a job.
+  Cancelled, Error) and the printer's message – or the file name during a job. While
+  the plug is on but the printer isn't answering it says **Please wait**, with why:
+  "Shutting down" (the `power_off_script` is running), "Klipper is starting", or
+  "Waiting for the printer".
 - **Power pill**: shown only while the plug is on, with its live watts. Tap On to cut
   the plug: it asks first, and warns in red while a print is running. Tap the watts for
   the power sensor. When the plug is off the pill goes away and the Power on button

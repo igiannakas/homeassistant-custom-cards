@@ -1941,7 +1941,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.4.0 ===== */
+/* ===== printer-status-card 1.4.1 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1958,7 +1958,7 @@ registerMmuLanesCard();
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.4.0";
+const PSC_VERSION = "1.4.1";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -1984,9 +1984,10 @@ function hm(hours) {
 /* "4825h 49m 38s" → 4826 */
 function hoursFrom(text) {
   const t = String(text || "");
-  const h = Number((t.match(/(\d+)\s*h/) || [])[1] || 0);
-  const m = Number((t.match(/(\d+)\s*m/) || [])[1] || 0);
-  return t ? Math.round(h + m / 60) : null;
+  const hh = t.match(/(\d+)\s*h/);
+  const mm = t.match(/(\d+)\s*m/);
+  if (!hh && !mm) return null; // "unavailable" while the printer boots or shuts down
+  return Math.round(Number(hh?.[1] || 0) + Number(mm?.[1] || 0) / 60);
 }
 
 const STATES = {
@@ -1997,7 +1998,8 @@ const STATES = {
   complete: { word: "Complete", color: C.green, icon: "mdi:check-circle-outline" },
   cancelled: { word: "Cancelled", color: C.grey, icon: "mdi:close-circle-outline" },
   error: { word: "Error", color: C.red, icon: "mdi:alert-circle-outline" },
-  starting: { word: "Starting", color: C.grey, icon: "mdi:printer-3d" },
+  // Plug on but Klipper/Moonraker not answering: booting, or shutting down before the plug cuts.
+  busy: { word: "Please wait", color: C.grey, icon: "mdi:timer-sand" },
 };
 
 /* Everything the card shows. */
@@ -2014,7 +2016,10 @@ function model(hass, cfg) {
   if (!plugOn) key = "off";
   else if (["error", "shutdown"].includes(printer) || job === "error") key = "error";
   else if (["printing", "paused", "complete", "cancelled"].includes(job)) key = job;
-  else if (!printer || printer === "unavailable" || printer === "unknown" || printer === "startup") key = "starting";
+  else if (!printer || printer === "unavailable" || printer === "unknown" || printer === "startup") key = "busy";
+  // Why we are waiting: the safe power-off script is running, Klipper is starting, or no answer yet.
+  const off = cfg.power_off_script && cfg.power_off_script.startsWith("script.") ? st(cfg.power_off_script) : undefined;
+  const busyMsg = off?.state === "on" ? "Shutting down" : printer === "startup" ? "Klipper is starting" : "Waiting for the printer";
 
   const msg = [s("current_display_message"), s("printer_message")].find((x) => x && !["unknown", "unavailable"].includes(x)) || "";
   const watts = num(st(cfg.power_sensor)?.state);
@@ -2023,7 +2028,7 @@ function model(hass, cfg) {
   return {
     key,
     state: STATES[key],
-    message: !plugOn ? "Power is off" : msg,
+    message: !plugOn ? "Power is off" : key === "busy" ? busyMsg : msg,
     plug: plug ? { on: plugOn, watts } : null,
     file: s("filename") && !["unknown", "unavailable"].includes(s("filename")) ? s("filename") : "",
     progress: num(s("progress")),
@@ -2059,7 +2064,7 @@ function lightModel(s, id) {
    resume, cancel) are deliberately not here – they are done on the printer. */
 function actions(key) {
   if (key === "off") return [["poweron", "Power on", "mdi:power"]];
-  if (["printing", "paused", "starting"].includes(key)) return [];
+  if (["printing", "paused", "busy"].includes(key)) return [];
   return [["poweroff", "Power off", "mdi:power"]];
 }
 

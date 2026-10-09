@@ -135,6 +135,19 @@ const cfg = {
   assert.strictEqual(q(".l2").textContent, "");
   eq(acts(), ["Power off"]);
 
+  // Plug on but Moonraker not answering: "Please wait", with the reason, and no buttons.
+  const down = { ...Object.fromEntries([p("printer_state", "unavailable"), p("totals_jobs", "unavailable"), p("totals_print_time", "unavailable"), p("totals_filament_used", "unavailable")]) };
+  card.hass = hass(states(down));
+  assert.strictEqual(q(".nm").textContent, "Voron · Please wait");
+  assert.strictEqual(q(".msg").textContent, "Waiting for the printer");
+  eq(acts(), []);
+  eq([...r.querySelectorAll(".stats b")].map((b) => b.textContent), ["0.84 kWh", "–", "–", "–"], "no fake 0 h while totals are unavailable");
+  card.hass = hass(states({ ...down, "script.power_off_3d_printer": { state: "on", attributes: {} } }));
+  assert.strictEqual(q(".msg").textContent, "Shutting down", "the safe power-off script is running");
+  card.hass = hass(states(Object.fromEntries([p("printer_state", "startup")])));
+  assert.strictEqual(q(".nm").textContent, "Voron · Please wait");
+  assert.strictEqual(q(".msg").textContent, "Klipper is starting");
+
   // Error state.
   card.hass = hass(states(Object.fromEntries([p("printer_state", "shutdown"), p("printer_message", "MCU 'mcu' shutdown")])));
   assert.strictEqual(q(".nm").textContent, "Voron · Error");
