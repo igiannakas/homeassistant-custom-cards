@@ -8,7 +8,7 @@
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.0.0";
+const CMC_VERSION = "1.1.0";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -45,8 +45,11 @@ const CSS = `
   .title { font-size: 13px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
   .status { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .switch { all: unset; margin-left: auto; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px;
-    font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); -webkit-tap-highlight-color: transparent; }
+  /* Switch next to the status; padded so the whole label + switch is an easy tap target. */
+  .switch { all: unset; flex: none; margin: -6px -4px -6px 4px; padding: 6px 4px 6px 10px; display: inline-flex; align-items: center; gap: 8px;
+    cursor: pointer; border-radius: 16px; font-size: 12px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
+    -webkit-tap-highlight-color: transparent; }
+  .status:empty { display: none; }
   .sw { width: 34px; height: 20px; border-radius: 10px; position: relative; background: var(--disabled-color, #bdbdbd); transition: background-color 160ms; }
   .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
@@ -54,12 +57,13 @@ const CSS = `
   .switch.on .sw::after { transform: translateX(14px); }
   .modes { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 6px; }
   .mode { all: unset; box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 10px 2px 8px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
+    padding: 10px 2px 9px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
   .shape { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     background: ${tint(GREY, 20)}; transition: background-color 180ms; }
   .shape ha-icon { --mdc-icon-size: 24px; color: ${GREY}; transition: color 180ms; }
-  .name { max-width: 100%; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+  /* 12px like every other card's second line; the icon carries the tile. */
+  .name { max-width: 100%; font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .2px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mode.on { background: color-mix(in srgb, var(--c) 12%, transparent); }
   .mode.on .shape { background: color-mix(in srgb, var(--c) 20%, transparent); }
@@ -67,7 +71,6 @@ const CSS = `
   /* Press feedback without moving anything, so taps near the edge still land. */
   .mode:active, .switch:active { filter: brightness(.92); }
   .mode:focus-visible, .switch:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  @container (max-width: 300px) { .name { font-size: 12px; } }
   ha-card { container-type: inline-size; }
 `;
 
@@ -85,7 +88,11 @@ class ClimateModesCard extends HTMLElement {
         ] },
         { name: "icon_color", selector: { ui_color: {} } },
         { name: "thermostats", selector: { entity: { domain: "climate", multiple: true } } },
-        { name: "switch", selector: { entity: { domain: ["automation", "input_boolean", "switch"] } } },
+        { type: "grid", name: "", schema: [
+          { name: "switch", selector: { entity: { domain: ["automation", "input_boolean", "switch"] } } },
+          { name: "switch_name", selector: { text: {} } },
+        ] },
+        { name: "switch_tap_action", selector: { ui_action: {} } },
         { name: "modes", selector: { object: {} } },
       ],
       computeLabel: (s) =>
@@ -95,12 +102,15 @@ class ClimateModesCard extends HTMLElement {
           icon_color: "Icon colour",
           thermostats: "Thermostats (a mode is active when all share its preset)",
           switch: "Switch in the label row (optional)",
+          switch_name: "Switch label (default Automatic)",
+          switch_tap_action: "Switch tap (default: toggle)",
           modes: "Modes",
         })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
           modes: "One entry per tile: name, icon, color, preset (or active: {entity, state}) and tap_action.",
-          switch: "Shown instead of the status text, e.g. an automatic-aircon automation.",
+          switch: "Shown after the status, e.g. summer mode or an automatic-aircon automation.",
+          switch_tap_action: "E.g. navigate to #summer-mode to confirm in a pop-up first.",
         })[s.name],
     };
   }
@@ -131,8 +141,8 @@ class ClimateModesCard extends HTMLElement {
     root.innerHTML = `<style>${CSS}</style><ha-card>
       ${c.title || c.icon ? `<div class="label"><ha-icon icon="${esc(c.icon || "mdi:thermostat")}" style="color:${color(c.icon_color || "orange")}"></ha-icon>
         <span class="title">${esc(c.title || "")}</span>
-        ${c.switch ? `<button class="switch" role="switch" style="--sw-color:${color(c.switch_color || "blue")}"><span class="swl"></span><span class="sw"></span></button>`
-          : `<span class="status"></span>`}</div>` : ""}
+        <span class="status"></span>
+        ${c.switch ? `<button class="switch" role="switch" style="--sw-color:${color(c.switch_color || "blue")}"><span class="swl"></span><span class="sw"></span></button>` : ""}</div>` : ""}
       <div class="modes" style="--n:${Math.max(1, c.modes.length)}">
         ${c.modes
           .map((m, i) => `<button class="mode" data-i="${i}" style="--c:${color(m.color)}" aria-pressed="false">
@@ -195,6 +205,7 @@ class ClimateModesCard extends HTMLElement {
   }
 
   async _toggleSwitch() {
+    if (this._config.switch_tap_action) return this._tap({ tap_action: this._config.switch_tap_action });
     const id = this._config.switch;
     const on = this._hass.states[id]?.state === "on";
     this._fire("haptic", "light");

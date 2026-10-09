@@ -17,7 +17,8 @@
   history, so a Home Assistant restart does not reset it. Tap goes to
   `presence.navigation_path` (or opens the entity).
 - **Link pill**: a plain "go there" pill, e.g. to your climate dashboard.
-- On narrow cards (phones) the two pills stack on the right.
+- The pills are finger-sized buttons (36px). On a phone the weather takes the
+  first line and the two pills become a row of wide 44px buttons underneath.
 
 ## Configuration
 

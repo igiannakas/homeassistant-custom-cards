@@ -10,8 +10,9 @@
 ```
 
 - A label row (icon, title) with what the rooms are on – "All rooms · Night",
-  or "Mixed" when they differ – or, instead, a switch (e.g. an automatic
-  aircon automation).
+  or "Mixed" when they differ – and optionally a switch next to it (e.g.
+  summer mode, or an automatic aircon automation). The switch toggles, or runs
+  `switch_tap_action` instead – e.g. a confirmation pop-up.
 - A tile per mode. The active one glows in its own colour.
 - A mode is active when **all** `thermostats` share its `preset`, or when its
   own `active.entity` is in `active.state` (handy for an aircon speed helper).
@@ -42,6 +43,10 @@ modes:
     color: blue
     preset: away
     tap_action: { action: navigate, navigation_path: "#away-all" }
+switch: input_boolean.heating_summer_mode
+switch_name: Summer
+switch_color: amber
+switch_tap_action: { action: navigate, navigation_path: "#summer-mode" }
 ```
 
 Cooling example (entity + state modes and a switch in the label row):
@@ -63,7 +68,8 @@ modes:
 |---|---|
 | `title`, `icon`, `icon_color` | Label row. Colours are Home Assistant colour names (`orange`, `cyan`, …) or any CSS colour. |
 | `thermostats` | Climate entities whose shared preset picks the active mode. |
-| `switch`, `switch_name`, `switch_color` | Optional switch in the label row instead of the status text. |
+| `switch`, `switch_name`, `switch_color` | Optional switch in the label row, after the status. |
+| `switch_tap_action` | What tapping the switch does instead of toggling, e.g. `{ action: navigate, navigation_path: "#summer-mode" }`. |
 | `modes[].name`, `icon`, `color` | The tile. |
 | `modes[].preset` | Active when every thermostat has this preset. |
 | `modes[].active` | `{ entity, state }` – active when the entity is in that state (one value or a list). |

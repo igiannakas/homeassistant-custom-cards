@@ -94,6 +94,21 @@ const cfg = {
   await tick();
   eq(calls.pop(), ["homeassistant", "turn_off", { entity_id: "automation.ac" }]);
 
+  // Heating with a summer-mode switch: status and switch side by side; tap opens the pop-up.
+  const h2 = document.createElement("climate-modes-card");
+  document.body.appendChild(h2);
+  h2.setConfig({ ...cfg, switch: "input_boolean.summer", switch_name: "Summer", switch_color: "amber",
+    switch_tap_action: { action: "navigate", navigation_path: "#summer-mode" } });
+  h2.hass = hass(Array(4).fill("frost_protection"), { "input_boolean.summer": "on" });
+  const hr = h2.shadowRoot;
+  assert.strictEqual(hr.querySelector(".status").textContent, "All rooms · Off");
+  assert.strictEqual(hr.querySelector(".switch .swl").textContent, "Summer");
+  assert(hr.querySelector(".switch").classList.contains("on"));
+  hr.querySelector(".switch").click();
+  await tick();
+  assert.strictEqual(navs.pop(), "#summer-mode");
+  assert.strictEqual(calls.length, 0, "no direct toggle when a tap action is set");
+
   // A failing service shows a toast instead of throwing.
   let toast = null;
   card.addEventListener("hass-notification", (e) => (toast = e.detail.message));

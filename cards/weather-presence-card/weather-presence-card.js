@@ -8,7 +8,7 @@
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.0.0";
+const WPC_VERSION = "1.1.0";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -52,7 +52,8 @@ function ago(ms) {
 
 const CSS = `
   :host { display: block; }
-  ha-card { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 8px; container-type: inline-size; }
+  ha-card { padding: 8px 10px 8px 8px; container-type: inline-size; }
+  .wrap { display: flex; align-items: center; gap: 10px; }
   .wx { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent;
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; border-radius: 10px; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
@@ -66,14 +67,21 @@ const CSS = `
   .v ha-icon { --mdc-icon-size: 14px; }
   .v.real ha-icon { color: color-mix(in srgb, ${C.orange} 55%, ${C.grey}); }
   .v.fc ha-icon { color: color-mix(in srgb, ${C.blue} 55%, ${C.grey}); }
-  .pills { flex: none; display: flex; gap: 6px; align-items: center; }
-  /* Narrow (phone): the pills stack, so the temperatures keep their room. */
-  @container (max-width: 420px) { .pills { flex-direction: column; align-items: flex-end; } }
-  .pill { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px 0 7px;
-    border-radius: 14px; cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: .2px; white-space: nowrap;
+  .pills { flex: none; display: flex; gap: 8px; align-items: center; }
+  /* Pills are finger-sized (36px, 44px on a phone) – they are the card's buttons. */
+  .pill { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 36px; padding: 0 14px 0 10px; border-radius: 18px; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: .2px;
+    white-space: nowrap;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
     -webkit-tap-highlight-color: transparent; }
-  .pill ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; }
+  .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
+  /* Phone: the weather gets the full first line; the two pills share a row of wide buttons below. */
+  @container (max-width: 440px) {
+    .wrap { flex-wrap: wrap; row-gap: 8px; }
+    .wx { flex: 1 1 100%; }
+    .pills { flex: 1 1 100%; display: grid; grid-template-columns: repeat(var(--np, 2), minmax(0, 1fr)); }
+    .pill { height: 44px; border-radius: 22px; }
+  }
   .pill.home { background: ${tint(C.teal, 20)}; color: ${C.teal}; }
   .pill.home ha-icon { color: ${C.teal}; }
   .pill.link { color: var(--primary-text-color); padding-right: 4px; }
@@ -207,13 +215,14 @@ class WeatherPresenceCard extends HTMLElement {
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const link = this._config.link;
-    root.innerHTML = `<style>${CSS}</style><ha-card>
+    const np = (this._presenceId() ? 1 : 0) + (link ? 1 : 0);
+    root.innerHTML = `<style>${CSS}</style><ha-card><div class="wrap">
       <div class="wx" role="button" tabindex="0"><div class="shape"><ha-icon></ha-icon></div>
         <div class="txt"><div class="nm"></div><div class="sc"></div></div></div>
-      <div class="pills">
+      <div class="pills" style="--np:${np || 1}${np ? "" : ";display:none"}">
         ${this._presenceId() ? `<button class="pill pres"><ha-icon></ha-icon><span></span></button>` : ""}
         ${link ? `<button class="pill link"><ha-icon></ha-icon><span></span><ha-icon class="ch" icon="mdi:chevron-right"></ha-icon></button>` : ""}
-      </div></ha-card>`;
+      </div></div></ha-card>`;
     const wx = root.querySelector(".wx");
     let timer = null;
     let held = false;
