@@ -222,6 +222,19 @@ const cfg = {
   fc.hass = lh;
   eq(on(), ["Day"], "no schedule flag while summer mode locks the rooms");
 
+  // icon_tap_action: the label icon becomes a tap target (filled circle) and navigates.
+  const ic = document.createElement("climate-modes-card");
+  document.body.appendChild(ic);
+  ic.setConfig({ ...cfg, icon_tap_action: { action: "navigate", navigation_path: "/lovelace/climate" } });
+  ic.hass = hass(Array(4).fill("eco"));
+  const ti = ic.shadowRoot.querySelector(".label > ha-icon");
+  assert(ti.classList.contains("tap") && ti.getAttribute("role") === "button");
+  ti.click();
+  await tick();
+  navs.pop();
+  assert.strictEqual(window.location.pathname, "/lovelace/climate");
+  assert(!card.shadowRoot.querySelector(".label > ha-icon.tap"), "no tap target without icon_tap_action");
+
   console.log("ALL CLIMATE-MODES TESTS PASSED");
   process.exit(0);
 })().catch((e) => {

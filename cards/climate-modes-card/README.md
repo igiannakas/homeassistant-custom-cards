@@ -103,6 +103,7 @@ modes:
 | `status` | `mode` (default) shows the active mode in the label row; `activity` shows what the heating is doing (see above). |
 | `lock` | With `activity`: `{ entity, text, icon, color }` – while `entity` is on, the label row shows this instead, e.g. `{ entity: input_boolean.heating_summer_mode, text: "Summer · heating locked", icon: mdi:weather-sunny, color: amber }`. |
 | `names` | With `activity`: room names per thermostat, e.g. `{ climate.study_thermostat: Study }`. Default: the friendly name without "Thermostat". |
+| `icon_tap_action` | Makes the label-row icon a tap target (it gets a filled circle), e.g. `{ action: navigate, navigation_path: /lovelace/climate }`. |
 | `switch_tap_action` | What tapping the switch does instead of toggling, e.g. `{ action: toggle, confirmation: { title: Summer mode } }` to ask first. |
 | `modes[].name`, `icon`, `color` | The tile. |
 | `modes[].preset` | Active when every thermostat has this preset. |
