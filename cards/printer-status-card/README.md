@@ -24,9 +24,11 @@
 - **Job**: thumbnail, progress, time left and finish time, layer, filament used and
   speed. Stays up after the print as "Done" / "Cancelled".
 - **Idle**: energy used today, prints, hours printed and kilometres of filament.
-- **Camera**: any card you like (e.g. Frigate card), shown inside this one – only while the
-  printer has power. With the plug off the camera card is removed, so it doesn't keep trying to
-  connect, and it comes back when the plug is on.
+- **Camera**: any card you like (e.g. Frigate card), shown inside this one – only while there is
+  a picture: the printer must be reachable (plug on and Moonraker's printer state not
+  unavailable) and the camera must actually serve an image. The card asks Home Assistant for a
+  small still of the camera (`/api/camera_proxy/…`) every 15 s while hidden and every 60 s while
+  shown; an error hides the camera card, so it never sits there trying to connect.
 - **Buttons** follow the state: Pause + Cancel while printing, Resume + Cancel when
   paused, Home + Power off when idle, Power on when the plug is off (at once, no dialog). Home, Cancel and Power off ask first. There
   is no emergency stop on purpose.
@@ -66,4 +68,5 @@ camera_card:
 | `light_name` | Button label. Default `Light`. |
 | `light_on` | For a number: the level "on" sets when the card hasn't seen an earlier level. Default the maximum (100). |
 | `camera_card` | Any card config, rendered inside the card. |
+| `camera_entity` | Camera to test for a picture. Default: taken from `camera_card` (`cameras[0].camera_entity`, `camera_entity` or `entity`). |
 | `thumbnail` | Camera entity with the job thumbnail. Default `camera.<prefix>_thumbnail`. |

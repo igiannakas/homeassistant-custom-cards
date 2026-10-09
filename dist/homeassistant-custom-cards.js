@@ -1820,7 +1820,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.3.0 ===== */
+/* ===== printer-status-card 1.3.1 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1828,7 +1828,7 @@ registerMmuLanesCard();
  * A Klipper / Moonraker printer at a glance: state and message, a power pill (plug
  * and live watts), the current job (thumbnail, progress, time left, finish time,
  * layer, filament, speed) or, when idle, today's energy and lifetime totals, your
- * camera card (only while the printer has power), the buttons that make sense for the
+ * camera card (only while the printer is reachable and the camera serves a picture), the buttons that make sense for the
  * state (Power on when the plug is off), and an optional chamber light
  * toggle (glows while on; hold it for the light's more-info). Home, Cancel and
  * Power off always ask first. Tap any value for its own more-info (the watts on the power
@@ -1836,7 +1836,7 @@ registerMmuLanesCard();
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.3.0";
+const PSC_VERSION = "1.3.1";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -2099,6 +2099,7 @@ class PrinterStatusCard extends HTMLElement {
           { name: "light_name", selector: { text: {} } },
         ] },
         { name: "camera_card", selector: { object: {} } },
+        { name: "camera_entity", selector: { entity: { domain: "camera" } } },
       ],
       computeLabel: (s) =>
         ({
@@ -2109,6 +2110,7 @@ class PrinterStatusCard extends HTMLElement {
           energy_today: "Energy today (kWh)",
           power_off_script: "Safe power-off script",
           camera_card: "Camera card (YAML)",
+          camera_entity: "Camera to check (default: from the camera card)",
           light: "Chamber light",
           light_name: "Light button label",
         })[s.name] ?? s.name,
@@ -2172,10 +2174,26 @@ class PrinterStatusCard extends HTMLElement {
     this._cameraEl = null;
   }
 
-  /* The camera card lives only while the printer has power: with the plug off its stream can't
-     exist, and a mounted camera card would keep trying to connect. */
-  _syncCamera(show) {
+  /* The camera card is shown only while there is something to show: the printer is reachable
+     (plug on and Moonraker's printer_state not unavailable) and the camera actually serves a
+     picture. The camera entity's own state can't tell (it stays "idle" with the printer off),
+     so the card asks Home Assistant for a still image: OK → show; error → hide. It re-checks
+     every 15 s while hidden and every 60 s while shown. */
+  _cameraEntity() {
+    const c = this._config.camera_card || {};
+    return this._config.camera_entity || c.camera_entity || c.entity || c.cameras?.[0]?.camera_entity || "";
+  }
+
+  _syncCamera(up) {
     if (!this._config.camera_card) return;
+    if (!up) {
+      this._feedOk = false;
+      clearTimeout(this._probeTimer);
+      this._probeTimer = null;
+    } else if (!this._probeTimer && !this._probing) {
+      this._probe();
+    }
+    const show = up && this._feedOk;
     if (show && !this._cameraEl && !this._cameraPending) this._mountCamera();
     if (!show && (this._cameraEl || this._cameraPending)) {
       this._cameraGen = (this._cameraGen || 0) + 1; // drop a mount still in flight
@@ -2183,6 +2201,37 @@ class PrinterStatusCard extends HTMLElement {
       this._cameraEl = null;
       this.shadowRoot.querySelector(".camera").replaceChildren();
     }
+  }
+
+  async _probe() {
+    clearTimeout(this._probeTimer);
+    this._probeTimer = null;
+    this._probing = true;
+    let ok = false;
+    const id = this._cameraEntity();
+    try {
+      if (!id || typeof this._hass?.fetchWithAuth !== "function") ok = true; // nothing to test: trust the printer state
+      else {
+        const r = await this._hass.fetchWithAuth(`/api/camera_proxy/${id}?width=64&_=${Date.now()}`);
+        ok = !!r && r.ok && String(r.headers?.get?.("content-type") || "image").startsWith("image");
+      }
+    } catch (e) {
+      ok = false;
+    }
+    if (!this.isConnected || !this._printerUp) {
+      this._probing = false;
+      return;
+    }
+    this._feedOk = ok;
+    // Schedule the next check before re-syncing, so the sync never starts a second probe.
+    this._probeTimer = setTimeout(() => this._probe(), ok ? 60000 : 15000);
+    this._probing = false;
+    this._syncCamera(true);
+  }
+
+  disconnectedCallback() {
+    clearTimeout(this._probeTimer);
+    this._probeTimer = null;
   }
 
   async _mountCamera() {
@@ -2273,7 +2322,10 @@ class PrinterStatusCard extends HTMLElement {
     }
 
     // Buttons for this state (rebuilt only when the set changes, so taps are never lost).
-    this._syncCamera(m.key !== "off");
+    // Printer reachable: plug on and Moonraker answering (printer_state not unavailable/unknown).
+    const ps = String(this._hass.states[`sensor.${this._config.prefix}_printer_state`]?.state || "unavailable");
+    this._printerUp = m.key !== "off" && !["unavailable", "unknown"].includes(ps);
+    this._syncCamera(this._printerUp);
     const acts = actions(m.key).filter(([k]) => (k !== "poweroff" || this._config.power_off_script) && (k !== "poweron" || this._config.power_switch));
     if (m.light) acts.push(["light", "", ""]);
     const keys = acts.map((a) => a[0]).join();

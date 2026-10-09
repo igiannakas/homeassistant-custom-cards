@@ -175,6 +175,16 @@ const cfg = {
   assert(!document.querySelector("psc-confirm-dialog"), "turning on does not ask");
   eq(calls.pop(), ["switch", "turn_on", { entity_id: "switch.voron" }]);
 
+  // Idle printer: switching the plug off from the pill also asks first; cancel does nothing.
+  card.hass = hass(states());
+  q(".pill .tog").click();
+  await tick();
+  dlg = document.querySelector("psc-confirm-dialog");
+  assert(dlg && dlg.shadowRoot.textContent.includes("Cut power"), "plug off asks first");
+  dlg.shadowRoot.querySelector(".cancel").click();
+  await tick();
+  assert.strictEqual(calls.length, 0, "cancel leaves the plug on");
+
   // Without a power-off script there is no Power off button; without energy_today three stats.
   const bare = mount({ prefix: "voron" }, states());
   eq([...bare.shadowRoot.querySelectorAll(".act")].map((b) => b.textContent), ["Home"]);
@@ -254,6 +264,28 @@ const cfg = {
   cam.hass = hass(states());
   await tick();
   assert.strictEqual(made.length, 2, "mounted once, not on every update");
+  // Printer unreachable (plug on, Moonraker unavailable): no camera.
+  cam.hass = hass(states({ "sensor.voron_printer_state": { state: "unavailable", attributes: {} } }));
+  await tick();
+  assert(!cam.shadowRoot.querySelector(".camera .cam"), "no camera while the printer is unavailable");
+  // Feed test: the card asks HA for a still; an error hides the camera, a picture shows it.
+  let feed = false;
+  const probes = [];
+  const withFeed = (st) => ({ ...hass(st), fetchWithAuth: async (url) => { probes.push(url); return feed ? { ok: true, headers: { get: () => "image/jpeg" } } : { ok: false, headers: { get: () => "text/plain" } }; } });
+  const fc = mount({ ...cfg, camera_card: { type: "custom:frigate-card", cameras: [{ camera_entity: "camera.voron_camera" }] } }, states());
+  fc.hass = withFeed(states());
+  await tick(); await tick();
+  // The first check (no fetchWithAuth in the test hass) trusted the printer; the next check uses the feed.
+  fc._probe();
+  await tick(); await tick();
+  assert(probes[0].startsWith("/api/camera_proxy/camera.voron_camera"), probes[0]);
+  assert(!fc.shadowRoot.querySelector(".camera .cam"), "no camera when the feed fails");
+  feed = true;
+  fc._probe();
+  await tick(); await tick();
+  assert(fc.shadowRoot.querySelector(".camera .cam"), "camera shown once the feed answers");
+  clearTimeout(fc._probeTimer);
+  fc.remove();
   // A card set up with the plug already off never creates the camera until power returns.
   const made0 = made.length;
   const camOff = mount({ ...cfg, camera_card: { type: "custom:frigate-card" } }, offStates);
@@ -265,6 +297,7 @@ const cfg = {
   eq([...noPlug.shadowRoot.querySelectorAll(".act")].map((x) => x.textContent), []);
 
   console.log("printer-status-card: all tests passed");
+  process.exit(0); // feed checks leave timers running
 })().catch((e) => {
   console.error(e);
   process.exit(1);
