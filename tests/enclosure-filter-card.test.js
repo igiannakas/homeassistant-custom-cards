@@ -14,16 +14,18 @@ function states(over = {}) {
     "sensor.stealthmax_exhaust_temperature": s(30.1),
     "sensor.stealthmax_exhaust_humidity": s(30.2),
     "sensor.stealthmax_exhaust_voc": s(96),
-    "sensor.stealthmax_voc_delta": s(216),
+    "sensor.stealthmax_intake_exhaust_voc_delta": s(216),
+    "sensor.stealthmax_intake_voc_manual_calibration": s(499.95),
+    "sensor.stealthmax_exhaust_voc_manual_calibration": s(110.12),
     ...over,
   };
 }
 const cfg = {
   title: "StealthMax",
   vent: VENT,
-  intake: { temperature: "sensor.stealthmax_intake_temperature", humidity: "sensor.stealthmax_intake_humidity", voc: "sensor.stealthmax_intake_voc" },
-  exhaust: { temperature: "sensor.stealthmax_exhaust_temperature", humidity: "sensor.stealthmax_exhaust_humidity", voc: "sensor.stealthmax_exhaust_voc" },
-  details: [{ entity: "sensor.stealthmax_voc_delta", name: "VOC delta" }, "sensor.missing"],
+  intake: { temperature: "sensor.stealthmax_intake_temperature", humidity: "sensor.stealthmax_intake_humidity", voc: "sensor.stealthmax_intake_voc", voc_manual: "sensor.stealthmax_intake_voc_manual_calibration" },
+  exhaust: { temperature: "sensor.stealthmax_exhaust_temperature", humidity: "sensor.stealthmax_exhaust_humidity", voc: "sensor.stealthmax_exhaust_voc", voc_manual: "sensor.stealthmax_exhaust_voc_manual_calibration" },
+  details: [{ entity: "sensor.stealthmax_intake_exhaust_voc_delta", name: "VOC delta" }, "sensor.missing"],
 };
 
 (async () => {
@@ -35,18 +37,24 @@ const cfg = {
   // Only numeric options become segments; 0/100 read Closed/Open.
   eq(seg().map((b) => b.textContent), ["Closed", "25", "50", "75", "Open"]);
   eq(seg().map((b) => b.classList.contains("on")), [false, true, false, false, false]);
-  assert.strictEqual(r.querySelector(".side.in .vals").textContent, "31.2°29%VOC 312");
-  assert.strictEqual(r.querySelector(".side.out .vals").textContent, "30.1°30%VOC 96");
+  assert.strictEqual(r.querySelector(".side.in .vals").textContent, "31.2°29%VOC 312VOC (manual) 500");
+  assert.strictEqual(r.querySelector(".side.out .vals").textContent, "30.1°30%VOC 96VOC (manual) 110");
   // VOC 312 is orange tier, 96 green.
-  assert(r.querySelector(".side.in .vals .v:last-child").getAttribute("style").includes("--orange-color"));
-  assert(r.querySelector(".side.out .vals .v:last-child").getAttribute("style").includes("--green-color"));
+  assert(r.querySelectorAll(".side.in .vals .v")[2].getAttribute("style").includes("--orange-color"));
+  assert(r.querySelectorAll(".side.out .vals .v")[2].getAttribute("style").includes("--green-color"));
+  assert(r.querySelectorAll(".side.in .vals .v")[3].getAttribute("style").includes("--red-color"));
   assert.strictEqual(r.querySelector(".sum").textContent, "VOC 312 → 96");
   assert.strictEqual(r.querySelector(".extra").textContent, "VOC delta 216");
 
   seg()[4].click();
   eq(calls.pop(), ["select", "select_option", { entity_id: VENT, option: "100" }]);
   r.querySelector(".side.in").click();
-  eq(events.splice(0), [["more-info", "sensor.stealthmax_intake_voc"]]);
+  r.querySelectorAll(".side.out .v").forEach((b) => b.click());
+  r.querySelector(".extra .x").click();
+  eq(events.splice(0).map((x) => x[1]), [
+    "sensor.stealthmax_intake_voc", "sensor.stealthmax_exhaust_temperature", "sensor.stealthmax_exhaust_humidity", "sensor.stealthmax_exhaust_voc",
+    "sensor.stealthmax_exhaust_voc_manual_calibration", "sensor.stealthmax_intake_exhaust_voc_delta",
+  ]);
 
   // Manual vent: no segment lit, summary says so.
   card.hass = hass(states({ [VENT]: { state: "Manual", attributes: { options: opts } } }));

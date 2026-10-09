@@ -4,7 +4,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│ (nozzle) Voron · Printing                 (plug) On · 142 W │
+│ (nozzle) Voron · Printing               (plug) On | 142 W │
 │          bracket_v3.gcode                                   │
 │ ┌──────┐ 62%  1h 23m left · done 15:42                      │
 │ │ img  │ ███████████████░░░░░░░░░                           │
@@ -18,15 +18,18 @@
 
 - **Header**: state in its colour (Off, Ready, Printing, Paused, Complete,
   Cancelled, Error) and the printer's message – or the file name during a job.
-- **Power pill**: the plug and its live watts. Turning it on is immediate;
-  turning it off asks first, and warns in red while a print is running.
+- **Power pill**: the plug and its live watts. Tap On / Off to switch the plug:
+  turning it on is immediate, turning it off asks first, and warns in red while a
+  print is running. Tap the watts for the power sensor.
 - **Job**: thumbnail, progress, time left and finish time, layer, filament used and
   speed. Stays up after the print as "Done" / "Cancelled".
 - **Idle**: energy used today, prints, hours printed and kilometres of filament.
 - **Camera**: any card you like (e.g. Frigate card), shown inside this one.
 - **Buttons** follow the state: Pause + Cancel while printing, Resume + Cancel when
-  paused, Home + Power off when idle. Cancel and Power off ask first. There is no
-  emergency stop on purpose.
+  paused, Home + Power off when idle. Home, Cancel and Power off ask first. There
+  is no emergency stop on purpose.
+- **Tap any value** (progress, time left, finish time, layer, filament, speed,
+  today's energy, totals, the state) for its own more-info.
 
 ## Configuration
 

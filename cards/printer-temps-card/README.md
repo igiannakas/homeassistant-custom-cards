@@ -22,7 +22,8 @@ Moonraker printer.
 - **Fans**: one line, coloured while running.
 - **Label row**: "All heaters off", "Heating" or "At temperature" (every heater
   that is on is within 2° of its target).
-- Tap anything for its more-info. Sensors that do not exist are left out.
+- Tap a value – temperature, target, power, fan – for its own more-info; the rest
+  of a tile opens its temperature. Sensors that do not exist are left out.
 
 ## Configuration
 

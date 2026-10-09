@@ -4,12 +4,13 @@
  * A Klipper / Moonraker printer at a glance: state and message, a power pill (plug
  * and live watts), the current job (thumbnail, progress, time left, finish time,
  * layer, filament, speed) or, when idle, today's energy and lifetime totals, your
- * camera card, and the buttons that make sense for the state. Cancel and power-off
- * always ask first. Sensors are found from the Moonraker prefix (e.g. "voron").
+ * camera card, and the buttons that make sense for the state. Home, Cancel and
+ * Power off always ask first. Tap any value for its own more-info (the watts on the power
+ * pill too). Sensors are found from the Moonraker prefix (e.g. "voron").
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.0.0";
+const PSC_VERSION = "1.1.0";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -97,7 +98,7 @@ function actions(key) {
   if (key === "printing") return [["pause", "Pause", "mdi:pause"], ["cancel", "Cancel", "mdi:stop", true]];
   if (key === "paused") return [["resume", "Resume", "mdi:play"], ["cancel", "Cancel", "mdi:stop", true]];
   if (key === "off" || key === "starting") return [];
-  return [["home", "Home", "mdi:home"], ["poweroff", "Power off", "mdi:power", true]];
+  return [["home", "Home", "mdi:home", true], ["poweroff", "Power off", "mdi:power", true]];
 }
 
 /* ------------------------------------------------------------------------ */
@@ -184,13 +185,21 @@ const CSS = `
   .nm .st { font-weight: 400; color: var(--secondary-text-color); }
   .sc { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pill { all: unset; box-sizing: border-box; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px;
-    padding: 0 14px 0 10px; border-radius: 18px; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: .2px;
-    white-space: nowrap; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
+  .pill { flex: none; display: inline-flex; align-items: stretch; height: 36px; border-radius: 18px; overflow: hidden;
+    font-size: 13px; font-weight: 600; letter-spacing: .2px; white-space: nowrap;
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color); }
+  .pill button { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
     -webkit-tap-highlight-color: transparent; }
+  .pill .tog { padding: 0 12px 0 10px; }
+  .pill .w { padding: 0 14px 0 10px; border-left: 1px solid color-mix(in srgb, currentColor 25%, transparent); }
+  .pill .w:empty { display: none; }
+  .pill .tog:has(+ .w:empty) { padding-right: 14px; }
   .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
   .pill.on { background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
   .pill.on ha-icon { color: ${C.orange}; }
+  [data-e] { cursor: pointer; }
+  .jt [data-e], .stats [data-e], .txt [data-e] { border-radius: 4px; -webkit-tap-highlight-color: transparent; }
+  [data-e]:active { filter: brightness(.85); }
   .job { display: flex; gap: 10px; margin: 0 2px 8px; }
   .thumb { flex: 0 0 64px; height: 64px; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05);
     display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -198,14 +207,15 @@ const CSS = `
   .thumb ha-icon { --mdc-icon-size: 30px; color: ${C.grey}; }
   .jt { flex: 1; min-width: 0; }
   .pct { font-size: 20px; line-height: 26px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; }
-  .pct span { font-size: 12px; font-weight: 400; letter-spacing: .4px; color: var(--secondary-text-color); margin-left: 8px; }
+  .pct .when { font-size: 12px; font-weight: 400; letter-spacing: .4px; color: var(--secondary-text-color); margin-left: 8px; }
   .pbar { height: 8px; border-radius: 4px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); margin: 4px 0 6px; overflow: hidden; }
   .pbar i { display: block; height: 100%; border-radius: 4px; transition: width 400ms; }
   .camera { margin: 0 0 8px; border-radius: 10px; overflow: hidden; }
   .camera:empty { display: none; }
   .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 8px; text-align: center; }
-  .stats > div { display: grid; min-width: 0; border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
-  .stats > div:first-child { border-left: none; }
+  .stats > button { all: unset; box-sizing: border-box; display: grid; min-width: 0; cursor: pointer; text-align: center;
+    border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); -webkit-tap-highlight-color: transparent; }
+  .stats > button:first-child { border-left: none; }
   .stats b { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--primary-text-color); white-space: nowrap; }
   .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 6px; }
@@ -215,8 +225,8 @@ const CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
   .act ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
   .act.cancel ha-icon, .act.poweroff ha-icon { color: ${C.orange}; }
-  .pill:active, .act:active { filter: brightness(.92); }
-  .pill:focus-visible, .act:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  .pill button:active, .act:active { filter: brightness(.92); }
+  .pill button:focus-visible, .act:focus-visible, [data-e]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
 class PrinterStatusCard extends HTMLElement {
@@ -283,14 +293,27 @@ class PrinterStatusCard extends HTMLElement {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${CSS}</style><ha-card>
       <div class="head"><div class="shape"><ha-icon></ha-icon></div>
-        <div class="txt"><div class="nm"></div><div class="sc msg"></div></div>
-        ${this._config.power_switch ? `<button class="pill"><ha-icon icon="mdi:power-plug"></ha-icon><span></span></button>` : ""}</div>
-      <div class="job"><div class="thumb"><ha-icon icon="mdi:cube-outline"></ha-icon></div>
+        <div class="txt" data-e="sensor.${esc(this._config.prefix)}_current_print_state" role="button" tabindex="0"><div class="nm"></div><div class="sc msg"></div></div>
+        ${this._config.power_switch ? `<div class="pill"><button class="tog"><ha-icon icon="mdi:power-plug"></ha-icon><span></span></button><button class="w"${this._config.power_sensor ? ` data-e="${esc(this._config.power_sensor)}"` : ""}></button></div>` : ""}</div>
+      <div class="job"><div class="thumb" data-e="${esc(this._config.thumbnail || `camera.${this._config.prefix}_thumbnail`)}"><ha-icon icon="mdi:cube-outline"></ha-icon></div>
         <div class="jt"><div class="pct"></div><div class="pbar"><i></i></div><div class="sc l1"></div><div class="sc l2"></div></div></div>
       <div class="camera"></div>
       <div class="stats"></div>
       <div class="acts"></div></ha-card>`;
-    root.querySelector(".pill")?.addEventListener("click", () => this._togglePlug());
+    root.querySelector(".pill .tog")?.addEventListener("click", () => this._togglePlug());
+    // Any value opens its own entity.
+    const card = root.querySelector("ha-card");
+    const open = (e) => {
+      const v = e.target.closest("[data-e]");
+      if (v) this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: v.dataset.e }, bubbles: true, composed: true }));
+    };
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(".txt")) {
+        e.preventDefault();
+        open(e);
+      }
+    });
     this._built = true;
     this._actKeys = null;
     this._mountCamera();
@@ -335,8 +358,9 @@ class PrinterStatusCard extends HTMLElement {
     const pill = root.querySelector(".pill");
     if (pill && m.plug) {
       pill.classList.toggle("on", m.plug.on);
-      set(".pill span", m.plug.on ? `On${m.plug.watts === null ? "" : ` · ${fmt(m.plug.watts)} W`}` : "Off");
-      pill.setAttribute("aria-pressed", String(m.plug.on));
+      set(".pill .tog span", m.plug.on ? "On" : "Off");
+      set(".pill .w", m.plug.on && m.plug.watts !== null ? `${fmt(m.plug.watts)} W` : "");
+      pill.querySelector(".tog").setAttribute("aria-pressed", String(m.plug.on));
     }
 
     // Current job (printing, paused, or the last one that finished).
@@ -344,13 +368,16 @@ class PrinterStatusCard extends HTMLElement {
     job.style.display = active ? "" : "none";
     if (active) {
       const pct = m.progress === null ? 0 : Math.max(0, Math.min(100, m.progress));
-      const when = m.key === "complete" ? "Done" : m.key === "cancelled" ? "Cancelled" : `${hm(m.left)} left${m.eta ? ` · done ${m.eta}` : ""}`;
-      set(".pct", `${fmt(pct)}%<span>${esc(when)}</span>`, true);
+      const p = this._config.prefix;
+      const e = (key, text) => `<span data-e="sensor.${esc(p)}_${key}">${esc(text)}</span>`;
+      const when =
+        m.key === "complete" ? "Done" : m.key === "cancelled" ? "Cancelled" : `${e("print_time_left", `${hm(m.left)} left`)}${m.eta ? ` · ${e("print_eta", `done ${m.eta}`)}` : ""}`;
+      set(".pct", `${e("progress", `${fmt(pct)}%`)}<span class="when">${when}</span>`, true);
       const bar = root.querySelector(".pbar i");
       bar.style.width = `${pct}%`;
       bar.style.background = m.state.color;
-      set(".l1", [m.layers ? `Layer ${fmt(m.layer)} / ${fmt(m.layers)}` : "", m.filament !== null ? `${fmt(m.filament, 1)} m filament` : ""].filter(Boolean).join(" · "));
-      set(".l2", m.key === "printing" && m.speed !== null ? `${fmt(m.speed)} mm/s` : "");
+      set(".l1", [m.layers ? e("current_layer", `Layer ${fmt(m.layer)} / ${fmt(m.layers)}`) : "", m.filament !== null ? e("filament_used", `${fmt(m.filament, 1)} m filament`) : ""].filter(Boolean).join(" · "), true);
+      set(".l2", m.key === "printing" && m.speed !== null ? e("print_speed", `${fmt(m.speed)} mm/s`) : "", true);
       const thumb = root.querySelector(".thumb");
       if (m.thumb && thumb.dataset.src !== m.thumb) {
         thumb.dataset.src = m.thumb;
@@ -364,10 +391,15 @@ class PrinterStatusCard extends HTMLElement {
     stats.style.display = active ? "none" : "";
     if (!active) {
       const cells = [];
-      if (this._config.energy_today) cells.push([`${fmt(m.today, 2)} kWh`, "today"]);
-      cells.push([fmt(m.jobs), "prints"], [m.hours === null ? "–" : `${fmt(m.hours)} h`, "printed"], [m.km === null ? "–" : `${fmt(m.km, 1)} km`, "filament"]);
+      const p = this._config.prefix;
+      if (this._config.energy_today) cells.push([`${fmt(m.today, 2)} kWh`, "today", this._config.energy_today]);
+      cells.push(
+        [fmt(m.jobs), "prints", `sensor.${p}_totals_jobs`],
+        [m.hours === null ? "–" : `${fmt(m.hours)} h`, "printed", `sensor.${p}_totals_print_time`],
+        [m.km === null ? "–" : `${fmt(m.km, 1)} km`, "filament", `sensor.${p}_totals_filament_used`],
+      );
       stats.style.gridTemplateColumns = `repeat(${cells.length}, minmax(0, 1fr))`;
-      set(".stats", cells.map(([b, s]) => `<div><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join(""), true);
+      set(".stats", cells.map(([b, s, id]) => `<button data-e="${esc(id)}"><b>${esc(b)}</b><span>${esc(s)}</span></button>`).join(""), true);
     }
 
     // Buttons for this state (rebuilt only when the set changes, so taps are never lost).
@@ -388,7 +420,13 @@ class PrinterStatusCard extends HTMLElement {
     const press = (id) => this._call("button", "press", { entity_id: id });
     if (k === "pause") return press(`button.${p}_pause_print`);
     if (k === "resume") return press(`button.${p}_resume_print`);
-    if (k === "home") return press(`button.${p}_home_all_axes`);
+    if (k === "home") {
+      const ok = await confirmDialog({
+        title: "Home all axes", icon: "mdi:home", color: C.blue, primary: name,
+        secondary: "The toolhead and bed move to their home positions. Keep the build area clear.", confirmLabel: "Home",
+      });
+      if (ok) press(`button.${p}_home_all_axes`);
+    }
     if (k === "cancel") {
       const ok = await confirmDialog({
         title: "Cancel print", icon: "mdi:stop", color: C.orange, primary: this._m.file || name,

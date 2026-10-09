@@ -2,12 +2,13 @@
  * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * A printer enclosure's filter / vent (e.g. a StealthMax): the vent position as a
- * segmented selector, intake and exhaust side by side (temperature, humidity, VOC),
- * and any extra readings (delta, calibration values) as a small line.
+ * segmented selector, intake and exhaust side by side (temperature, humidity, VOC,
+ * VOC with manual calibration), and any extra readings (e.g. the delta) as a small
+ * line. Tap any value for its own more-info.
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.0.0";
+const EFC_VERSION = "1.1.0";
 const EFC_TAG = "enclosure-filter-card";
 
 const C = {
@@ -55,14 +56,18 @@ const CSS = `
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
   .opt.on { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
   .io { display: flex; align-items: stretch; gap: 6px; }
-  .side { all: unset; box-sizing: border-box; flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; cursor: pointer;
+  .side { box-sizing: border-box; flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; cursor: pointer;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); display: grid; gap: 1px; -webkit-tap-highlight-color: transparent; }
+  .vals { display: flex; flex-wrap: wrap; gap: 1px 10px; }
   .h { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
-  .v { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
-    color: var(--secondary-text-color); white-space: nowrap; }
+  .v, .x { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; line-height: 16px;
+    letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; cursor: pointer; border-radius: 4px;
+    -webkit-tap-highlight-color: transparent; }
+  .v:active, .x:active { filter: brightness(.85); }
+  .v:focus-visible, .x:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .arrow { align-self: center; --mdc-icon-size: 20px; color: color-mix(in srgb, var(--secondary-text-color) 45%, transparent); }
-  .extra { padding: 8px 6px 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .extra { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 8px 6px 2px; }
   .extra:empty { display: none; }
   .opt:active, .side:active { filter: brightness(.94); }
   .opt:focus-visible, .side:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
@@ -79,6 +84,7 @@ class EnclosureFilterCard extends HTMLElement {
         { name: "temperature", selector: { entity: { domain: "sensor" } } },
         { name: "humidity", selector: { entity: { domain: "sensor" } } },
         { name: "voc", selector: { entity: { domain: "sensor" } } },
+        { name: "voc_manual", selector: { entity: { domain: "sensor" } } },
       ],
     });
     return {
@@ -90,7 +96,7 @@ class EnclosureFilterCard extends HTMLElement {
         { name: "details", selector: { object: {} } },
       ],
       computeLabel: (s) =>
-        ({ title: "Title", vent: "Vent position (select)", temperature: "Temperature", humidity: "Humidity", voc: "VOC index", details: "Extra readings (optional)" })[s.name] ?? s.name,
+        ({ title: "Title", vent: "Vent position (select)", temperature: "Temperature", humidity: "Humidity", voc: "VOC index", voc_manual: "VOC index (manual calibration)", details: "Extra readings (optional)" })[s.name] ?? s.name,
       computeHelper: (s) => ({ details: "List of {entity, name}, shown as one small line." })[s.name],
     };
   }
@@ -123,7 +129,7 @@ class EnclosureFilterCard extends HTMLElement {
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const opts = this._config.vent ? this._options() : [];
-    const side = (k, title) => `<button class="side ${k}"><div class="h">${esc(title)}</div><div class="vals"></div></button>`;
+    const side = (k, title) => `<div class="side ${k}" role="button" tabindex="0"><div class="h">${esc(title)}</div><div class="vals"></div></div>`;
     root.innerHTML = `<style>${CSS}</style><ha-card>
       <div class="label"><ha-icon icon="mdi:air-filter"></ha-icon><span class="title">${esc(this._config.title ?? "Filter")}</span><span class="sum"></span></div>
       ${opts.length ? `<div class="vent"><span class="vl">Vent</span><div class="seg" style="--n:${opts.length}">
@@ -131,8 +137,24 @@ class EnclosureFilterCard extends HTMLElement {
       <div class="io">${side("in", this._config.intake_name || "Intake")}<ha-icon class="arrow" icon="mdi:arrow-right-thick"></ha-icon>${side("out", this._config.exhaust_name || "Exhaust")}</div>
       <div class="extra"></div></ha-card>`;
     root.querySelectorAll(".opt").forEach((b) => b.addEventListener("click", () => this._select(b.dataset.o)));
-    root.querySelector(".side.in").addEventListener("click", () => this._more(this._config.intake.voc || this._config.intake.temperature));
-    root.querySelector(".side.out").addEventListener("click", () => this._more(this._config.exhaust.voc || this._config.exhaust.temperature));
+    // A value opens its own sensor; the rest of a side opens its VOC (or temperature).
+    const sideMore = (el) => {
+      const c = el.classList.contains("in") ? this._config.intake : this._config.exhaust;
+      return c.voc || c.temperature;
+    };
+    const open = (e) => {
+      const v = e.target.closest("[data-e]");
+      const sd = e.target.closest(".side");
+      this._more(v ? v.dataset.e : sd && sideMore(sd));
+    };
+    root.querySelector(".io").addEventListener("click", open);
+    root.querySelector(".extra").addEventListener("click", open);
+    root.querySelector(".io").addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("side")) {
+        e.preventDefault();
+        open(e);
+      }
+    });
     this._built = true;
   }
 
@@ -141,13 +163,18 @@ class EnclosureFilterCard extends HTMLElement {
     const t = st(cfg.temperature);
     const h = st(cfg.humidity);
     const v = st(cfg.voc);
+    const vm = st(cfg.voc_manual);
     const parts = [];
-    if (t !== undefined) parts.push(`<span class="v"><ha-icon icon="mdi:thermometer"></ha-icon>${t === null ? "–" : `${t.toFixed(1)}°`}</span>`);
-    if (h !== undefined) parts.push(`<span class="v"><ha-icon icon="mdi:water-percent"></ha-icon>${h === null ? "–" : `${Math.round(h)}%`}</span>`);
-    if (v !== undefined) {
-      const [c, tc] = VOC[vocLevel(v)];
-      parts.push(`<span class="v" style="color:${tc}"><ha-icon icon="mdi:spray" style="color:${c}"></ha-icon>VOC ${fmt(v)}</span>`);
-    }
+    const btn = (id, style, icon, iconStyle, text) =>
+      `<button class="v" data-e="${esc(id)}"${style ? ` style="${style}"` : ""}><ha-icon icon="${icon}"${iconStyle ? ` style="${iconStyle}"` : ""}></ha-icon>${text}</button>`;
+    if (t !== undefined) parts.push(btn(cfg.temperature, "", "mdi:thermometer", "", t === null ? "–" : `${t.toFixed(1)}°`));
+    if (h !== undefined) parts.push(btn(cfg.humidity, "", "mdi:water-percent", "", h === null ? "–" : `${Math.round(h)}%`));
+    const voc = (id, val, label) => {
+      const [c, tc] = VOC[vocLevel(val)];
+      parts.push(btn(id, `color:${tc}`, "mdi:spray", `color:${c}`, `${label} ${fmt(val)}`));
+    };
+    if (v !== undefined) voc(cfg.voc, v, "VOC");
+    if (vm !== undefined) voc(cfg.voc_manual, vm, "VOC (manual)");
     return { html: parts.join(""), voc: v };
   }
 
@@ -178,9 +205,9 @@ class EnclosureFilterCard extends HTMLElement {
         const st = this._hass.states[d.entity];
         const n = num(st.state);
         const name = d.name || st.attributes.friendly_name || d.entity;
-        return `${esc(name)} ${n === null ? esc(st.state) : fmt(n, Math.abs(n) < 100 && n % 1 ? 1 : 0)}`;
+        return `<button class="x" data-e="${esc(d.entity)}">${esc(name)} ${n === null ? esc(st.state) : fmt(n, Math.abs(n) < 100 && n % 1 ? 1 : 0)}</button>`;
       })
-      .join(" · ");
+      .join("");
     set(root.querySelector(".extra"), extra);
   }
 

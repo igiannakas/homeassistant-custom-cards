@@ -54,6 +54,11 @@ function states(over = {}) {
   tiles()[1].click();
   r.querySelectorAll(".fan")[2].click();
   eq(events.splice(0), [["more-info", "sensor.voron_bed_temperature"], ["more-info", "sensor.voron_exhaust_fan"]]);
+  // Heater values: temperature, target and power each open their own entity.
+  card.hass = hass(states({ "number.voron_bed_target": { state: "110", attributes: {} }, "sensor.voron_bed_power": { state: "64", attributes: {} } }));
+  tiles()[1].querySelectorAll(".val [data-e]").forEach((b) => b.click());
+  tiles()[4].querySelector(".val [data-e]").click();
+  eq(events.splice(0).map((x) => x[1]), ["sensor.voron_bed_temperature", "number.voron_bed_target", "sensor.voron_bed_power", "sensor.voron_stepper_body_temp"]);
 
   // Missing sensors are left out; custom lists work.
   const st2 = states();

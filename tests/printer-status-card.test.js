@@ -54,20 +54,40 @@ const cfg = {
   // Idle: Ready, message, plug with watts, totals, Home + Power off. No E-stop anywhere.
   assert.strictEqual(q(".nm").textContent, "Voron · Ready");
   assert.strictEqual(q(".msg").textContent, "Printer is ready");
-  assert.strictEqual(q(".pill span").textContent, "On · 142 W");
+  assert.strictEqual(q(".pill .tog span").textContent, "On");
+  assert.strictEqual(q(".pill .w").textContent, "142 W");
   assert(q(".pill").classList.contains("on"));
   assert.strictEqual(q(".job").style.display, "none");
   eq([...r.querySelectorAll(".stats b")].map((b) => b.textContent), ["0.84 kWh", "1,342", "4,826 h", "412.3 km"]);
   eq(acts(), ["Home", "Power off"]);
   assert(!/e-?stop|emergency/i.test(r.innerHTML), "no emergency stop");
 
+  // Home asks first.
   r.querySelector(".act.home").click();
+  await tick();
+  let dlg = document.querySelector("psc-confirm-dialog");
+  assert(dlg && dlg.shadowRoot.textContent.includes("Home all axes"));
+  assert.strictEqual(calls.length, 0);
+  dlg.shadowRoot.querySelector(".confirm").click();
+  await tick();
   eq(calls.pop(), ["button", "press", { entity_id: "button.voron_home_all_axes" }]);
+
+  // Every value opens its own more-info; the watts too, without touching the plug.
+  const ev = t.events;
+  q(".pill .w").click();
+  r.querySelectorAll(".stats button").forEach((b) => b.click());
+  q(".txt").click();
+  eq(ev.splice(0), [
+    ["more-info", "sensor.tasmota_energy_power_2"], ["more-info", "sensor.tasmota_energy_today_2"], ["more-info", "sensor.voron_totals_jobs"],
+    ["more-info", "sensor.voron_totals_print_time"], ["more-info", "sensor.voron_totals_filament_used"], ["more-info", "sensor.voron_current_print_state"],
+  ]);
+  assert.strictEqual(calls.length, 0);
+  assert(!document.querySelector("psc-confirm-dialog"));
 
   // Power off asks first; cancel does nothing, confirm runs the script.
   r.querySelector(".act.poweroff").click();
   await tick();
-  let dlg = document.querySelector("psc-confirm-dialog");
+  dlg = document.querySelector("psc-confirm-dialog");
   assert(dlg, "asks first");
   dlg.shadowRoot.querySelector(".cancel").click();
   await tick();
@@ -91,6 +111,11 @@ const cfg = {
   assert.strictEqual(q(".thumb img").getAttribute("src"), "/api/camera_proxy/camera.voron_thumbnail?token=a");
   assert.strictEqual(q(".stats").style.display, "none");
   eq(acts(), ["Pause", "Cancel"]);
+  for (const sel of [".pct [data-e]", ".l1 [data-e]", ".l2 [data-e]", ".thumb"]) r.querySelectorAll(sel).forEach((n) => n.click());
+  eq(t.events.splice(0).map((x) => x[1]), [
+    "sensor.voron_progress", "sensor.voron_print_time_left", "sensor.voron_print_eta", "sensor.voron_current_layer",
+    "sensor.voron_filament_used", "sensor.voron_print_speed", "camera.voron_thumbnail",
+  ]);
   const pause = r.querySelector(".act.pause");
   card.hass = hass(states(printing()));
   assert.strictEqual(r.querySelector(".act.pause"), pause, "buttons are not rebuilt on every update");
@@ -105,7 +130,7 @@ const cfg = {
   eq(calls.pop(), ["button", "press", { entity_id: "button.voron_cancel_print" }]);
 
   // Plug while printing: asks, in red, and says the print ends.
-  q(".pill").click();
+  q(".pill .tog").click();
   await tick();
   dlg = document.querySelector("psc-confirm-dialog");
   assert(dlg.shadowRoot.textContent.includes("is printing"));
@@ -137,9 +162,10 @@ const cfg = {
   card.hass = hass(states({ "switch.voron": { state: "off", attributes: {} }, "sensor.tasmota_energy_power_2": { state: "0", attributes: {} } }));
   assert.strictEqual(q(".nm").textContent, "Voron · Off");
   assert.strictEqual(q(".msg").textContent, "Power is off");
-  assert.strictEqual(q(".pill span").textContent, "Off");
+  assert.strictEqual(q(".pill .tog span").textContent, "Off");
+  assert.strictEqual(q(".pill .w").textContent, "");
   eq(acts(), []);
-  q(".pill").click();
+  q(".pill .tog").click();
   await tick();
   assert(!document.querySelector("psc-confirm-dialog"), "turning on does not ask");
   eq(calls.pop(), ["switch", "turn_on", { entity_id: "switch.voron" }]);

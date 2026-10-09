@@ -3,11 +3,12 @@
  *
  * Heaters (temperature, target, heater power – the tile glows while heating), other
  * temperature readings, and the fans, for a Klipper / Moonraker printer. Sensors
- * are found from the Moonraker prefix; every list can be overridden.
+ * are found from the Moonraker prefix; every list can be overridden. Tap any value
+ * (temperature, target, power, fan) for its own more-info.
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.0.0";
+const PTC_VERSION = "1.1.0";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -47,7 +48,7 @@ function heaters(hass, cfg) {
     const tg = num(hass.states[target]?.state);
     const pw = num(hass.states[power]?.state);
     const on = tg !== null && tg > 0;
-    return { kind: "heater", name: h.name, icon: h.icon || "mdi:thermometer", entity: temp, t, tg, pw, on, missing: !hass.states[temp] };
+    return { kind: "heater", name: h.name, icon: h.icon || "mdi:thermometer", entity: temp, target, power, t, tg, pw, on, missing: !hass.states[temp] };
   });
 }
 
@@ -78,7 +79,7 @@ const CSS = `
   .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; }
   .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 6px; }
-  .tile { all: unset; box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px;
+  .tile { box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px;
     padding: 8px 10px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
   /* A heater that is on glows, like a lit room on the lights card. */
@@ -94,6 +95,9 @@ const CSS = `
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .val { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; }
   .val b { font-size: 14px; font-weight: 500; color: var(--primary-text-color); margin-right: 4px; }
+  .val [data-e] { all: unset; cursor: pointer; border-radius: 4px; -webkit-tap-highlight-color: transparent; }
+  .val [data-e]:active { filter: brightness(.85); }
+  .val [data-e]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .bar { height: 4px; border-radius: 2px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
   .bar i { display: block; height: 100%; background: ${C.orange}; border-radius: 2px; transition: width 400ms; }
   .fans { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 6px 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
@@ -161,14 +165,27 @@ class PrinterTempsCard extends HTMLElement {
     root.innerHTML = `<style>${CSS}</style><ha-card>
       <div class="label"><ha-icon icon="mdi:thermometer"></ha-icon><span class="title">${esc(this._config.title ?? "Temperatures")}</span><span class="sum"></span></div>
       <div class="tiles">${items
-        .map((it, i) => `<button class="tile ${it.kind}" data-i="${i}"><div class="hh"><span class="shape"><ha-icon icon="${esc(it.icon)}"></ha-icon></span>
-          <span class="txt"><div class="nm">${esc(it.name)}</div><div class="val"></div></span></div>${it.kind === "heater" ? `<div class="bar"><i></i></div>` : ""}</button>`)
+        .map((it, i) => `<div class="tile ${it.kind}" role="button" tabindex="0" data-i="${i}"><div class="hh"><span class="shape"><ha-icon icon="${esc(it.icon)}"></ha-icon></span>
+          <span class="txt"><div class="nm">${esc(it.name)}</div><div class="val"></div></span></div>${it.kind === "heater" ? `<div class="bar"><i></i></div>` : ""}</div>`)
         .join("")}</div>
       <div class="fans">${fl.map((f, i) => `<button class="fan" data-i="${i}"><ha-icon icon="${esc(f.icon)}"></ha-icon><span></span></button>`).join("")}</div>
     </ha-card>`;
     this._items = items.map((it) => it.entity);
     this._fans = fl.map((f) => f.entity);
-    root.querySelectorAll(".tile").forEach((b) => b.addEventListener("click", () => this._more(this._items[Number(b.dataset.i)])));
+    // A value opens its own entity (temperature, target, power); the rest of the tile its temperature.
+    const tiles = root.querySelector(".tiles");
+    const open = (e) => {
+      const v = e.target.closest("[data-e]");
+      const tile = e.target.closest(".tile");
+      this._more(v ? v.dataset.e : tile && this._items[Number(tile.dataset.i)]);
+    };
+    tiles.addEventListener("click", open);
+    tiles.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("tile")) {
+        e.preventDefault();
+        open(e);
+      }
+    });
     root.querySelectorAll(".fan").forEach((b) => b.addEventListener("click", () => this._more(this._fans[Number(b.dataset.i)])));
     if (!fl.length) root.querySelector(".fans").style.display = "none";
     this._built = true;
@@ -188,10 +205,12 @@ class PrinterTempsCard extends HTMLElement {
       if (!it) return;
       el.classList.toggle("on", !!it.on);
       if (it.kind === "heater") {
-        set(el.querySelector(".val"), `<b>${deg(it.t)}</b>${it.on ? `→ ${deg(it.tg, 0)}` : "Off"}${it.on && it.pw !== null ? ` · ${Math.round(it.pw)}%` : ""}`);
+        const tg = `<button data-e="${esc(it.target)}">${it.on ? `→ ${deg(it.tg, 0)}` : "Off"}</button>`;
+        const pw = it.on && it.pw !== null ? ` · <button data-e="${esc(it.power)}">${Math.round(it.pw)}%</button>` : "";
+        set(el.querySelector(".val"), `<button data-e="${esc(it.entity)}"><b>${deg(it.t)}</b></button>${tg}${pw}`);
         el.querySelector(".bar i").style.width = `${it.on && it.pw !== null ? Math.max(0, Math.min(100, it.pw)) : 0}%`;
       } else {
-        set(el.querySelector(".val"), `<b>${deg(it.t)}</b>`);
+        set(el.querySelector(".val"), `<button data-e="${esc(it.entity)}"><b>${deg(it.t)}</b></button>`);
       }
     });
     fans(this._hass, this._config).forEach((f, i) => {
