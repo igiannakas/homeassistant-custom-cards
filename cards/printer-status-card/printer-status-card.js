@@ -4,15 +4,16 @@
  * A Klipper / Moonraker printer at a glance: state and message, a power pill while
  * the plug is on (On and live watts), the current job (thumbnail, progress, time left, finish time,
  * layer, filament, speed) or, when idle, today's energy and lifetime totals, your
- * camera card (only while the printer is reachable and the camera serves a picture), the buttons that make sense for the
- * state (Power on when the plug is off), and an optional chamber light
- * toggle (glows while on; hold it for the light's more-info). Home, Cancel and
- * Power on, Power off and turning the plug off always ask first. Tap any value for its own more-info (the watts on the power
+ * camera card (only while the printer is reachable and the camera serves a picture), Power on
+ * (plug off) or a safe Power off (idle), and an optional chamber light toggle (glows while
+ * on; hold it for the light's more-info). Printer operations – homing, pause, resume,
+ * cancel – are left to the printer itself on purpose. Power on, Power off and turning the
+ * plug off always ask first. Tap any value for its own more-info (the watts on the power
  * pill too). Sensors are found from the Moonraker prefix (e.g. "voron").
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.3.2";
+const PSC_VERSION = "1.4.0";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -109,13 +110,12 @@ function lightModel(s, id) {
   return { on: s.state === "on", level: s.state === "on" && b !== null ? Math.round((b / 255) * 100) : null, numeric: false };
 }
 
-/* Which buttons fit the state: [key, label, icon, confirm?] */
+/* Which power buttons fit the state: [key, label, icon]. Printer operations (home, pause,
+   resume, cancel) are deliberately not here – they are done on the printer. */
 function actions(key) {
-  if (key === "printing") return [["pause", "Pause", "mdi:pause"], ["cancel", "Cancel", "mdi:stop", true]];
-  if (key === "paused") return [["resume", "Resume", "mdi:play"], ["cancel", "Cancel", "mdi:stop", true]];
   if (key === "off") return [["poweron", "Power on", "mdi:power"]];
-  if (key === "starting") return [];
-  return [["home", "Home", "mdi:home", true], ["poweroff", "Power off", "mdi:power", true]];
+  if (["printing", "paused", "starting"].includes(key)) return [];
+  return [["poweroff", "Power off", "mdi:power"]];
 }
 
 /* ------------------------------------------------------------------------ */
@@ -242,7 +242,7 @@ const CSS = `
     justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--primary-text-color);
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
   .act ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
-  .act.cancel ha-icon, .act.poweroff ha-icon { color: ${C.orange}; }
+  .act.poweroff ha-icon { color: ${C.orange}; }
   .act.poweron ha-icon { color: ${C.green}; }
   /* Chamber light: glows while on, like a lit room on the lights card. */
   .act.light.on { background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
@@ -292,7 +292,7 @@ class PrinterStatusCard extends HTMLElement {
         })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
-          prefix: "Finds sensor.<prefix>_current_print_state, _progress, _filename … and button.<prefix>_pause_print etc.",
+          prefix: "Finds sensor.<prefix>_current_print_state, _printer_state, _progress, _filename …",
           camera_card: "Any card, shown inside this one, e.g. type: custom:frigate-card with your printer camera.",
         })[s.name],
     };
@@ -581,25 +581,8 @@ class PrinterStatusCard extends HTMLElement {
   }
 
   async _action(k) {
-    const p = this._config.prefix;
     const name = this._config.name || "Printer";
     const press = (id) => this._call("button", "press", { entity_id: id });
-    if (k === "pause") return press(`button.${p}_pause_print`);
-    if (k === "resume") return press(`button.${p}_resume_print`);
-    if (k === "home") {
-      const ok = await confirmDialog({
-        title: "Home all axes", icon: "mdi:home", color: C.blue, primary: name,
-        secondary: "The toolhead and bed move to their home positions. Keep the build area clear.", confirmLabel: "Home",
-      });
-      if (ok) press(`button.${p}_home_all_axes`);
-    }
-    if (k === "cancel") {
-      const ok = await confirmDialog({
-        title: "Cancel print", icon: "mdi:stop", color: C.orange, primary: this._m.file || name,
-        secondary: `The print stops and cannot be resumed.`, confirmLabel: "Cancel print",
-      });
-      if (ok) press(`button.${p}_cancel_print`);
-    }
     if (k === "poweron") {
       const ok = await confirmDialog({
         title: "Power on", icon: "mdi:power", color: C.green, primary: name,

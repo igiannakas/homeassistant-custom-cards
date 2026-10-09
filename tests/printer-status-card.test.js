@@ -51,7 +51,8 @@ const cfg = {
   const q = (s) => r.querySelector(s);
   const acts = () => [...r.querySelectorAll(".act")].map((b) => b.textContent);
 
-  // Idle: Ready, message, plug with watts, totals, Home + Power off. No E-stop anywhere.
+  // Idle: Ready, message, plug with watts, totals, Power off only. No printer operations
+  // (home, pause, resume, cancel, E-stop) anywhere – those are done on the printer.
   assert.strictEqual(q(".nm").textContent, "Voron · Ready");
   assert.strictEqual(q(".msg").textContent, "Printer is ready");
   assert.strictEqual(q(".pill .tog span").textContent, "On");
@@ -59,18 +60,12 @@ const cfg = {
   assert(q(".pill").classList.contains("on"));
   assert.strictEqual(q(".job").style.display, "none");
   eq([...r.querySelectorAll(".stats b")].map((b) => b.textContent), ["0.84 kWh", "1,342", "4,826 h", "412.3 km"]);
-  eq(acts(), ["Home", "Power off"]);
-  assert(!/e-?stop|emergency/i.test(r.innerHTML), "no emergency stop");
-
-  // Home asks first.
-  r.querySelector(".act.home").click();
-  await tick();
-  let dlg = document.querySelector("psc-confirm-dialog");
-  assert(dlg && dlg.shadowRoot.textContent.includes("Home all axes"));
-  assert.strictEqual(calls.length, 0);
-  dlg.shadowRoot.querySelector(".confirm").click();
-  await tick();
-  eq(calls.pop(), ["button", "press", { entity_id: "button.voron_home_all_axes" }]);
+  eq(acts(), ["Power off"]);
+  assert(!/e-?stop|emergency|home_all|pause_print|resume_print|cancel_print/i.test(r.innerHTML), "no printer operations");
+  const pwr = r.querySelector(".act.poweroff");
+  card.hass = hass(states());
+  assert.strictEqual(r.querySelector(".act.poweroff"), pwr, "buttons are not rebuilt on every update");
+  let dlg;
 
   // Every value opens its own more-info; the watts too, without touching the plug.
   const ev = t.events;
@@ -99,7 +94,7 @@ const cfg = {
   await tick();
   eq(calls.pop(), ["script", "turn_on", { entity_id: "script.power_off_3d_printer" }]);
 
-  // Printing: job block with progress, time left, layers, filament, speed; Pause + Cancel.
+  // Printing: job block with progress, time left, layers, filament, speed; no buttons.
   card.hass = hass(states(printing()));
   assert.strictEqual(q(".nm").textContent, "Voron · Printing");
   assert.strictEqual(q(".msg").textContent, "bracket_v3.gcode");
@@ -110,24 +105,13 @@ const cfg = {
   assert.strictEqual(q(".l2").textContent, "250 mm/s");
   assert.strictEqual(q(".thumb img").getAttribute("src"), "/api/camera_proxy/camera.voron_thumbnail?token=a");
   assert.strictEqual(q(".stats").style.display, "none");
-  eq(acts(), ["Pause", "Cancel"]);
+  eq(acts(), []);
+  assert.strictEqual(q(".acts").childNodes.length, 0, "empty, so .acts:empty hides the row");
   for (const sel of [".pct [data-e]", ".l1 [data-e]", ".l2 [data-e]", ".thumb"]) r.querySelectorAll(sel).forEach((n) => n.click());
   eq(t.events.splice(0).map((x) => x[1]), [
     "sensor.voron_progress", "sensor.voron_print_time_left", "sensor.voron_print_eta", "sensor.voron_current_layer",
     "sensor.voron_filament_used", "sensor.voron_print_speed", "camera.voron_thumbnail",
   ]);
-  const pause = r.querySelector(".act.pause");
-  card.hass = hass(states(printing()));
-  assert.strictEqual(r.querySelector(".act.pause"), pause, "buttons are not rebuilt on every update");
-  pause.click();
-  eq(calls.pop(), ["button", "press", { entity_id: "button.voron_pause_print" }]);
-  r.querySelector(".act.cancel").click();
-  await tick();
-  dlg = document.querySelector("psc-confirm-dialog");
-  assert(dlg.shadowRoot.textContent.includes("bracket_v3.gcode"));
-  dlg.shadowRoot.querySelector(".confirm").click();
-  await tick();
-  eq(calls.pop(), ["button", "press", { entity_id: "button.voron_cancel_print" }]);
 
   // Plug while printing: asks, in red, and says the print ends.
   q(".pill .tog").click();
@@ -139,19 +123,17 @@ const cfg = {
   await tick();
   eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.voron" }]);
 
-  // Paused: Resume + Cancel.
+  // Paused: no buttons either.
   card.hass = hass(states({ ...printing(), ...Object.fromEntries([p("current_print_state", "paused")]) }));
   assert.strictEqual(q(".nm").textContent, "Voron · Paused");
-  eq(acts(), ["Resume", "Cancel"]);
-  r.querySelector(".act.resume").click();
-  eq(calls.pop(), ["button", "press", { entity_id: "button.voron_resume_print" }]);
+  eq(acts(), []);
 
   // Complete: job stays visible as "Done", idle buttons back.
   card.hass = hass(states({ ...printing(), ...Object.fromEntries([p("current_print_state", "complete"), p("progress", 100)]) }));
   assert.strictEqual(q(".nm").textContent, "Voron · Complete");
   assert.strictEqual(q(".pct").textContent, "100%Done");
   assert.strictEqual(q(".l2").textContent, "");
-  eq(acts(), ["Home", "Power off"]);
+  eq(acts(), ["Power off"]);
 
   // Error state.
   card.hass = hass(states(Object.fromEntries([p("printer_state", "shutdown"), p("printer_message", "MCU 'mcu' shutdown")])));
@@ -189,9 +171,9 @@ const cfg = {
   await tick();
   assert.strictEqual(calls.length, 0, "cancel leaves the plug on");
 
-  // Without a power-off script there is no Power off button; without energy_today three stats.
+  // Without a power-off script there are no buttons; without energy_today three stats.
   const bare = mount({ prefix: "voron" }, states());
-  eq([...bare.shadowRoot.querySelectorAll(".act")].map((b) => b.textContent), ["Home"]);
+  eq([...bare.shadowRoot.querySelectorAll(".act")].map((b) => b.textContent), []);
   assert.strictEqual(bare.shadowRoot.querySelectorAll(".stats b").length, 3);
   assert(!bare.shadowRoot.querySelector(".pill"));
   assert.strictEqual(bare.shadowRoot.querySelector(".nm").textContent, "Printer · Ready");
@@ -203,11 +185,11 @@ const cfg = {
   const lc = mount({ ...cfg, light: LED }, states(led(25)));
   const lr = lc.shadowRoot;
   const lacts = () => [...lr.querySelectorAll(".act")].map((x) => x.textContent);
-  eq(lacts(), ["Home", "Power off", "Light 25%"]);
+  eq(lacts(), ["Power off", "Light 25%"]);
   const lb = lr.querySelector(".act.light");
   assert(lb.classList.contains("on"));
   assert.strictEqual(lb.querySelector("ha-icon").getAttribute("icon"), "mdi:led-strip-variant");
-  assert.strictEqual(lr.querySelector(".acts").style.getPropertyValue("--n"), "3");
+  assert.strictEqual(lr.querySelector(".acts").style.getPropertyValue("--n"), "2");
   lb.click();
   await tick();
   assert(!document.querySelector("psc-confirm-dialog"), "light toggles without asking");
@@ -220,7 +202,7 @@ const cfg = {
   lb.click();
   eq(calls.pop(), ["number", "set_value", { entity_id: LED, value: 25 }], "back to the level it had");
   lc.hass = hass(states({ ...printing(), ...led(100) }));
-  eq(lacts(), ["Pause", "Cancel", "Light"], "full brightness shows no %");
+  eq(lacts(), ["Light"], "full brightness shows no %; the light is the only button while printing");
   // A fresh card that has never seen it on turns it fully on; light_on overrides.
   const fresh = mount({ ...cfg, light: LED }, states(led(0)));
   fresh.shadowRoot.querySelector(".act.light").click();

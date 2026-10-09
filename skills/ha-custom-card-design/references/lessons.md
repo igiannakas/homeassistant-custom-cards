@@ -45,6 +45,7 @@ Most of these generalise to any dashboard.
 | "All off/on should trigger immediately, no confirmation" | Benign bulk actions are immediate. |
 | "home and power off should trigger a pop up to confirm action" / "remove the estop button" | Anything that moves hardware or cuts power asks first. Leave out what the user doesn't want on the card at all. |
 | "the off button shouldn't show when the printer is off… only the bottom power on button" / "clicking power on should require confirmation" | Show one control per job: the plug pill only while on, the Power on button only while off. Powering hardware up confirms too. |
+| "remove the home button… Any dangerous printer operations should be done on the printer, not on Home Assistant" → also removed Pause/Resume and Cancel | A dashboard monitors a machine; it does not operate it. Offer power and convenience (light) only, and ask which other actions go when removing one. |
 | "Tapping on any value should show the more info for that value" | Every number is its own tap target. The watts on a power pill open the power sensor, while On/Off still toggles. |
 | "The tap targets for home/climate are too small for mobile" | Pills are 44px on phones and fill the row. |
 | "second bedroom and kitchen show me the more info dialogue instead of the pop up" | Behaviour is consistent across items, even when one room has a single lamp. |

@@ -112,10 +112,11 @@ exactly rather than "close enough".
 - **Confirmation follows the stakes, so ask the user which actions confirm:**
   - Immediate: all lights on/off, a light, choosing a mode.
   - Powering up a machine (a printer plug) also confirms: the user asked for it.
-  - Confirm with a dialog: anything that moves hardware, ends a job or cuts power
-    (home axes, cancel print, safe power-off, plug off). Warn in red when it would
-    interrupt something running.
-  - Leave out what the user doesn't want on the card at all (e.g. an emergency stop).
+  - Confirm with a dialog: anything that cuts power (safe power-off, plug off). Warn in
+    red when it would interrupt something running.
+  - Leave out what the user doesn't want on the card at all. Here that is every machine
+    operation: homing, pause, resume, cancel and emergency stop are done at the printer,
+    so the printer card only offers power and the light.
 - **Confirm dialogs** use the Bubble look: blurred backdrop, 32px radius, 56px buttons,
   a coloured confirm button, Escape and backdrop cancel. See the skeleton.
 - **Pop-ups** owned by Bubble Card open with `history.pushState(null, "", "#hash")`

@@ -12,7 +12,7 @@
 │          250 mm/s                                           │
 │ ┌──────────────────── camera card ─────────────────────┐   │
 │ └───────────────────────────────────────────────────────┘   │
-│ (  Pause  )                      (  Cancel  )               │
+│ (  Light  )                                                 │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -30,9 +30,9 @@
   unavailable) and the camera must actually serve an image. The card asks Home Assistant for a
   small still of the camera (`/api/camera_proxy/…`) every 15 s while hidden and every 60 s while
   shown; an error hides the camera card, so it never sits there trying to connect.
-- **Buttons** follow the state: Pause + Cancel while printing, Resume + Cancel when
-  paused, Home + Power off when idle, Power on when the plug is off. Home, Cancel, Power off and Power on ask first. There
-  is no emergency stop on purpose.
+- **Buttons** are power only: Power on when the plug is off, a safe Power off when the
+  printer is idle, nothing while it prints. Both ask first. Printer operations – homing,
+  pause, resume, cancel, emergency stop – are left out on purpose: do those on the printer.
 - **Chamber light** (optional, `light`): an extra button that glows while the light is
   on and shows its level when dimmed ("Light 25%"). A tap toggles it at once. For a
   Klipper output pin (a 0–100 `number`), on returns to the last level it had, or to
@@ -59,7 +59,7 @@ camera_card:
 
 | Option | What it is |
 |---|---|
-| `prefix` | **Required.** The Moonraker integration prefix. The card reads `sensor.<prefix>_current_print_state`, `_printer_state`, `_printer_message`, `_current_display_message`, `_filename`, `_progress`, `_print_time_left`, `_print_eta`, `_current_layer`, `_total_layer`, `_filament_used`, `_print_speed`, `_totals_jobs`, `_totals_print_time`, `_totals_filament_used`, and presses `button.<prefix>_pause_print`, `_resume_print`, `_cancel_print`, `_home_all_axes`. |
+| `prefix` | **Required.** The Moonraker integration prefix. The card reads `sensor.<prefix>_current_print_state`, `_printer_state`, `_printer_message`, `_current_display_message`, `_filename`, `_progress`, `_print_time_left`, `_print_eta`, `_current_layer`, `_total_layer`, `_filament_used`, `_print_speed`, `_totals_jobs`, `_totals_print_time`, `_totals_filament_used`. |
 | `name` | Shown in the header. Default `Printer`. |
 | `power_switch` | The printer's smart plug (`switch` or `input_boolean`). Without it there is no pill and the printer counts as powered. |
 | `power_sensor` | Live watts for the pill. |
