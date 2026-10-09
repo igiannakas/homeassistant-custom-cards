@@ -12,7 +12,7 @@
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.3.2";
+const CMC_VERSION = "1.3.3";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -166,7 +166,9 @@ const CSS = `
      All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
   .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; } /* 10px gap: titles at edge + 46, like Mushroom */
   .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; }
-  /* A tappable icon (icon_tap_action) keeps a filled circle in its own colour – the tap-target convention. */
+  /* header_tap_action: icon, title and status line all open it; the icon keeps a filled circle in
+     its own colour – the tap-target convention. The switch keeps its own action. */
+  .label .title.tap, .label .status.tap { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .label > ha-icon.tap { width: 36px; border-radius: 50%; cursor: pointer; background: color-mix(in srgb, currentColor 20%, transparent);
     -webkit-tap-highlight-color: transparent; }
   .label > ha-icon.tap:active { filter: brightness(.92); }
@@ -235,7 +237,7 @@ class ClimateModesCard extends HTMLElement {
           { name: "switch_name", selector: { text: {} } },
         ] },
         { name: "switch_tap_action", selector: { ui_action: {} } },
-        { name: "icon_tap_action", selector: { ui_action: {} } },
+        { name: "header_tap_action", selector: { ui_action: {} } },
         { name: "status", selector: { select: { mode: "dropdown", options: [
           { value: "mode", label: "The active mode (All rooms · Day)" },
           { value: "activity", label: "What the heating is doing (Heating · Study / Idle)" },
@@ -252,7 +254,7 @@ class ClimateModesCard extends HTMLElement {
           switch: "Switch in the label row (optional)",
           switch_name: "Switch label (default Automatic)",
           switch_tap_action: "Switch tap (default: toggle)",
-          icon_tap_action: "Icon tap (optional, e.g. open the climate view)",
+          header_tap_action: "Header tap – icon, title and status (optional, e.g. open the climate view)",
           status: "Label row shows",
           modes: "Modes",
         })[s.name] ?? s.name,
@@ -292,7 +294,7 @@ class ClimateModesCard extends HTMLElement {
     this._ro?.disconnect();
     this._ro = null;
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      ${c.title || c.icon ? `<div class="label${c.status === "activity" ? " two" : ""}"><ha-icon icon="${esc(c.icon || "mdi:thermostat")}" style="color:${color(c.icon_color || "orange")}"${c.icon_tap_action ? ` class="tap" role="button" tabindex="0" aria-label="${esc(c.title || "Open")}"` : ""}></ha-icon>
+      ${c.title || c.icon ? `<div class="label${c.status === "activity" ? " two" : ""}"><ha-icon icon="${esc(c.icon || "mdi:thermostat")}" style="color:${color(c.icon_color || "orange")}"${this._headerAction() ? ` class="tap" role="button" tabindex="0" aria-label="${esc(c.title || "Open")}"` : ""}></ha-icon>
         <span class="title">${esc(c.title || "")}</span>
         <span class="status"></span>
         ${c.switch ? `<button class="switch" role="switch" style="--sw-color:${color(c.switch_color || "blue")}"><span class="swl"></span><span class="sw"></span></button>` : ""}</div>` : ""}
@@ -306,11 +308,17 @@ class ClimateModesCard extends HTMLElement {
     root.querySelector(".switch")?.addEventListener("click", () => this._toggleSwitch());
     const tapIcon = root.querySelector(".label > ha-icon.tap");
     if (tapIcon) {
-      const go = () => this._tap({ name: c.title, icon: c.icon, color: c.icon_color, tap_action: c.icon_tap_action });
+      const go = () => this._tap({ name: c.title, icon: c.icon, color: c.icon_color, tap_action: this._headerAction() });
       tapIcon.addEventListener("click", go);
       tapIcon.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), go()));
+      root.querySelectorAll(".label .title, .label .status").forEach((n) => { n.classList.add("tap"); n.addEventListener("click", go); });
     }
     this._built = true;
+  }
+
+  /* header_tap_action (icon_tap_action is the older name for the same thing). */
+  _headerAction() {
+    return this._config.header_tap_action || this._config.icon_tap_action;
   }
 
   _render() {

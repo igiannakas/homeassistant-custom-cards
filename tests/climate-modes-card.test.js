@@ -234,6 +234,23 @@ const cfg = {
   navs.pop();
   assert.strictEqual(window.location.pathname, "/lovelace/climate");
   assert(!card.shadowRoot.querySelector(".label > ha-icon.tap"), "no tap target without icon_tap_action");
+  // header_tap_action: title and status open it too; the switch keeps its own job.
+  const hc2 = document.createElement("climate-modes-card");
+  document.body.appendChild(hc2);
+  hc2.setConfig({ ...cfg, status: "activity", switch: "input_boolean.summer", header_tap_action: { action: "navigate", navigation_path: "/lovelace/heat" } });
+  hc2.hass = hass(Array(4).fill("eco"), { "input_boolean.summer": "off" });
+  for (const sel of [".title", ".status", ".label > ha-icon"]) {
+    window.history.replaceState(null, "", "/lovelace/0");
+    hc2.shadowRoot.querySelector(sel).click();
+    await tick();
+    assert.strictEqual(window.location.pathname, "/lovelace/heat", sel);
+  }
+  calls.length = 0;
+  window.history.replaceState(null, "", "/lovelace/0");
+  hc2.shadowRoot.querySelector(".switch").click();
+  await tick();
+  assert.strictEqual(window.location.pathname, "/lovelace/0", "the switch does not navigate");
+  eq(calls.pop(), ["homeassistant", "turn_on", { entity_id: "input_boolean.summer" }]);
 
   console.log("ALL CLIMATE-MODES TESTS PASSED");
   process.exit(0);
