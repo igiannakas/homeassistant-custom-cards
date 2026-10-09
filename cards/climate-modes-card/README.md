@@ -18,6 +18,10 @@
 - A tile per mode. The active one glows in its own colour.
 - A mode is active when **all** `thermostats` share its `preset`, or when its
   own `active.entity` is in `active.state` (handy for an aircon speed helper).
+- A **flag tile** uses `active: { attribute, state }` and glows on its own, next to the
+  active mode, when every thermostat's attribute is one of `state` – e.g. a Schedule tile
+  with `active: { attribute: schedule_override_active, state: [false] }` is green while
+  every room follows its schedule. It stays dark while a `lock` (summer mode) is on.
 - Tapping a tile runs its `tap_action`: `perform-action` (scripts, services),
   `navigate`, `more-info`, `toggle`. Errors (e.g. heating locked in summer mode) show as a
   toast.

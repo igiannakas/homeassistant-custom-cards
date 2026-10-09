@@ -309,7 +309,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== climate-modes-card 1.3.0 ===== */
+/* ===== climate-modes-card 1.3.1 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -325,7 +325,7 @@ registerAirQualityCard();
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.3.0";
+const CMC_VERSION = "1.3.1";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -445,12 +445,23 @@ function activity(hass, cfg) {
 }
 
 /* Which mode is on? A preset all thermostats share, or a mode's own entity + state. */
+/* A flag tile glows on its own, next to the active mode: active: {attribute, state} is on
+   when every thermostat's attribute is one of state (e.g. schedule_override_active: false
+   → the rooms follow their schedule). */
+function flagOn(hass, cfg, m) {
+  if (!m.active?.attribute) return false;
+  const th = list(cfg.thermostats).map((id) => hass.states[id]).filter(Boolean);
+  const want = list(m.active.state).map(String);
+  return th.length > 0 && th.every((s) => want.includes(String(s.attributes?.[m.active.attribute])));
+}
+
 function activeIndex(hass, cfg) {
   const modes = cfg.modes || [];
   const th = list(cfg.thermostats).map((id) => hass.states[id]).filter(Boolean);
   const presets = th.map((s) => s.attributes?.preset_mode);
   const allSame = presets.length && presets.every((p) => p === presets[0]);
   return modes.findIndex((m) => {
+    if (m.active?.attribute) return false; // a flag tile (see flagOn), never "the" mode
     if (m.active?.entity) {
       const s = hass.states[m.active.entity];
       return !!s && list(m.active.state).map(String).includes(String(s.state));
@@ -479,13 +490,13 @@ const CSS = `
     -webkit-tap-highlight-color: transparent; }
   .status:empty { display: none; }
   /* status: activity – what the heating is doing goes on its own line under the title (like a
-     Mushroom secondary line), so room names fit next to the switch even on a phone. */
-  .label.two { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "icon title sw" "icon status status";
+     Mushroom secondary line); icon and switch are centred on both lines. */
+  .label.two { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "icon title sw" "icon status sw";
     column-gap: 8px; row-gap: 0; align-items: center; }
   .label.two > ha-icon:first-child { grid-area: icon; }
   .label.two .title { grid-area: title; top: 0; align-self: end; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .label.two .status { grid-area: status; margin-left: 0; align-self: start; font-weight: 400; line-height: 16px; }
-  .label.two .switch { grid-area: sw; margin-top: -8px; margin-bottom: -8px; } /* sits on the title line without pushing the second line down */
+  .label.two .switch { grid-area: sw; align-self: center; } /* centred on the two lines, like the icon */
   /* Label-row switch: 40×24, the same on every card. */
   .sw { flex: none; width: 40px; height: 24px; border-radius: 12px; position: relative; background: var(--disabled-color, #bdbdbd); transition: background-color 160ms; }
   .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
@@ -509,6 +520,8 @@ const CSS = `
   .mode:active, .switch:active { filter: brightness(.92); }
   .mode:focus-visible, .switch:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   ha-card { container-type: inline-size; }
+  /* Six or more tiles on a phone: a touch smaller so names like "Schedule" fit. */
+  @container (max-width: 420px) { .modes.many .name { font-size: 11px; letter-spacing: 0; } }
 `;
 
 class ClimateModesCard extends HTMLElement {
@@ -551,7 +564,7 @@ class ClimateModesCard extends HTMLElement {
         })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
-          modes: "One entry per tile: name, icon, color, preset (or active: {entity, state}) and tap_action.",
+          modes: "One entry per tile: name, icon, color, preset (or active: {entity, state} / {attribute, state}) and tap_action.",
           switch: "Shown after the status, e.g. summer mode or an automatic-aircon automation.",
           switch_tap_action: "Add confirmation: {title, subject, text} in YAML to ask first.",
           lock: "With activity: {entity, text, icon, color} – e.g. summer mode: Summer · heating locked.",
@@ -589,7 +602,7 @@ class ClimateModesCard extends HTMLElement {
         <span class="title">${esc(c.title || "")}</span>
         <span class="status"></span>
         ${c.switch ? `<button class="switch" role="switch" style="--sw-color:${color(c.switch_color || "blue")}"><span class="swl"></span><span class="sw"></span></button>` : ""}</div>` : ""}
-      <div class="modes" style="--n:${Math.max(1, c.modes.length)}">
+      <div class="modes${c.modes.length >= 6 ? " many" : ""}" style="--n:${Math.max(1, c.modes.length)}">
         ${c.modes
           .map((m, i) => `<button class="mode" data-i="${i}" style="--c:${color(m.color)}" aria-pressed="false">
             <span class="shape"><ha-icon icon="${esc(m.icon || "mdi:thermostat")}"></ha-icon></span><span class="name">${esc(m.name || "")}</span></button>`)
@@ -608,8 +621,11 @@ class ClimateModesCard extends HTMLElement {
     const c = this._config;
     const active = activeIndex(hass, c);
     root.querySelectorAll(".mode").forEach((b, i) => {
-      b.classList.toggle("on", i === active);
-      b.setAttribute("aria-pressed", String(i === active));
+      // A flag (e.g. "on schedule") means nothing while a lock such as summer mode holds the rooms.
+      const locked = c.lock?.entity && hass.states[c.lock.entity]?.state === "on";
+      const on = i === active || (!locked && flagOn(hass, c, c.modes[i]));
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", String(on));
     });
     const status = root.querySelector(".status");
     if (status && c.status === "activity") {

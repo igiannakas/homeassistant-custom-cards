@@ -204,6 +204,24 @@ const cfg = {
   assert.strictEqual(icon().getAttribute("icon"), "mdi:radiator", "icon comes back");
   assert.strictEqual(keep.textContent, "Heating · Living Room");
 
+  // A flag tile (active: {attribute, state}) glows on its own, next to the active mode.
+  const fc = document.createElement("climate-modes-card");
+  document.body.appendChild(fc);
+  fc.setConfig({ ...cfg, modes: [...cfg.modes, { name: "Schedule", icon: "mdi:calendar-sync", color: "green",
+    active: { attribute: "schedule_override_active", state: [false] }, tap_action: run("script.resume") }] });
+  const fh = (override) => { const h = hass(Array(4).fill("comfort")); TH.forEach((id, i) => (h.states[id].attributes.schedule_override_active = override[i])); return h; };
+  fc.hass = fh([false, false, false, false]);
+  const on = () => [...fc.shadowRoot.querySelectorAll(".mode")].filter((b) => b.classList.contains("on")).map((b) => b.textContent.trim());
+  eq(on(), ["Day", "Schedule"], "following the schedule: the mode and the flag both glow");
+  assert(fc.shadowRoot.querySelector(".modes").classList.contains("many"));
+  fc.hass = fh([false, true, false, false]);
+  eq(on(), ["Day"], "one room overridden: the flag goes out");
+  assert.strictEqual(fc.shadowRoot.querySelector(".status").textContent, "All rooms · Day", "the flag never becomes the mode");
+  fc.setConfig({ ...fc._config, lock: { entity: "input_boolean.summer" } });
+  const lh = fh([false, false, false, false]); lh.states["input_boolean.summer"] = { state: "on", attributes: {} };
+  fc.hass = lh;
+  eq(on(), ["Day"], "no schedule flag while summer mode locks the rooms");
+
   console.log("ALL CLIMATE-MODES TESTS PASSED");
   process.exit(0);
 })().catch((e) => {
