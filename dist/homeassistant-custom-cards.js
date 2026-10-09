@@ -1820,7 +1820,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.2.1 ===== */
+/* ===== printer-status-card 1.3.0 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1828,14 +1828,15 @@ registerMmuLanesCard();
  * A Klipper / Moonraker printer at a glance: state and message, a power pill (plug
  * and live watts), the current job (thumbnail, progress, time left, finish time,
  * layer, filament, speed) or, when idle, today's energy and lifetime totals, your
- * camera card, the buttons that make sense for the state, and an optional chamber light
+ * camera card (only while the printer has power), the buttons that make sense for the
+ * state (Power on when the plug is off), and an optional chamber light
  * toggle (glows while on; hold it for the light's more-info). Home, Cancel and
  * Power off always ask first. Tap any value for its own more-info (the watts on the power
  * pill too). Sensors are found from the Moonraker prefix (e.g. "voron").
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.2.1";
+const PSC_VERSION = "1.3.0";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -1936,7 +1937,8 @@ function lightModel(s, id) {
 function actions(key) {
   if (key === "printing") return [["pause", "Pause", "mdi:pause"], ["cancel", "Cancel", "mdi:stop", true]];
   if (key === "paused") return [["resume", "Resume", "mdi:play"], ["cancel", "Cancel", "mdi:stop", true]];
-  if (key === "off" || key === "starting") return [];
+  if (key === "off") return [["poweron", "Power on", "mdi:power"]];
+  if (key === "starting") return [];
   return [["home", "Home", "mdi:home", true], ["poweroff", "Power off", "mdi:power", true]];
 }
 
@@ -2065,6 +2067,7 @@ const CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
   .act ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
   .act.cancel ha-icon, .act.poweroff ha-icon { color: ${C.orange}; }
+  .act.poweron ha-icon { color: ${C.green}; }
   /* Chamber light: glows while on, like a lit room on the lights card. */
   .act.light.on { background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
   .act.light.on ha-icon { color: ${C.orange}; }
@@ -2166,21 +2169,38 @@ class PrinterStatusCard extends HTMLElement {
     });
     this._built = true;
     this._actKeys = null;
-    this._mountCamera();
+    this._cameraEl = null;
+  }
+
+  /* The camera card lives only while the printer has power: with the plug off its stream can't
+     exist, and a mounted camera card would keep trying to connect. */
+  _syncCamera(show) {
+    if (!this._config.camera_card) return;
+    if (show && !this._cameraEl && !this._cameraPending) this._mountCamera();
+    if (!show && (this._cameraEl || this._cameraPending)) {
+      this._cameraGen = (this._cameraGen || 0) + 1; // drop a mount still in flight
+      this._cameraPending = false;
+      this._cameraEl = null;
+      this.shadowRoot.querySelector(".camera").replaceChildren();
+    }
   }
 
   async _mountCamera() {
     const cfg = this._config.camera_card;
     if (!cfg) return;
+    const gen = (this._cameraGen = (this._cameraGen || 0) + 1);
+    this._cameraPending = true;
     try {
       const helpers = await window.loadCardHelpers?.();
-      if (!helpers) return;
+      if (!helpers || gen !== this._cameraGen) return;
       const el = helpers.createCardElement(cfg);
       el.hass = this._hass;
       this._cameraEl = el;
       this.shadowRoot.querySelector(".camera").replaceChildren(el);
     } catch (e) {
       /* camera card not available – the rest of the card works without it */
+    } finally {
+      if (gen === this._cameraGen) this._cameraPending = false;
     }
   }
 
@@ -2253,7 +2273,8 @@ class PrinterStatusCard extends HTMLElement {
     }
 
     // Buttons for this state (rebuilt only when the set changes, so taps are never lost).
-    const acts = actions(m.key).filter(([k]) => k !== "poweroff" || this._config.power_off_script);
+    this._syncCamera(m.key !== "off");
+    const acts = actions(m.key).filter(([k]) => (k !== "poweroff" || this._config.power_off_script) && (k !== "poweron" || this._config.power_switch));
     if (m.light) acts.push(["light", "", ""]);
     const keys = acts.map((a) => a[0]).join();
     if (keys !== this._actKeys) {
@@ -2348,6 +2369,12 @@ class PrinterStatusCard extends HTMLElement {
         secondary: `The print stops and cannot be resumed.`, confirmLabel: "Cancel print",
       });
       if (ok) press(`button.${p}_cancel_print`);
+    }
+    if (k === "poweron") {
+      // Turning the plug on is harmless, so it happens at once (like the pill).
+      const id = this._config.power_switch;
+      const [domain] = id.split(".");
+      return this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_on", { entity_id: id });
     }
     if (k === "poweroff") {
       const ok = await confirmDialog({

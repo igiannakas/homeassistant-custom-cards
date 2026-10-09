@@ -164,7 +164,12 @@ const cfg = {
   assert.strictEqual(q(".msg").textContent, "Power is off");
   assert.strictEqual(q(".pill .tog span").textContent, "Off");
   assert.strictEqual(q(".pill .w").textContent, "");
-  eq(acts(), []);
+  // Plug off: the only button is Power on, and it works at once (no dialog).
+  eq(acts(), ["Power on"]);
+  r.querySelector(".act.poweron").click();
+  await tick();
+  assert(!document.querySelector("psc-confirm-dialog"), "power on does not ask");
+  eq(calls.pop(), ["switch", "turn_on", { entity_id: "switch.voron" }]);
   q(".pill .tog").click();
   await tick();
   assert(!document.querySelector("psc-confirm-dialog"), "turning on does not ask");
@@ -234,6 +239,30 @@ const cfg = {
   assert.strictEqual(made[0].type, "custom:frigate-card");
   const camEl = cam.shadowRoot.querySelector(".camera .cam");
   assert(camEl && camEl.hass, "camera card mounted with hass");
+  // Printer off: the camera card is removed (no stream to show); back on: mounted again.
+  const offStates = states({ "switch.voron": { state: "off", attributes: {} } });
+  cam.hass = hass(offStates);
+  assert(!cam.shadowRoot.querySelector(".camera .cam"), "camera removed while the plug is off");
+  assert.strictEqual(cam.shadowRoot.querySelector(".camera").children.length, 0);
+  cam.hass = hass(offStates);
+  await tick();
+  assert.strictEqual(made.length, 1, "not re-created while off");
+  cam.hass = hass(states());
+  await tick();
+  assert(cam.shadowRoot.querySelector(".camera .cam"), "camera back when the plug is on");
+  assert.strictEqual(made.length, 2);
+  cam.hass = hass(states());
+  await tick();
+  assert.strictEqual(made.length, 2, "mounted once, not on every update");
+  // A card set up with the plug already off never creates the camera until power returns.
+  const made0 = made.length;
+  const camOff = mount({ ...cfg, camera_card: { type: "custom:frigate-card" } }, offStates);
+  await tick();
+  assert.strictEqual(made.length, made0);
+  eq([...camOff.shadowRoot.querySelectorAll(".act")].map((x) => x.textContent), ["Power on"]);
+  // Without a power switch there is no Power on button.
+  const noPlug = mount({ prefix: "voron" }, states({ "sensor.voron_printer_state": { state: "unavailable", attributes: {} } }));
+  eq([...noPlug.shadowRoot.querySelectorAll(".act")].map((x) => x.textContent), []);
 
   console.log("printer-status-card: all tests passed");
 })().catch((e) => {

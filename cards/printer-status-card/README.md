@@ -24,9 +24,11 @@
 - **Job**: thumbnail, progress, time left and finish time, layer, filament used and
   speed. Stays up after the print as "Done" / "Cancelled".
 - **Idle**: energy used today, prints, hours printed and kilometres of filament.
-- **Camera**: any card you like (e.g. Frigate card), shown inside this one.
+- **Camera**: any card you like (e.g. Frigate card), shown inside this one – only while the
+  printer has power. With the plug off the camera card is removed, so it doesn't keep trying to
+  connect, and it comes back when the plug is on.
 - **Buttons** follow the state: Pause + Cancel while printing, Resume + Cancel when
-  paused, Home + Power off when idle. Home, Cancel and Power off ask first. There
+  paused, Home + Power off when idle, Power on when the plug is off (at once, no dialog). Home, Cancel and Power off ask first. There
   is no emergency stop on purpose.
 - **Chamber light** (optional, `light`): an extra button that glows while the light is
   on and shows its level when dimmed ("Light 25%"). A tap toggles it at once. For a
