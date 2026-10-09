@@ -117,6 +117,61 @@ const cfg = {
   await tick();
   assert.strictEqual(toast, "Summer mode is on");
 
+  // Built-in confirmation: a dialog in the card's own look, texts rendered as templates,
+  // cancel does nothing, confirm runs the action. No pop-up card needed.
+  calls.length = 0;
+  const rendered = [];
+  const conn = { subscribeMessage: (cb, msg) => { rendered.push(msg.template); setTimeout(() => cb({ result: msg.template.replace(/\{\{\s*'([^']*)'\s*\}\}/g, "$1").replace(/\{\{.*?\}\}/g, "21") }), 0); return Promise.resolve(() => {}); } };
+  const cc = document.createElement("climate-modes-card");
+  document.body.appendChild(cc);
+  cc.setConfig({ ...cfg, modes: [
+    { name: "Boost", icon: "mdi:fire", color: "red", preset: "boost",
+      tap_action: { ...run("script.heating_mode_boost"), confirmation: { title: "Boost heating", subject: "All rooms", text: "Every room heats to {{ x }} °C for 30 minutes." } } },
+    { name: "Day", icon: "mdi:weather-sunny", color: "amber", preset: "comfort", tap_action: { ...run("script.heating_mode_comfort"), confirmation: true } },
+  ], switch: "input_boolean.summer", switch_name: "Summer", switch_color: "amber",
+    switch_tap_action: { action: "toggle", confirmation: { title: "{{ 'Turn off' }} summer mode", text: "Locks every thermostat." } } });
+  cc.hass = { ...hass(Array(4).fill("eco"), { "input_boolean.summer": "off" }), connection: conn };
+  const cm = () => [...cc.shadowRoot.querySelectorAll(".mode")];
+  cm()[0].click();
+  await tick(); await tick();
+  let dlg = document.querySelector("cmc-confirm-dialog");
+  assert(dlg, "asks first");
+  const dt = dlg.shadowRoot.textContent;
+  assert(dt.includes("Boost heating") && dt.includes("All rooms") && dt.includes("Every room heats to 21 °C"), dt);
+  assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--red-color"));
+  assert.strictEqual(rendered.length, 1, "only template strings go to the server");
+  dlg.shadowRoot.querySelector(".cancel").click();
+  await tick();
+  assert(!document.querySelector("cmc-confirm-dialog"));
+  assert.strictEqual(calls.length, 0, "cancel runs nothing");
+  cm()[0].click();
+  await tick(); await tick();
+  cm()[0].click(); // a second tap while asking opens no second dialog
+  await tick(); await tick();
+  assert.strictEqual(document.querySelectorAll("cmc-confirm-dialog").length, 1);
+  document.querySelector("cmc-confirm-dialog").shadowRoot.querySelector(".confirm").click();
+  await tick();
+  eq(calls.pop(), ["script", "heating_mode_boost", {}, {}]);
+  // confirmation: true uses the tile's name.
+  cm()[1].click();
+  await tick(); await tick();
+  dlg = document.querySelector("cmc-confirm-dialog");
+  assert.strictEqual(dlg.shadowRoot.querySelector(".title").textContent, "Day");
+  window.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await tick();
+  assert(!document.querySelector("cmc-confirm-dialog"), "Escape cancels");
+  assert.strictEqual(calls.length, 0);
+  // The switch asks too, then toggles its own entity.
+  cc.shadowRoot.querySelector(".switch").click();
+  await tick(); await tick();
+  dlg = document.querySelector("cmc-confirm-dialog");
+  assert.strictEqual(dlg.shadowRoot.querySelector(".title").textContent, "Turn off summer mode");
+  assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--amber-color"));
+  dlg.shadowRoot.querySelector(".confirm").click();
+  await tick();
+  eq(calls.pop(), ["homeassistant", "toggle", { entity_id: "input_boolean.summer" }]);
+
   console.log("ALL CLIMATE-MODES TESTS PASSED");
   process.exit(0);
 })().catch((e) => {

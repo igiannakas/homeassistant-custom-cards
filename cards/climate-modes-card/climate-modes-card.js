@@ -4,11 +4,13 @@
  * Whole-house shortcuts in one card: a label row (icon, title, what the rooms are
  * on, or a switch) and a row of mode tiles. A tile glows in its colour while it is
  * the active mode. Made for heating presets across several thermostats, and just
- * as happy with any entity + state (e.g. an aircon speed helper).
+ * as happy with any entity + state (e.g. an aircon speed helper). Any tap action can ask
+ * first: add `confirmation` and the card shows its own confirm dialog (Bubble Card look,
+ * texts may be templates), so no pop-up card is needed.
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.1.4";
+const CMC_VERSION = "1.2.0";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -21,6 +23,93 @@ const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const list = (v) => (v === undefined || v === null || v === "" ? [] : Array.isArray(v) ? v : [v]);
+
+const DIALOG_CSS = `
+  :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
+    font-family: var(--ha-font-family-body, Roboto, sans-serif); }
+  .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px); animation: fade 160ms ease-out; }
+  .dialog { position: relative; box-sizing: border-box; width: min(400px, calc(100vw - 32px)); padding: 25px 18px 18px;
+    border-radius: 32px; color: var(--primary-text-color);
+    background: color-mix(in srgb, var(--card-background-color, #fff) 94%, transparent);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 12px 40px rgba(0,0,0,.25);
+    animation: pop 180ms cubic-bezier(.2,.9,.3,1.2); }
+  .row { display: flex; align-items: center; gap: 6px; padding-left: 8px; }
+  .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+  .glyph ha-icon { --mdc-icon-size: 24px; }
+  .title { font-size: 20px; line-height: 26px; font-weight: 600; }
+  .body { margin-top: 20px; }
+  .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
+  .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; }
+  .buttons { margin-top: 20px; display: grid; gap: 8px; }
+  button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
+    border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
+  button .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
+  button .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
+  button.confirm { color: #fff; }
+  button.confirm .glyph { background: rgba(255,255,255,.2); }
+  button.confirm .glyph ha-icon { color: #fff; }
+  button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+  button:active { filter: brightness(.92); }
+  @keyframes fade { from { opacity: 0; } }
+  @keyframes pop { from { opacity: 0; transform: scale(.94); } }
+`;
+
+/* Render a Home Assistant template once (titles and texts may be templates). */
+function renderTemplate(hass, tpl) {
+  const t = String(tpl ?? "");
+  if (!/\{[{%]/.test(t) || !hass?.connection?.subscribeMessage) return Promise.resolve(t);
+  return new Promise((resolve) => {
+    let finished = false;
+    let unsub;
+    const finish = (v) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      Promise.resolve(unsub).then((u) => typeof u === "function" && u()).catch(() => {});
+      resolve(String(v ?? ""));
+    };
+    const timer = setTimeout(() => finish(""), 4000);
+    unsub = hass.connection.subscribeMessage((msg) => finish(msg?.result), { type: "render_template", template: t, report_errors: false });
+    Promise.resolve(unsub).catch(() => finish(""));
+  });
+}
+
+/* Confirm dialog in the Bubble Card look. Resolves true (confirm) or false (cancel). */
+function confirmDialog({ title, icon, col, subjectIcon, subject, text, confirmLabel }) {
+  return new Promise((resolve) => {
+    const host = document.createElement("cmc-confirm-dialog");
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>${DIALOG_CSS}</style><div class="backdrop"></div>
+      <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+        <div class="row"><div class="glyph" style="background:${tint(col, 20)}"><ha-icon icon="${esc(icon)}" style="color:${col}"></ha-icon></div>
+          <div class="title">${esc(title)}</div></div>
+        ${subject || text ? `<div class="row body"><div class="glyph"><ha-icon icon="${esc(subjectIcon)}" style="color:${col}"></ha-icon></div>
+          <div>${subject ? `<div class="primary">${esc(subject)}</div>` : ""}${text ? `<div class="secondary">${esc(text)}</div>` : ""}</div></div>` : ""}
+        <div class="buttons">
+          <button class="confirm" style="background:${col}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
+          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+        </div></div>`;
+    const done = (ok) => {
+      document.removeEventListener("keydown", onKey, true);
+      host.remove();
+      resolve(ok);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        done(false);
+      }
+    };
+    root.querySelector(".backdrop").addEventListener("click", () => done(false));
+    root.querySelector(".cancel").addEventListener("click", () => done(false));
+    root.querySelector(".confirm").addEventListener("click", () => done(true));
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(host);
+    root.querySelector(".confirm").focus();
+  });
+}
 
 /* Which mode is on? A preset all thermostats share, or a mode's own entity + state. */
 function activeIndex(hass, cfg) {
@@ -117,7 +206,7 @@ class ClimateModesCard extends HTMLElement {
         ({
           modes: "One entry per tile: name, icon, color, preset (or active: {entity, state}) and tap_action.",
           switch: "Shown after the status, e.g. summer mode or an automatic-aircon automation.",
-          switch_tap_action: "E.g. navigate to #summer-mode to confirm in a pop-up first.",
+          switch_tap_action: "Add confirmation: {title, subject, text} in YAML to ask first.",
         })[s.name],
     };
   }
@@ -194,6 +283,7 @@ class ClimateModesCard extends HTMLElement {
     const a = mode?.tap_action;
     if (!a || a.action === "none") return;
     this._fire("haptic", "light");
+    if (a.confirmation && !(await this._confirm(mode, a.confirmation))) return;
     try {
       if (a.action === "navigate") {
         history.pushState(null, "", a.navigation_path);
@@ -211,8 +301,39 @@ class ClimateModesCard extends HTMLElement {
     }
   }
 
+  /* Ask first. confirmation: true, or {title, icon, subject, subject_icon, text, confirm_label};
+     every text may be a template. Defaults come from the tile (name, icon, colour). */
+  async _confirm(mode, conf) {
+    if (this._asking) return false;
+    this._asking = true;
+    try {
+      const o = conf === true ? {} : conf || {};
+      const [title, icon, subject, text, label] = await Promise.all(
+        [o.title, o.icon, o.subject, o.text, o.confirm_label].map((v) => (v ? renderTemplate(this._hass, v) : Promise.resolve(""))),
+      );
+      const name = title.trim() || mode.name || "Are you sure?";
+      return await confirmDialog({
+        title: name,
+        icon: icon.trim() || mode.icon || "mdi:help-circle-outline",
+        col: color(mode.color || "blue"),
+        subjectIcon: o.subject_icon || this._config.icon || "mdi:information-outline",
+        subject: subject.trim(),
+        text: text.trim(),
+        confirmLabel: label.trim() || name,
+      });
+    } finally {
+      this._asking = false;
+    }
+  }
+
   async _toggleSwitch() {
-    if (this._config.switch_tap_action) return this._tap({ tap_action: this._config.switch_tap_action });
+    const c = this._config;
+    if (c.switch_tap_action) {
+      return this._tap({
+        name: c.switch_name ?? "Automatic", color: c.switch_color || "blue", icon: c.icon,
+        active: { entity: c.switch }, tap_action: c.switch_tap_action,
+      });
+    }
     const id = this._config.switch;
     const on = this._hass.states[id]?.state === "on";
     this._fire("haptic", "light");

@@ -55,11 +55,11 @@ Taken from a live dashboard at phone width, light theme. A few show example valu
 ## Dependencies
 
 The cards themselves need nothing else: no Mushroom, no card-mod, no build step.
-Two options lean on other cards if you use them:
+Confirmations are built in (each card shows its own dialog), so no pop-up card such as
+Bubble Card is needed. One option leans on another card if you use it:
 
 | Used for | Needs | Notes |
 |---|---|---|
-| Confirmation pop-ups opened by a `#hash` link (e.g. the Climate modes card's `#away-all`, `#boost-all`, `#summer-mode`) | [Bubble Card](https://github.com/Clooos/Bubble-Card) | A `navigate` to `#something` opens the Bubble Card pop-up with that `hash`. The pop-up must be on the **same view** as the card that opens it, so a card used on two views needs the pop-ups on both. Without Bubble Card, point the action at a script or `more-info` instead. |
 | The camera inside the Printer status card (`camera_card`) | Whatever card you put there | Any card works; the screenshots use [Advanced Camera Card](https://github.com/dermotduffy/advanced-camera-card). Leave `camera_card` out and the card has no camera. |
 
 ## Installing (HACS)
