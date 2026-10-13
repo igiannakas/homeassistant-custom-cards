@@ -119,11 +119,13 @@ const cfg = {
   assert(!r4.querySelector(".link"), "hidden link pill is not rendered");
   assert.strictEqual(r4.querySelector(".pres span").textContent, "Home");
   assert(r4.querySelector(".pills").getAttribute("style").includes("--np:1"), "one pill → one column");
+  assert(!r4.querySelector(".wrap").classList.contains("multi"), "a lone pill stays beside the weather on a phone");
   assert(!r4.querySelector(".pills").getAttribute("style").includes("display:none"));
   // Turning it back on (editor toggle off) brings the pill back with its kept settings.
   c4.setConfig({ ...cfg, link: { ...cfg.link, hide: false } });
   assert.strictEqual(r4.querySelector(".link span").textContent, "Climate");
   assert(r4.querySelector(".pills").getAttribute("style").includes("--np:2"));
+  assert(r4.querySelector(".wrap").classList.contains("multi"), "two pills get their own row on a phone");
 
   // A link with nowhere to go (editor-cleared {} or a name without a path) is not a dead "Open" pill.
   for (const link of [{}, { name: "Climate" }, { hide: false }]) {

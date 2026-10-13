@@ -4082,7 +4082,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== weather-presence-card 1.2.1 ===== */
+/* ===== weather-presence-card 1.2.2 ===== */
 (() => {
 /*
  * Weather & presence card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -4095,7 +4095,7 @@ registerRoomLightsCard();
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.2.1";
+const WPC_VERSION = "1.2.2";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -4163,13 +4163,20 @@ const CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
     -webkit-tap-highlight-color: transparent; }
   .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
-  /* Phone: the weather gets the full first line; the two pills share a row of wide buttons below
-     (40px: 44 read as too large, 36 as too small to hit). */
+  /* Phone: pills are 40px (44 read as too large, 36 as too small to hit). Two pills don't fit
+     beside the weather, so they share a row of wide buttons below it; a single pill stays on the
+     weather's line (moving it down only made the card taller) and the readings wrap if tight. */
   @container (max-width: 440px) {
+    .pill { height: 40px; border-radius: 20px; }
+    .wrap.multi { flex-wrap: wrap; row-gap: 8px; }
+    .wrap.multi .wx { flex: 1 1 100%; }
+    .wrap.multi .pills { flex: 1 1 100%; display: grid; grid-template-columns: repeat(var(--np, 2), minmax(0, 1fr)); }
+  }
+  /* Too narrow even for one pill beside the weather: everything stacks. */
+  @container (max-width: 300px) {
     .wrap { flex-wrap: wrap; row-gap: 8px; }
     .wx { flex: 1 1 100%; }
     .pills { flex: 1 1 100%; display: grid; grid-template-columns: repeat(var(--np, 2), minmax(0, 1fr)); }
-    .pill { height: 40px; border-radius: 20px; }
   }
   .pill.home { background: ${tint(C.teal, 20)}; color: ${C.teal}; }
   .pill.home ha-icon { color: ${C.teal}; }
@@ -4316,7 +4323,7 @@ class WeatherPresenceCard extends HTMLElement {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const link = this._link();
     const np = (this._presenceId() ? 1 : 0) + (link ? 1 : 0);
-    root.innerHTML = `<style>${CSS}</style><ha-card><div class="wrap">
+    root.innerHTML = `<style>${CSS}</style><ha-card><div class="wrap${np > 1 ? " multi" : ""}">
       <div class="wx" role="button" tabindex="0"><div class="shape"><ha-icon></ha-icon></div>
         <div class="txt"><div class="nm"></div><div class="sc"></div></div></div>
       <div class="pills" style="--np:${np || 1}${np ? "" : ";display:none"}">
