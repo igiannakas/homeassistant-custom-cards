@@ -119,13 +119,11 @@ const cfg = {
   assert(!r4.querySelector(".link"), "hidden link pill is not rendered");
   assert.strictEqual(r4.querySelector(".pres span").textContent, "Home");
   assert(r4.querySelector(".pills").getAttribute("style").includes("--np:1"), "one pill → one column");
-  assert(!r4.querySelector(".wrap").classList.contains("multi"), "a lone pill stays beside the weather on a phone");
   assert(!r4.querySelector(".pills").getAttribute("style").includes("display:none"));
   // Turning it back on (editor toggle off) brings the pill back with its kept settings.
   c4.setConfig({ ...cfg, link: { ...cfg.link, hide: false } });
   assert.strictEqual(r4.querySelector(".link span").textContent, "Climate");
   assert(r4.querySelector(".pills").getAttribute("style").includes("--np:2"));
-  assert(r4.querySelector(".wrap").classList.contains("multi"), "two pills get their own row on a phone");
 
   // A link with nowhere to go (editor-cleared {} or a name without a path) is not a dead "Open" pill.
   for (const link of [{}, { name: "Climate" }, { hide: false }]) {
@@ -134,6 +132,17 @@ const cfg = {
     c5.hass = hass();
     assert(!c5.shadowRoot.querySelector(".link"), JSON.stringify(link));
   }
+  // Pills stay beside the weather when they fit (readings may wrap), else they get their own row.
+  // Widths as measured live: icon+gap 46, "Met Office 17.6°C" 120, Home 84, Climate 109, gaps 10/8.
+  const pair = 84 + 8 + 109;
+  assert(!Card.stacks(404, 46 + 120, 10, pair), "440px iPhone Pro Max: both pills fit on the right");
+  assert(Card.stacks(339, 46 + 120, 10, pair), "375px phone: two pills need their own row");
+  assert(!Card.stacks(339, 46 + 120, 10, 84), "375px phone: one pill still fits beside the weather");
+  assert(!Card.stacks(404, 46 + 120, 10, 404 - 176), "exactly fitting is fitting");
+  // Without layout (jsdom, or a hidden card) nothing is measured or changed.
+  c4._fit();
+  assert(!r4.querySelector(".wrap").classList.contains("stacked"));
+
   // Only the link hidden, no presence → no pill row at all.
   const c6 = document.createElement("weather-presence-card");
   c6.setConfig({ weather: "weather.mo", link: { ...cfg.link, hide: true } });
