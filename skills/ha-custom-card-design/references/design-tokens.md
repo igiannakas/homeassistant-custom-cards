@@ -115,7 +115,7 @@ cells) and 8px gaps, never through extra height.
   move to a row of full-width cells below only when they don't – decided by measuring natural
   widths (ResizeObserver), not by counting pills or by a breakpoint.
 
-## Vertical alignment (measured on every change)
+## Alignment (measured on every change)
 
 - **One centre line per row:** the icon circle, the text block (title + its secondary lines,
   wrapped in one element) and the trailing controls (pills, chips, switches) share one centre.
@@ -127,9 +127,21 @@ cells) and 8px gaps, never through extra height.
   line of the parent's line-height and the glyph sits 0.4–3px low – it was 2px under the
   weather card's readings and 3px on its pill chevron.
 - Small reading icons (14px) sit centred on their own line of text.
+- **Subtext starts on the title's vertical line, measured on ink.** Every line of a text block –
+  readings, status, values – starts where the title's first letter starts, judged by what is drawn,
+  not by boxes. A reading icon's glyph has its own side bearing inside its 14px box (thermometer
+  4px, water drop 3.5px) and so does a leading "1"; aligned boxes left the thermometer 3px right of
+  the title. Every card with text blocks includes the shared `inkAlign` helper: it gives each
+  `.v > ha-icon` the margin `title bearing − glyph bearing` (glyph bearing from the SVG bbox, title
+  bearing from canvas text metrics) and each text-led line the same for its first character. It is
+  position-independent, so wrapping can't break it, and runs once per frame after a render
+  (`inkSchedule(this, ".txt")` at the top of `_render`), retrying while icons load.
 - **Check:** the icon audit (every ha-icon's svg centre against its own box, all cards, must be
-  under 0.3px), the row check (circle, text-block and control centres equal), and a pixel check
-  of a phone-width screenshot (ink centres within 1px). Report the numbers.
+  under 0.3px), the row check (circle, text-block and control centres equal), the ink check
+  (each subtext line's first ink against the title's first letter, under 0.3px – glyph bboxes for
+  icons, Range rect + canvas `actualBoundingBoxLeft` for letters), and a pixel check of a
+  phone-width screenshot (count faint anti-aliased pixels; ink edges in the same pixel column).
+  Report the numbers.
 
 ## Dialogs and sheets (Bubble Card look)
 

@@ -118,6 +118,9 @@ visual change ends with a measured alignment check – not a look at a screensho
   the same as a stock Mushroom card on that view. Measure one Mushroom card as the reference.
 - **Vertical:** in a row, the icon, the text block (title + status) and any trailing control
   (switch, pill) share one centre line. Compare the three centres numerically.
+- **Subtext on the title's vertical line, by ink:** every line under a title starts where the
+  title's first letter starts, measured on what is drawn – an icon's glyph sits inside its box
+  with its own side bearing (3–4px for the thermometer). Cards use the shared `inkAlign` helper.
 - **Across cards:** stacked cards keep the same insets (a custom card under a Mushroom card must
   not start its title 2px earlier).
 - **One centre line per row:** icon circle, text block (title + secondary lines in one element)
