@@ -9,7 +9,7 @@
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.2.2";
+const WPC_VERSION = "1.3.0";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -66,6 +66,7 @@ const CSS = `
   .sc { display: flex; flex-wrap: wrap; column-gap: 9px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
     color: var(--secondary-text-color); }
   .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+  .v ha-icon, .pill ha-icon { flex: none; width: var(--mdc-icon-size); height: var(--mdc-icon-size); }
   .v ha-icon { --mdc-icon-size: 14px; }
   .v.real ha-icon { color: color-mix(in srgb, ${C.orange} 55%, ${C.grey}); }
   .v.fc ha-icon { color: color-mix(in srgb, ${C.blue} 55%, ${C.grey}); }
@@ -77,21 +78,16 @@ const CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
     -webkit-tap-highlight-color: transparent; }
   .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
-  /* Phone: pills are 40px (44 read as too large, 36 as too small to hit). Two pills don't fit
-     beside the weather, so they share a row of wide buttons below it; a single pill stays on the
-     weather's line (moving it down only made the card taller) and the readings wrap if tight. */
+  /* Phone: pills are 40px (44 read as too large, 36 as too small to hit). */
   @container (max-width: 440px) {
     .pill { height: 40px; border-radius: 20px; }
-    .wrap.multi { flex-wrap: wrap; row-gap: 8px; }
-    .wrap.multi .wx { flex: 1 1 100%; }
-    .wrap.multi .pills { flex: 1 1 100%; display: grid; grid-template-columns: repeat(var(--np, 2), minmax(0, 1fr)); }
   }
-  /* Too narrow even for one pill beside the weather: everything stacks. */
-  @container (max-width: 300px) {
-    .wrap { flex-wrap: wrap; row-gap: 8px; }
-    .wx { flex: 1 1 100%; }
-    .pills { flex: 1 1 100%; display: grid; grid-template-columns: repeat(var(--np, 2), minmax(0, 1fr)); }
-  }
+  /* The pills stay beside the weather whenever they fit there (the readings may wrap onto two
+     lines). Only when they don't – measured in _fit() – do they move to a row of wide buttons
+     below it, e.g. two pills on a 375px phone. */
+  .wrap.stacked { flex-wrap: wrap; row-gap: 8px; }
+  .wrap.stacked .wx { flex: 1 1 100%; }
+  .wrap.stacked .pills { flex: 1 1 100%; display: grid; grid-template-columns: repeat(var(--np, 2), minmax(0, 1fr)); }
   .pill.home { background: ${tint(C.teal, 20)}; color: ${C.teal}; }
   .pill.home ha-icon { color: ${C.teal}; }
   .pill.link { color: var(--primary-text-color); padding-right: 4px; }
@@ -174,10 +170,46 @@ class WeatherPresenceCard extends HTMLElement {
   connectedCallback() {
     clearInterval(this._tick);
     this._tick = setInterval(() => this._hass && this._render(), 60000);
+    this._observe();
   }
 
   disconnectedCallback() {
     clearInterval(this._tick);
+    this._ro?.disconnect();
+  }
+
+  /* Re-check the layout whenever the card's width changes (rotation, sidebar, column count). */
+  _observe() {
+    const wrap = this.shadowRoot?.querySelector(".wrap");
+    if (!wrap || typeof ResizeObserver === "undefined") return;
+    this._ro = this._ro || new ResizeObserver(() => this._fit());
+    this._ro.disconnect();
+    this._ro.observe(wrap);
+  }
+
+  /* Do the pills need their own row? They fit beside the weather when the icon, the wider of the
+     condition and the widest single reading (the readings may wrap, the condition may not be cut)
+     and the pills at their natural width all fit in the row. */
+  static stacks(available, weather, gap, pills) {
+    return weather + gap + pills > available + 0.5;
+  }
+
+  /* Measures natural widths, so the answer is the same whichever layout is showing (no flip-flop). */
+  _fit() {
+    const root = this.shadowRoot;
+    const wrap = root?.querySelector(".wrap");
+    const pills = root ? [...root.querySelectorAll(".pill")] : [];
+    if (!wrap || !pills.length || !wrap.clientWidth) return; // nothing to place, or not laid out (hidden)
+    const range = this.ownerDocument.createRange();
+    const contentW = (node) => (range.selectNodeContents(node), range.getBoundingClientRect().width);
+    const px = (el, prop) => parseFloat(getComputedStyle(el)[prop]) || 0;
+    const wx = root.querySelector(".wx");
+    const text = Math.max(contentW(root.querySelector(".nm")), ...[...root.querySelectorAll(".sc .v")].map((v) => v.getBoundingClientRect().width));
+    const weather = root.querySelector(".shape").offsetWidth + px(wx, "columnGap") + text;
+    const pillsW =
+      pills.reduce((s, p) => s + contentW(p) + px(p, "paddingLeft") + px(p, "paddingRight"), 0) +
+      px(root.querySelector(".pills"), "columnGap") * (pills.length - 1);
+    wrap.classList.toggle("stacked", WeatherPresenceCard.stacks(wrap.clientWidth, weather, px(wrap, "columnGap"), pillsW));
   }
 
   /* The link pill, or null when it is hidden or has nowhere to go (an editor-cleared link is {}). */
@@ -237,7 +269,7 @@ class WeatherPresenceCard extends HTMLElement {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const link = this._link();
     const np = (this._presenceId() ? 1 : 0) + (link ? 1 : 0);
-    root.innerHTML = `<style>${CSS}</style><ha-card><div class="wrap${np > 1 ? " multi" : ""}">
+    root.innerHTML = `<style>${CSS}</style><ha-card><div class="wrap">
       <div class="wx" role="button" tabindex="0"><div class="shape"><ha-icon></ha-icon></div>
         <div class="txt"><div class="nm"></div><div class="sc"></div></div></div>
       <div class="pills" style="--np:${np || 1}${np ? "" : ";display:none"}">
@@ -271,6 +303,8 @@ class WeatherPresenceCard extends HTMLElement {
     });
     root.querySelector(".link")?.addEventListener("click", () => link?.navigation_path && this._navigate(link.navigation_path));
     this._built = true;
+    this._observe();
+    this.ownerDocument.fonts?.ready?.then(() => this._fit());
   }
 
   _render() {
@@ -278,9 +312,13 @@ class WeatherPresenceCard extends HTMLElement {
     if (!this._built) this._build();
     const hass = this._hass;
     const root = this.shadowRoot;
+    let changed = false;
     const set = (node, v, html = false) => {
       if (!node) return;
-      if (html ? node.innerHTML !== v : node.textContent !== v) html ? (node.innerHTML = v) : (node.textContent = v);
+      if (html ? node.innerHTML !== v : node.textContent !== v) {
+        html ? (node.innerHTML = v) : (node.textContent = v);
+        changed = true;
+      }
     };
 
     const w = hass.states[this._config.weather];
@@ -311,6 +349,14 @@ class WeatherPresenceCard extends HTMLElement {
     if (link && lc) {
       link.querySelector("ha-icon").setAttribute("icon", lc.icon || "mdi:arrow-right");
       set(link.querySelector("span"), lc.name || "Open");
+    }
+    // New text ("Away · 3h", a longer condition) can change what fits; check once per frame.
+    if (changed && this._ro && !this._fitQueued) {
+      this._fitQueued = true;
+      requestAnimationFrame(() => {
+        this._fitQueued = false;
+        this._fit();
+      });
     }
   }
 

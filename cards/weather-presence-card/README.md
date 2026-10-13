@@ -16,9 +16,10 @@
 - **Link pill**: a plain "go there" pill, e.g. to your climate dashboard. Turn on
   **Hide this pill** to drop it where it makes no sense, such as on the climate
   dashboard itself; its name, icon and path are kept for when you turn it back on.
-- The pills are finger-sized buttons (36px, 40px on a phone). On a phone two pills
-  become a row of wide buttons under the weather; a single pill (e.g. with the link
-  pill hidden) stays beside the weather.
+- The pills are finger-sized buttons (36px, 40px on a phone). They stay beside the
+  weather whenever they fit (the two readings may wrap onto two lines), e.g. both
+  pills on a 440px iPhone Pro Max. When they don't fit, e.g. both pills on a 375px
+  phone, they become a row of wide buttons under the weather.
 
 ## Configuration
 
@@ -47,4 +48,4 @@ link:
 | `presence.entity` | Someone home: `input_boolean` / `binary_sensor` on, `person` home, or `zone` count above 0. |
 | `presence.navigation_path` | Where tapping the presence pill goes. |
 | `link.name`, `link.icon`, `link.navigation_path` | The link pill. Shown only when it has a `navigation_path`; leave `link` out to drop it. |
-| `link.hide` | `true` hides the link pill but keeps its settings (editor: **Hide this pill**). The presence pill then sits beside the weather, on a phone too. |
+| `link.hide` | `true` hides the link pill but keeps its settings (editor: **Hide this pill**). |
