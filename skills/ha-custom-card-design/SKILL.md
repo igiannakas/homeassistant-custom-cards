@@ -85,7 +85,7 @@ exactly rather than "close enough".
   everything else neutral (`rgba(primary-text-rgb, .04)`) so the glow carries meaning.
 - **Coloured text** is mixed toward the text colour so it stays readable:
   `color-mix(in srgb, var(--amber-color) 70%, var(--primary-text-color))`.
-- **Pills:** 36px high (44px on phones), radius 18. Use them for links and toggles
+- **Pills:** 36px high (40px on phones), radius 18. Use them for links and toggles
   in a header (presence, climate, power). A split pill does two things: the left half
   toggles and the right half opens the reading.
 - **Spacing follows Mushroom:** every card's content starts 10px from its edges (card padding

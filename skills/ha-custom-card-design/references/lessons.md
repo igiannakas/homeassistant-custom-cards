@@ -50,7 +50,7 @@ Most of these generalise to any dashboard.
 | "make the icon navigate to …/climate" → "as it's clickable it has to be in a circular background like the mushroom cards" | The moment an icon gets an action it gets the Mushroom circle (36px, colour at 20%). |
 | "cross check alignment as always" (toggle not centred on icon + two text lines; titles 2px short of Mushroom) | Alignment is checked by measurement on every change: glyph x, title x (edge + 46), and one shared vertical centre for icon, text block and trailing control. |
 | "Tapping on any value should show the more info for that value" | Every number is its own tap target. The watts on a power pill open the power sensor, while On/Off still toggles. |
-| "The tap targets for home/climate are too small for mobile" | Pills are 44px on phones and fill the row. |
+| "The tap targets for home/climate are too small for mobile" → later "those buttons are a bit too large" (at 44px) | Header pills are 40px on phones and fill the row: 36 was too small to hit, 44 looked oversized. |
 | "second bedroom and kitchen show me the more info dialogue instead of the pop up" | Behaviour is consistent across items, even when one room has a single lamp. |
 | "Open room needs a different placement & color. Like the call to action button" + "add a separator" | Sheet actions go below a divider. The main action is filled in the card's colour. |
 | "the lights inside the room need to mirror their images as in the room detail tab" | Reuse the icons the user already chose in their room views. Read them from the view config. |

@@ -81,7 +81,7 @@ Everything inherits `var(--ha-font-family-body, Roboto, sans-serif)`.
 - **Tile:** radius 10, padding 8–10, a 36px shape and text block with a 10px gap.
   `grid-auto-rows: 1fr` keeps rows level.
 - **Pill:** height 36, radius 18, padding `0 14px 0 10px`, 18px icon. On phones (container
-  ≤ 440px) use 44px high and full-width grid cells. A **split pill** puts two buttons in
+  ≤ 440px) use 40px high and full-width grid cells. A **split pill** puts two buttons in
   one rounded box with a 1px divider in `color-mix(currentColor 25%, transparent)`.
 - **Segmented selector:** a track with 3px padding, radius 12. Segments are 32px high
   with radius 9, and the selected one has the card background plus

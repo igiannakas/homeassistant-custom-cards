@@ -4082,7 +4082,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== weather-presence-card 1.2.0 ===== */
+/* ===== weather-presence-card 1.2.1 ===== */
 (() => {
 /*
  * Weather & presence card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -4095,7 +4095,7 @@ registerRoomLightsCard();
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.2.0";
+const WPC_VERSION = "1.2.1";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -4156,19 +4156,20 @@ const CSS = `
   .v.real ha-icon { color: color-mix(in srgb, ${C.orange} 55%, ${C.grey}); }
   .v.fc ha-icon { color: color-mix(in srgb, ${C.blue} 55%, ${C.grey}); }
   .pills { flex: none; display: flex; gap: 8px; align-items: center; }
-  /* Pills are finger-sized (36px, 44px on a phone) – they are the card's buttons. */
+  /* Pills are finger-sized (36px, 40px on a phone) – they are the card's buttons. */
   .pill { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     height: 36px; padding: 0 14px 0 10px; border-radius: 18px; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: .2px;
     white-space: nowrap;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
     -webkit-tap-highlight-color: transparent; }
   .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
-  /* Phone: the weather gets the full first line; the two pills share a row of wide buttons below. */
+  /* Phone: the weather gets the full first line; the two pills share a row of wide buttons below
+     (40px: 44 read as too large, 36 as too small to hit). */
   @container (max-width: 440px) {
     .wrap { flex-wrap: wrap; row-gap: 8px; }
     .wx { flex: 1 1 100%; }
     .pills { flex: 1 1 100%; display: grid; grid-template-columns: repeat(var(--np, 2), minmax(0, 1fr)); }
-    .pill { height: 44px; border-radius: 22px; }
+    .pill { height: 40px; border-radius: 20px; }
   }
   .pill.home { background: ${tint(C.teal, 20)}; color: ${C.teal}; }
   .pill.home ha-icon { color: ${C.teal}; }

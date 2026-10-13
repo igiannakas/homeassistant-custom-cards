@@ -17,7 +17,7 @@
   **Hide this pill** to drop it where it makes no sense, such as on the climate
   dashboard itself; its name, icon and path are kept for when you turn it back on.
 - The pills are finger-sized buttons (36px). On a phone the weather takes the
-  first line and the two pills become a row of wide 44px buttons underneath.
+  first line and the two pills become a row of wide 40px buttons underneath.
 
 ## Configuration
 
