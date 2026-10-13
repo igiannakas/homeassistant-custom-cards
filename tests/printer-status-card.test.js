@@ -44,7 +44,7 @@ const cfg = {
   const { Card, calls, mount, hass, document, tick, eq } = t;
   assert.throws(() => new Card().setConfig({}));
   const names = JSON.stringify(Card.getConfigForm().schema);
-  for (const k of ["prefix", "power_switch", "power_sensor", "energy_today", "power_off_script", "camera_card"]) assert(names.includes(`"${k}"`), k);
+  for (const k of ["prefix", "power_switch", "power_sensor", "power_sensor_switch", "energy_today", "power_off_script", "camera_card"]) assert(names.includes(`"${k}"`), k);
 
   const card = mount(cfg, states());
   const r = card.shadowRoot;
@@ -183,6 +183,49 @@ const cfg = {
   dlg.shadowRoot.querySelector(".cancel").click();
   await tick();
   assert.strictEqual(calls.length, 0, "cancel leaves the plug on");
+
+  // Upstream plug (power_sensor_switch): the power sensor measures a strip that feeds the printer's
+  // own plug and other things. Printer on: the usual On | watts pill.
+  {
+    const up = "switch.voron_master_plug";
+    const ups = (printerOn, stripOn, w) =>
+      states({ "switch.voron": { state: printerOn ? "on" : "off", attributes: {} }, [up]: { state: stripOn ? "on" : "off", attributes: {} },
+        "sensor.tasmota_energy_power_2": { state: String(w), attributes: {} } });
+    const uc = mount({ ...cfg, power_sensor_switch: up }, ups(true, true, 153));
+    const ur = uc.shadowRoot;
+    const u = (sel) => ur.querySelector(sel);
+    assert(!u(".pill").hidden && u(".pill").classList.contains("on"));
+    assert(!u(".pill .tog").hidden && !u(".pill .w").hidden);
+    assert.strictEqual(u(".pill .w").textContent, "153 W");
+    assert(u(".pill .w ha-icon").hidden, "no second plug glyph beside the toggle");
+    // Printer off, strip on: just the watts – no toggle (Power on below does that), no glow.
+    uc.hass = hass(ups(false, true, 12));
+    assert.strictEqual(u(".nm").textContent, "Voron · Off");
+    assert(!u(".pill").hidden, "watts stay while the strip is on");
+    assert(!u(".pill").classList.contains("on"), "no glow while the printer is off");
+    assert(u(".pill .tog").hidden, "no toggle while the printer is off");
+    assert(!u(".pill .w").hidden && !u(".pill .w ha-icon").hidden, "the watts lead with the plug glyph");
+    assert.strictEqual(u(".pill .w").textContent, "12 W");
+    eq([...ur.querySelectorAll(".act")].map((b) => b.textContent), ["Power on"]);
+    u(".pill .w").click();
+    eq(t.events.splice(0), [["more-info", "sensor.tasmota_energy_power_2"]]);
+    assert.strictEqual(calls.length, 0, "the watts never switch anything");
+    // Strip off too: nothing to show.
+    uc.hass = hass(ups(false, false, 0));
+    assert(u(".pill").hidden, "no pill while the strip is off");
+    // Back on: the toggle and the glow return, the extra glyph goes.
+    uc.hass = hass(ups(true, true, 140));
+    assert(!u(".pill .tog").hidden && u(".pill").classList.contains("on") && u(".pill .w ha-icon").hidden);
+    assert.strictEqual(u(".pill .w").textContent, "140 W");
+    // Without power_sensor_switch nothing changes: no pill at all while the printer's plug is off.
+    card.hass = hass(states({ "switch.voron": { state: "off", attributes: {} }, "sensor.tasmota_energy_power_2": { state: "12", attributes: {} } }));
+    assert(q(".pill").hidden);
+    card.hass = hass(states());
+    // An unknown power reading: the toggle alone.
+    uc.hass = hass(ups(true, true, "unavailable"));
+    assert(!u(".pill .tog").hidden && u(".pill .w").hidden);
+    uc.remove();
+  }
 
   // Without a power-off script there are no buttons; without energy_today three stats.
   const bare = mount({ prefix: "voron" }, states());
@@ -325,6 +368,20 @@ const cfg = {
     assert.strictEqual(cr.querySelector(".nm").textContent, "Voron · Off");
     assert.strictEqual(cr.querySelector(".sc").textContent, "Today 0.84 kWh");
     assert(cr.querySelector(".watts").hidden, "no watts while the plug is off");
+    // Upstream plug: watts while the strip is on, neutral while the printer is off.
+    const up = "switch.voron_master_plug";
+    const uc = mount({ ...cfg, layout: "compact", power_sensor_switch: up }, states({ [up]: { state: "on", attributes: {} } }));
+    const ur = uc.shadowRoot;
+    assert(!ur.querySelector(".watts").hidden && !ur.querySelector(".watts").classList.contains("off"));
+    assert.strictEqual(ur.querySelector(".watts span").textContent, "142 W");
+    uc.hass = hass(states({ "switch.voron": { state: "off", attributes: {} }, [up]: { state: "on", attributes: {} }, "sensor.tasmota_energy_power_2": { state: "12", attributes: {} } }));
+    assert.strictEqual(ur.querySelector(".nm").textContent, "Voron · Off");
+    assert.strictEqual(ur.querySelector(".sc").textContent, "Today 0.84 kWh");
+    assert(!ur.querySelector(".watts").hidden, "watts while the strip is on");
+    assert(ur.querySelector(".watts").classList.contains("off"), "without the glow");
+    assert.strictEqual(ur.querySelector(".watts span").textContent, "12 W");
+    uc.hass = hass(states({ "switch.voron": { state: "off", attributes: {} }, [up]: { state: "off", attributes: {} }, "sensor.tasmota_energy_power_2": { state: "0", attributes: {} } }));
+    assert(ur.querySelector(".watts").hidden, "none once the strip is off");
   }
 console.log("printer-status-card: all tests passed");
   process.exit(0); // feed checks leave timers running

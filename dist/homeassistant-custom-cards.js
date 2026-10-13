@@ -2585,13 +2585,14 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.5.2 ===== */
+/* ===== printer-status-card 1.6.0 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * A Klipper / Moonraker printer at a glance: state and message, a power pill while
- * the plug is on (On and live watts), the current job (thumbnail, progress, time left, finish time,
+ * the plug is on (On and live watts – or just the watts, while an upstream plug that the
+ * power sensor measures is on and the printer is off), the current job (thumbnail, progress, time left, finish time,
  * layer, filament, speed) or, when idle, today's energy and lifetime totals, your
  * camera card (only while the printer is reachable and the camera serves a picture), Power on
  * (plug off) or a safe Power off (idle), and an optional chamber light toggle (glows while
@@ -2604,7 +2605,7 @@ registerMmuLanesCard();
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.5.2";
+const PSC_VERSION = "1.6.0";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -2669,13 +2670,17 @@ function model(hass, cfg) {
 
   const msg = [s("current_display_message"), s("printer_message")].find((x) => x && !["unknown", "unavailable"].includes(x)) || "";
   const watts = num(st(cfg.power_sensor)?.state);
+  // The watts are live while the circuit the power sensor measures is on: normally the printer's
+  // own plug, or an upstream plug (power_sensor_switch, e.g. a strip that also feeds a dryer and a
+  // screen), whose reading is worth showing even while the printer itself is off.
+  const meterOn = cfg.power_sensor_switch ? st(cfg.power_sensor_switch)?.state === "on" : plugOn;
   const eta = st(`sensor.${p}_print_eta`)?.state;
   const etaDate = eta && !["unknown", "unavailable"].includes(eta) ? new Date(eta) : null;
   return {
     key,
     state: STATES[key],
     message: !plugOn ? "Power is off" : key === "busy" ? busyMsg : msg,
-    plug: plug ? { on: plugOn, watts } : null,
+    plug: plug ? { on: plugOn, watts, live: meterOn && watts !== null } : null,
     file: s("filename") && !["unknown", "unavailable"].includes(s("filename")) ? s("filename") : "",
     progress: num(s("progress")),
     left: num(s("print_time_left")),
@@ -2846,6 +2851,9 @@ const CSS = `
     background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
   .watts[hidden] { display: none; }
   .watts ha-icon { --mdc-icon-size: 18px; color: ${C.orange}; }
+  /* Printer off, upstream plug on: the reading stays, without the glow (glow means active). */
+  .watts.off { background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color); }
+  .watts.off ha-icon { color: ${C.grey}; }
   /* Spacing follows Mushroom: content starts 10px from the card edge. */
   ha-card { padding: 10px; container-type: inline-size; }
   .head { display: flex; align-items: center; gap: 10px; padding: 0 0 10px; }
@@ -2864,8 +2872,10 @@ const CSS = `
     -webkit-tap-highlight-color: transparent; }
   .pill .tog { padding: 0 12px 0 10px; }
   .pill .w { padding: 0 14px 0 10px; border-left: 1px solid color-mix(in srgb, currentColor 25%, transparent); }
-  .pill[hidden], .pill .w:empty { display: none; }
-  .pill .tog:has(+ .w:empty) { padding-right: 14px; }
+  .pill[hidden], .pill button[hidden], .pill ha-icon[hidden] { display: none; }
+  .pill .tog:has(+ .w[hidden]) { padding-right: 14px; }
+  /* Watts only (printer off, upstream plug on): no toggle, so no divider; the plug glyph leads. */
+  .pill .tog[hidden] + .w { border-left: none; }
   .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
   .pill.on { background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
   .pill.on ha-icon { color: ${C.orange}; }
@@ -3021,6 +3031,7 @@ class PrinterStatusCard extends HTMLElement {
           { name: "power_sensor", selector: { entity: { domain: "sensor", device_class: "power" } } },
           { name: "energy_today", selector: { entity: { domain: "sensor", device_class: "energy" } } },
         ] },
+        { name: "power_sensor_switch", selector: { entity: { domain: ["switch", "input_boolean"] } } },
         { name: "power_off_script", selector: { entity: { domain: ["script", "button"] } } },
         { type: "grid", name: "", schema: [
           { name: "light", selector: { entity: { domain: ["light", "switch", "input_boolean", "number", "input_number"] } } },
@@ -3037,6 +3048,7 @@ class PrinterStatusCard extends HTMLElement {
           navigation_path: "Compact: tap opens (e.g. /lovelace/voron)",
           power_switch: "Power plug",
           power_sensor: "Power (W)",
+          power_sensor_switch: "Plug the power sensor measures (if upstream)",
           energy_today: "Energy today (kWh)",
           power_off_script: "Safe power-off script",
           camera_card: "Camera card (YAML)",
@@ -3048,6 +3060,7 @@ class PrinterStatusCard extends HTMLElement {
         ({
           prefix: "Finds sensor.<prefix>_current_print_state, _printer_state, _progress, _filename …",
           camera_card: "Any card, shown inside this one, e.g. type: custom:frigate-card with your printer camera.",
+          power_sensor_switch: "When the watts come from an upstream plug that also feeds other things (e.g. a strip), the watts show whenever it is on – even with the printer off. Default: the power plug.",
         })[s.name],
     };
   }
@@ -3118,8 +3131,9 @@ class PrinterStatusCard extends HTMLElement {
       bar.style.setProperty("--c", m.state.color);
     }
     const watts = root.querySelector(".watts");
-    const showW = !!(m.plug?.on && m.plug.watts !== null);
+    const showW = !!m.plug?.live;
     watts.hidden = !showW;
+    watts.classList.toggle("off", !m.plug?.on);
     if (showW) set(".watts span", `${fmt(m.plug.watts)} W`);
   }
 
@@ -3129,7 +3143,7 @@ class PrinterStatusCard extends HTMLElement {
     root.innerHTML = `<style>${CSS}</style><ha-card>
       <div class="head"><div class="shape"><ha-icon></ha-icon></div>
         <div class="txt" data-e="sensor.${esc(this._config.prefix)}_current_print_state" role="button" tabindex="0"><div class="nm"></div><div class="sc msg"></div></div>
-        ${this._config.power_switch ? `<div class="pill"><button class="tog"><ha-icon icon="mdi:power-plug"></ha-icon><span></span></button><button class="w"${this._config.power_sensor ? ` data-e="${esc(this._config.power_sensor)}"` : ""}></button></div>` : ""}</div>
+        ${this._config.power_switch ? `<div class="pill"><button class="tog"><ha-icon icon="mdi:power-plug"></ha-icon><span></span></button><button class="w"${this._config.power_sensor ? ` data-e="${esc(this._config.power_sensor)}"` : ""}><ha-icon icon="mdi:power-plug" hidden></ha-icon><span></span></button></div>` : ""}</div>
       <div class="job"><div class="thumb" data-e="${esc(this._config.thumbnail || `camera.${this._config.prefix}_thumbnail`)}"><ha-icon icon="mdi:cube-outline"></ha-icon></div>
         <div class="jt"><div class="pct"></div><div class="pbar"><i></i></div><div class="sc l1"></div><div class="sc l2"></div></div></div>
       <div class="camera"></div>
@@ -3258,12 +3272,20 @@ class PrinterStatusCard extends HTMLElement {
 
     const pill = root.querySelector(".pill");
     if (pill && m.plug) {
-      // Only while the plug is on; when it is off the Power on button below takes over.
-      pill.hidden = !m.plug.on;
+      // The toggle only while the plug is on (when it is off the Power on button below takes over);
+      // the watts whenever they are live – with an upstream power_sensor_switch, also while the
+      // printer is off, then on their own and without the glow.
+      const tog = pill.querySelector(".tog");
+      const w = pill.querySelector(".w");
+      pill.hidden = !m.plug.on && !m.plug.live;
       pill.classList.toggle("on", m.plug.on);
+      if (tog.hidden !== !m.plug.on) tog.hidden = !m.plug.on;
+      if (w.hidden !== !m.plug.live) w.hidden = !m.plug.live;
+      const wIcon = w.querySelector("ha-icon");
+      if (wIcon.hidden !== m.plug.on) wIcon.hidden = m.plug.on;
       set(".pill .tog span", m.plug.on ? "On" : "Off");
-      set(".pill .w", m.plug.on && m.plug.watts !== null ? `${fmt(m.plug.watts)} W` : "");
-      pill.querySelector(".tog").setAttribute("aria-pressed", String(m.plug.on));
+      set(".pill .w span", m.plug.live ? `${fmt(m.plug.watts)} W` : "");
+      tog.setAttribute("aria-pressed", String(m.plug.on));
     }
 
     // Current job (printing, paused, or the last one that finished).

@@ -21,10 +21,12 @@
   the plug is on but the printer isn't answering it says **Please wait**, with why:
   "Shutting down" (the `power_off_script` is running), "Klipper is starting", or
   "Waiting for the printer".
-- **Power pill**: shown only while the plug is on, with its live watts. Tap On to cut
+- **Power pill**: shown while the plug is on, with its live watts. Tap On to cut
   the plug: it asks first, and warns in red while a print is running. Tap the watts for
-  the power sensor. When the plug is off the pill goes away and the Power on button
-  below takes its place.
+  the power sensor. When the plug is off the toggle goes away and the Power on button
+  below takes its place. If the power sensor measures an upstream plug that also feeds
+  other things (`power_sensor_switch`, e.g. a strip with the printer, a filament dryer and
+  a screen), the watts stay – on their own, without the glow – whenever that plug is on.
 - **Job**: thumbnail, progress, time left and finish time, layer, filament used and
   speed. Stays up after the print as "Done" / "Cancelled".
 - **Idle**: energy used today, prints, hours printed and kilometres of filament.
@@ -53,7 +55,8 @@ wording as the full card, nothing to operate:
   on its own line while printing, with a progress bar; "file · finished 15:41" when complete;
   "Chamber 24° · 4 of 8 loaded" when ready (chamber sensor and Happy Hare lane sensors, when
   they exist); "Today 0.25 kWh" when off; the printer's message otherwise.
-- Live watts in a pill while the plug is on.
+- Live watts in a pill while the plug is on – or, with `power_sensor_switch`, whenever that
+  upstream plug is on (without the glow while the printer itself is off).
 - The icon and the watts stay centred on the text, however many lines it wraps to; padding and
   insets match Mushroom cards (56px high on one line).
 - A tap anywhere opens `navigation_path` (e.g. `/lovelace/voron`), or the printer's state
@@ -96,6 +99,7 @@ camera_card:
 | `chamber_sensor` | Compact: the chamber temperature shown when ready (default `sensor.<prefix>_heater_chamber_temperature`). |
 | `power_switch` | The printer's smart plug (`switch` or `input_boolean`). Without it there is no pill and the printer counts as powered. |
 | `power_sensor` | Live watts for the pill. |
+| `power_sensor_switch` | The plug the power sensor actually measures, when it is upstream of `power_switch` and feeds other things too (e.g. a power strip). The watts then show whenever this plug is on, even while the printer is off. Default: `power_switch`. Never switched by the card. |
 | `energy_today` | kWh today, shown when idle. |
 | `power_off_script` | A `script` or `button` that shuts the printer down safely and then cuts the plug. Without it there is no Power off button. |
 | `light` | Chamber light: a `light`, `switch`, `input_boolean`, or a 0–100 `number` / `input_number` (e.g. Moonraker's `number.<prefix>_output_pin_chamber_leds`). Hidden while unavailable. |
