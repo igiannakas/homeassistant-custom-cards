@@ -4,7 +4,7 @@
  * air-quality-card, climate-modes-card, enclosure-filter-card, energy-summary-card, home-status-card, mmu-lanes-card, printer-status-card, printer-temps-card, room-lights-card, weather-presence-card
  */
 
-/* ===== air-quality-card 1.1.11 ===== */
+/* ===== air-quality-card 1.1.12 ===== */
 (() => {
 /*
  * Air quality card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -17,7 +17,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.1.11";
+const AQC_VERSION = "1.1.12";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -150,6 +150,98 @@ const CSS = `
   @container (max-width: 152px) { .row.pm { grid-template-columns: max-content; } }
 `;
 
+/* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
+   measured on ink rather than boxes. A reading icon's glyph has its own side bearing inside its
+   box (the thermometer 4px, the water drop 3.5px) and so does a leading "1"; each gets the
+   margin that puts its ink under the title's first letter. The margin depends only on the glyph,
+   not on where it sits, so it holds when a line wraps. */
+const INK = { ctx: undefined, units: new Map() };
+const inkCtx = () => {
+  if (INK.ctx === undefined)
+    INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  return INK.ctx;
+};
+const inkVisible = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+// The first thing drawn in el: a text node or an ha-icon.
+function inkLead(el) {
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) {
+      if (n.textContent.trim()) return { text: n };
+    } else if (n.nodeType === 1 && inkVisible(n)) {
+      if (n.localName === "ha-icon") return { icon: n };
+      const r = inkLead(n);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+// Left side bearing (px) of a text node's first character, in its own font.
+function inkText(node) {
+  const ctx = inkCtx();
+  if (!ctx) return null;
+  const cs = getComputedStyle(node.parentElement);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+// Left side bearing (px) of an icon's glyph; null until the icon has loaded.
+function inkIcon(hi) {
+  const svg = hi.shadowRoot?.querySelector("ha-svg-icon")?.shadowRoot?.querySelector("svg");
+  if (!svg) return null;
+  const name = hi.getAttribute("icon") || "";
+  let u = INK.units.get(name);
+  if (u === undefined) {
+    let b;
+    try {
+      b = (svg.querySelector("g") || svg).getBBox();
+    } catch (e) {
+      return null;
+    }
+    if (!b.width) return null;
+    u = b.x / (svg.viewBox?.baseVal?.width || 24);
+    if (name) INK.units.set(name, u);
+  }
+  return u * (parseFloat(getComputedStyle(svg).width) || 0);
+}
+const inkSet = (el, px) => {
+  const v = Math.abs(px) > 0.2 ? `${px.toFixed(2)}px` : "";
+  if (el.style.marginLeft !== v) el.style.marginLeft = v;
+};
+// Align every block (title line first, then its lines); false while an icon is still loading.
+function inkAlign(blocks) {
+  let done = true;
+  for (const b of blocks) {
+    const lines = [...b.children].filter(inkVisible);
+    const t = lines.length > 1 ? inkLead(lines[0]) : null;
+    if (!t || !t.text) continue;
+    const ref = inkText(t.text);
+    if (ref === null) return true; // no canvas (tests): leave the layout alone
+    for (const line of lines.slice(1)) {
+      for (const hi of line.querySelectorAll(".v > ha-icon")) {
+        const l = inkIcon(hi);
+        if (l === null) done = false;
+        else inkSet(hi, ref - l);
+      }
+      const lead = inkLead(line);
+      if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
+    }
+  }
+  return done;
+}
+// Re-align after a render, once per frame; retries while icons load, then calls after().
+function inkSchedule(host, selector, after) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const root = host.shadowRoot;
+    if (!root) return;
+    const done = inkAlign(root.querySelectorAll(selector));
+    if (after) after();
+    host._inkTries = done ? 0 : (host._inkTries || 0) + 1;
+    if (!done && host._inkTries < 20) setTimeout(() => inkSchedule(host, selector, after), 150);
+  });
+}
+
 class AirQualityCard extends HTMLElement {
   static getStubConfig() {
     return { title: "Air quality", rooms: [] };
@@ -233,6 +325,7 @@ class AirQualityCard extends HTMLElement {
   }
 
   _render() {
+    inkSchedule(this, ".txt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -788,7 +881,7 @@ async function registerClimateModesCard() {
 registerClimateModesCard();
 })();
 
-/* ===== enclosure-filter-card 1.1.6 ===== */
+/* ===== enclosure-filter-card 1.1.7 ===== */
 (() => {
 /*
  * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -800,7 +893,7 @@ registerClimateModesCard();
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.1.6";
+const EFC_VERSION = "1.1.7";
 const EFC_TAG = "enclosure-filter-card";
 
 const C = {
@@ -874,6 +967,98 @@ const CSS = `
   .opt:active, .side:active { filter: brightness(.94); }
   .opt:focus-visible, .side:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
+
+/* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
+   measured on ink rather than boxes. A reading icon's glyph has its own side bearing inside its
+   box (the thermometer 4px, the water drop 3.5px) and so does a leading "1"; each gets the
+   margin that puts its ink under the title's first letter. The margin depends only on the glyph,
+   not on where it sits, so it holds when a line wraps. */
+const INK = { ctx: undefined, units: new Map() };
+const inkCtx = () => {
+  if (INK.ctx === undefined)
+    INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  return INK.ctx;
+};
+const inkVisible = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+// The first thing drawn in el: a text node or an ha-icon.
+function inkLead(el) {
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) {
+      if (n.textContent.trim()) return { text: n };
+    } else if (n.nodeType === 1 && inkVisible(n)) {
+      if (n.localName === "ha-icon") return { icon: n };
+      const r = inkLead(n);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+// Left side bearing (px) of a text node's first character, in its own font.
+function inkText(node) {
+  const ctx = inkCtx();
+  if (!ctx) return null;
+  const cs = getComputedStyle(node.parentElement);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+// Left side bearing (px) of an icon's glyph; null until the icon has loaded.
+function inkIcon(hi) {
+  const svg = hi.shadowRoot?.querySelector("ha-svg-icon")?.shadowRoot?.querySelector("svg");
+  if (!svg) return null;
+  const name = hi.getAttribute("icon") || "";
+  let u = INK.units.get(name);
+  if (u === undefined) {
+    let b;
+    try {
+      b = (svg.querySelector("g") || svg).getBBox();
+    } catch (e) {
+      return null;
+    }
+    if (!b.width) return null;
+    u = b.x / (svg.viewBox?.baseVal?.width || 24);
+    if (name) INK.units.set(name, u);
+  }
+  return u * (parseFloat(getComputedStyle(svg).width) || 0);
+}
+const inkSet = (el, px) => {
+  const v = Math.abs(px) > 0.2 ? `${px.toFixed(2)}px` : "";
+  if (el.style.marginLeft !== v) el.style.marginLeft = v;
+};
+// Align every block (title line first, then its lines); false while an icon is still loading.
+function inkAlign(blocks) {
+  let done = true;
+  for (const b of blocks) {
+    const lines = [...b.children].filter(inkVisible);
+    const t = lines.length > 1 ? inkLead(lines[0]) : null;
+    if (!t || !t.text) continue;
+    const ref = inkText(t.text);
+    if (ref === null) return true; // no canvas (tests): leave the layout alone
+    for (const line of lines.slice(1)) {
+      for (const hi of line.querySelectorAll(".v > ha-icon")) {
+        const l = inkIcon(hi);
+        if (l === null) done = false;
+        else inkSet(hi, ref - l);
+      }
+      const lead = inkLead(line);
+      if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
+    }
+  }
+  return done;
+}
+// Re-align after a render, once per frame; retries while icons load, then calls after().
+function inkSchedule(host, selector, after) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const root = host.shadowRoot;
+    if (!root) return;
+    const done = inkAlign(root.querySelectorAll(selector));
+    if (after) after();
+    host._inkTries = done ? 0 : (host._inkTries || 0) + 1;
+    if (!done && host._inkTries < 20) setTimeout(() => inkSchedule(host, selector, after), 150);
+  });
+}
 
 class EnclosureFilterCard extends HTMLElement {
   static getStubConfig() {
@@ -981,6 +1166,7 @@ class EnclosureFilterCard extends HTMLElement {
   }
 
   _render() {
+    inkSchedule(this, ".side");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -1045,7 +1231,7 @@ async function registerEnclosureFilterCard() {
 registerEnclosureFilterCard();
 })();
 
-/* ===== energy-summary-card 1.1.1 ===== */
+/* ===== energy-summary-card 1.1.2 ===== */
 (() => {
 /*
  * Energy summary card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1059,7 +1245,7 @@ registerEnclosureFilterCard();
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.1.1";
+const ESC_VERSION = "1.1.2";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -1173,6 +1359,98 @@ const CSS = `
     .v small { font-size: 10px; margin-left: 1px; }
   }
 `;
+
+/* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
+   measured on ink rather than boxes. A reading icon's glyph has its own side bearing inside its
+   box (the thermometer 4px, the water drop 3.5px) and so does a leading "1"; each gets the
+   margin that puts its ink under the title's first letter. The margin depends only on the glyph,
+   not on where it sits, so it holds when a line wraps. */
+const INK = { ctx: undefined, units: new Map() };
+const inkCtx = () => {
+  if (INK.ctx === undefined)
+    INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  return INK.ctx;
+};
+const inkVisible = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+// The first thing drawn in el: a text node or an ha-icon.
+function inkLead(el) {
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) {
+      if (n.textContent.trim()) return { text: n };
+    } else if (n.nodeType === 1 && inkVisible(n)) {
+      if (n.localName === "ha-icon") return { icon: n };
+      const r = inkLead(n);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+// Left side bearing (px) of a text node's first character, in its own font.
+function inkText(node) {
+  const ctx = inkCtx();
+  if (!ctx) return null;
+  const cs = getComputedStyle(node.parentElement);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+// Left side bearing (px) of an icon's glyph; null until the icon has loaded.
+function inkIcon(hi) {
+  const svg = hi.shadowRoot?.querySelector("ha-svg-icon")?.shadowRoot?.querySelector("svg");
+  if (!svg) return null;
+  const name = hi.getAttribute("icon") || "";
+  let u = INK.units.get(name);
+  if (u === undefined) {
+    let b;
+    try {
+      b = (svg.querySelector("g") || svg).getBBox();
+    } catch (e) {
+      return null;
+    }
+    if (!b.width) return null;
+    u = b.x / (svg.viewBox?.baseVal?.width || 24);
+    if (name) INK.units.set(name, u);
+  }
+  return u * (parseFloat(getComputedStyle(svg).width) || 0);
+}
+const inkSet = (el, px) => {
+  const v = Math.abs(px) > 0.2 ? `${px.toFixed(2)}px` : "";
+  if (el.style.marginLeft !== v) el.style.marginLeft = v;
+};
+// Align every block (title line first, then its lines); false while an icon is still loading.
+function inkAlign(blocks) {
+  let done = true;
+  for (const b of blocks) {
+    const lines = [...b.children].filter(inkVisible);
+    const t = lines.length > 1 ? inkLead(lines[0]) : null;
+    if (!t || !t.text) continue;
+    const ref = inkText(t.text);
+    if (ref === null) return true; // no canvas (tests): leave the layout alone
+    for (const line of lines.slice(1)) {
+      for (const hi of line.querySelectorAll(".v > ha-icon")) {
+        const l = inkIcon(hi);
+        if (l === null) done = false;
+        else inkSet(hi, ref - l);
+      }
+      const lead = inkLead(line);
+      if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
+    }
+  }
+  return done;
+}
+// Re-align after a render, once per frame; retries while icons load, then calls after().
+function inkSchedule(host, selector, after) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const root = host.shadowRoot;
+    if (!root) return;
+    const done = inkAlign(root.querySelectorAll(selector));
+    if (after) after();
+    host._inkTries = done ? 0 : (host._inkTries || 0) + 1;
+    if (!done && host._inkTries < 20) setTimeout(() => inkSchedule(host, selector, after), 150);
+  });
+}
 
 class EnergySummaryCard extends HTMLElement {
   static getStubConfig(hass) {
@@ -1311,6 +1589,7 @@ class EnergySummaryCard extends HTMLElement {
   }
 
   _render() {
+    inkSchedule(this, ".stat");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const hass = this._hass;
@@ -1379,7 +1658,7 @@ async function registerEnergySummaryCard() {
 registerEnergySummaryCard();
 })();
 
-/* ===== home-status-card 1.2.3 ===== */
+/* ===== home-status-card 1.2.4 ===== */
 (() => {
 /*
  * Home status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1391,7 +1670,7 @@ registerEnergySummaryCard();
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.2.3";
+const HSC_VERSION = "1.2.4";
 const HSC_TAG = "home-status-card";
 
 const C = {
@@ -1651,6 +1930,98 @@ const CSS = `
   }
 `;
 
+/* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
+   measured on ink rather than boxes. A reading icon's glyph has its own side bearing inside its
+   box (the thermometer 4px, the water drop 3.5px) and so does a leading "1"; each gets the
+   margin that puts its ink under the title's first letter. The margin depends only on the glyph,
+   not on where it sits, so it holds when a line wraps. */
+const INK = { ctx: undefined, units: new Map() };
+const inkCtx = () => {
+  if (INK.ctx === undefined)
+    INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  return INK.ctx;
+};
+const inkVisible = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+// The first thing drawn in el: a text node or an ha-icon.
+function inkLead(el) {
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) {
+      if (n.textContent.trim()) return { text: n };
+    } else if (n.nodeType === 1 && inkVisible(n)) {
+      if (n.localName === "ha-icon") return { icon: n };
+      const r = inkLead(n);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+// Left side bearing (px) of a text node's first character, in its own font.
+function inkText(node) {
+  const ctx = inkCtx();
+  if (!ctx) return null;
+  const cs = getComputedStyle(node.parentElement);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+// Left side bearing (px) of an icon's glyph; null until the icon has loaded.
+function inkIcon(hi) {
+  const svg = hi.shadowRoot?.querySelector("ha-svg-icon")?.shadowRoot?.querySelector("svg");
+  if (!svg) return null;
+  const name = hi.getAttribute("icon") || "";
+  let u = INK.units.get(name);
+  if (u === undefined) {
+    let b;
+    try {
+      b = (svg.querySelector("g") || svg).getBBox();
+    } catch (e) {
+      return null;
+    }
+    if (!b.width) return null;
+    u = b.x / (svg.viewBox?.baseVal?.width || 24);
+    if (name) INK.units.set(name, u);
+  }
+  return u * (parseFloat(getComputedStyle(svg).width) || 0);
+}
+const inkSet = (el, px) => {
+  const v = Math.abs(px) > 0.2 ? `${px.toFixed(2)}px` : "";
+  if (el.style.marginLeft !== v) el.style.marginLeft = v;
+};
+// Align every block (title line first, then its lines); false while an icon is still loading.
+function inkAlign(blocks) {
+  let done = true;
+  for (const b of blocks) {
+    const lines = [...b.children].filter(inkVisible);
+    const t = lines.length > 1 ? inkLead(lines[0]) : null;
+    if (!t || !t.text) continue;
+    const ref = inkText(t.text);
+    if (ref === null) return true; // no canvas (tests): leave the layout alone
+    for (const line of lines.slice(1)) {
+      for (const hi of line.querySelectorAll(".v > ha-icon")) {
+        const l = inkIcon(hi);
+        if (l === null) done = false;
+        else inkSet(hi, ref - l);
+      }
+      const lead = inkLead(line);
+      if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
+    }
+  }
+  return done;
+}
+// Re-align after a render, once per frame; retries while icons load, then calls after().
+function inkSchedule(host, selector, after) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const root = host.shadowRoot;
+    if (!root) return;
+    const done = inkAlign(root.querySelectorAll(selector));
+    if (after) after();
+    host._inkTries = done ? 0 : (host._inkTries || 0) + 1;
+    if (!done && host._inkTries < 20) setTimeout(() => inkSchedule(host, selector, after), 150);
+  });
+}
+
 class HomeStatusCard extends HTMLElement {
   static getStubConfig() {
     return { name: "Home" };
@@ -1767,6 +2138,7 @@ class HomeStatusCard extends HTMLElement {
   }
 
   _render() {
+    inkSchedule(this, ".tb");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const m = model(this._hass, this._config);
@@ -1878,7 +2250,7 @@ async function registerHomeStatusCard() {
 registerHomeStatusCard();
 })();
 
-/* ===== mmu-lanes-card 1.1.6 ===== */
+/* ===== mmu-lanes-card 1.1.7 ===== */
 (() => {
 /*
  * MMU lanes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1891,7 +2263,7 @@ registerHomeStatusCard();
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.1.6";
+const MLC_VERSION = "1.1.7";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
@@ -1998,6 +2370,98 @@ const CSS = `
   .lane:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
+/* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
+   measured on ink rather than boxes. A reading icon's glyph has its own side bearing inside its
+   box (the thermometer 4px, the water drop 3.5px) and so does a leading "1"; each gets the
+   margin that puts its ink under the title's first letter. The margin depends only on the glyph,
+   not on where it sits, so it holds when a line wraps. */
+const INK = { ctx: undefined, units: new Map() };
+const inkCtx = () => {
+  if (INK.ctx === undefined)
+    INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  return INK.ctx;
+};
+const inkVisible = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+// The first thing drawn in el: a text node or an ha-icon.
+function inkLead(el) {
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) {
+      if (n.textContent.trim()) return { text: n };
+    } else if (n.nodeType === 1 && inkVisible(n)) {
+      if (n.localName === "ha-icon") return { icon: n };
+      const r = inkLead(n);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+// Left side bearing (px) of a text node's first character, in its own font.
+function inkText(node) {
+  const ctx = inkCtx();
+  if (!ctx) return null;
+  const cs = getComputedStyle(node.parentElement);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+// Left side bearing (px) of an icon's glyph; null until the icon has loaded.
+function inkIcon(hi) {
+  const svg = hi.shadowRoot?.querySelector("ha-svg-icon")?.shadowRoot?.querySelector("svg");
+  if (!svg) return null;
+  const name = hi.getAttribute("icon") || "";
+  let u = INK.units.get(name);
+  if (u === undefined) {
+    let b;
+    try {
+      b = (svg.querySelector("g") || svg).getBBox();
+    } catch (e) {
+      return null;
+    }
+    if (!b.width) return null;
+    u = b.x / (svg.viewBox?.baseVal?.width || 24);
+    if (name) INK.units.set(name, u);
+  }
+  return u * (parseFloat(getComputedStyle(svg).width) || 0);
+}
+const inkSet = (el, px) => {
+  const v = Math.abs(px) > 0.2 ? `${px.toFixed(2)}px` : "";
+  if (el.style.marginLeft !== v) el.style.marginLeft = v;
+};
+// Align every block (title line first, then its lines); false while an icon is still loading.
+function inkAlign(blocks) {
+  let done = true;
+  for (const b of blocks) {
+    const lines = [...b.children].filter(inkVisible);
+    const t = lines.length > 1 ? inkLead(lines[0]) : null;
+    if (!t || !t.text) continue;
+    const ref = inkText(t.text);
+    if (ref === null) return true; // no canvas (tests): leave the layout alone
+    for (const line of lines.slice(1)) {
+      for (const hi of line.querySelectorAll(".v > ha-icon")) {
+        const l = inkIcon(hi);
+        if (l === null) done = false;
+        else inkSet(hi, ref - l);
+      }
+      const lead = inkLead(line);
+      if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
+    }
+  }
+  return done;
+}
+// Re-align after a render, once per frame; retries while icons load, then calls after().
+function inkSchedule(host, selector, after) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const root = host.shadowRoot;
+    if (!root) return;
+    const done = inkAlign(root.querySelectorAll(selector));
+    if (after) after();
+    host._inkTries = done ? 0 : (host._inkTries || 0) + 1;
+    if (!done && host._inkTries < 20) setTimeout(() => inkSchedule(host, selector, after), 150);
+  });
+}
+
 class MmuLanesCard extends HTMLElement {
   static getStubConfig() {
     return { prefix: "printer" };
@@ -2074,6 +2538,7 @@ class MmuLanesCard extends HTMLElement {
   }
 
   _render() {
+    inkSchedule(this, ".lane");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -2120,7 +2585,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.5.1 ===== */
+/* ===== printer-status-card 1.5.2 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2139,7 +2604,7 @@ registerMmuLanesCard();
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.5.1";
+const PSC_VERSION = "1.5.2";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -2442,6 +2907,98 @@ const CSS = `
   .pill button:focus-visible, .act:focus-visible, [data-e]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
+/* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
+   measured on ink rather than boxes. A reading icon's glyph has its own side bearing inside its
+   box (the thermometer 4px, the water drop 3.5px) and so does a leading "1"; each gets the
+   margin that puts its ink under the title's first letter. The margin depends only on the glyph,
+   not on where it sits, so it holds when a line wraps. */
+const INK = { ctx: undefined, units: new Map() };
+const inkCtx = () => {
+  if (INK.ctx === undefined)
+    INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  return INK.ctx;
+};
+const inkVisible = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+// The first thing drawn in el: a text node or an ha-icon.
+function inkLead(el) {
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) {
+      if (n.textContent.trim()) return { text: n };
+    } else if (n.nodeType === 1 && inkVisible(n)) {
+      if (n.localName === "ha-icon") return { icon: n };
+      const r = inkLead(n);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+// Left side bearing (px) of a text node's first character, in its own font.
+function inkText(node) {
+  const ctx = inkCtx();
+  if (!ctx) return null;
+  const cs = getComputedStyle(node.parentElement);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+// Left side bearing (px) of an icon's glyph; null until the icon has loaded.
+function inkIcon(hi) {
+  const svg = hi.shadowRoot?.querySelector("ha-svg-icon")?.shadowRoot?.querySelector("svg");
+  if (!svg) return null;
+  const name = hi.getAttribute("icon") || "";
+  let u = INK.units.get(name);
+  if (u === undefined) {
+    let b;
+    try {
+      b = (svg.querySelector("g") || svg).getBBox();
+    } catch (e) {
+      return null;
+    }
+    if (!b.width) return null;
+    u = b.x / (svg.viewBox?.baseVal?.width || 24);
+    if (name) INK.units.set(name, u);
+  }
+  return u * (parseFloat(getComputedStyle(svg).width) || 0);
+}
+const inkSet = (el, px) => {
+  const v = Math.abs(px) > 0.2 ? `${px.toFixed(2)}px` : "";
+  if (el.style.marginLeft !== v) el.style.marginLeft = v;
+};
+// Align every block (title line first, then its lines); false while an icon is still loading.
+function inkAlign(blocks) {
+  let done = true;
+  for (const b of blocks) {
+    const lines = [...b.children].filter(inkVisible);
+    const t = lines.length > 1 ? inkLead(lines[0]) : null;
+    if (!t || !t.text) continue;
+    const ref = inkText(t.text);
+    if (ref === null) return true; // no canvas (tests): leave the layout alone
+    for (const line of lines.slice(1)) {
+      for (const hi of line.querySelectorAll(".v > ha-icon")) {
+        const l = inkIcon(hi);
+        if (l === null) done = false;
+        else inkSet(hi, ref - l);
+      }
+      const lead = inkLead(line);
+      if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
+    }
+  }
+  return done;
+}
+// Re-align after a render, once per frame; retries while icons load, then calls after().
+function inkSchedule(host, selector, after) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const root = host.shadowRoot;
+    if (!root) return;
+    const done = inkAlign(root.querySelectorAll(selector));
+    if (after) after();
+    host._inkTries = done ? 0 : (host._inkTries || 0) + 1;
+    if (!done && host._inkTries < 20) setTimeout(() => inkSchedule(host, selector, after), 150);
+  });
+}
+
 class PrinterStatusCard extends HTMLElement {
   static getStubConfig() {
     return { name: "Printer", prefix: "printer" };
@@ -2677,6 +3234,7 @@ class PrinterStatusCard extends HTMLElement {
   }
 
   _render() {
+    inkSchedule(this, ".txt, .jt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -2897,7 +3455,7 @@ async function registerPrinterStatusCard() {
 registerPrinterStatusCard();
 })();
 
-/* ===== printer-temps-card 1.1.7 ===== */
+/* ===== printer-temps-card 1.1.8 ===== */
 (() => {
 /*
  * Printer temperatures card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2909,7 +3467,7 @@ registerPrinterStatusCard();
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.7";
+const PTC_VERSION = "1.1.8";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -3030,6 +3588,98 @@ const CSS = `
 
 const deg = (v, d = 1) => (v === null ? "–" : `${v.toFixed(d)}°`);
 
+/* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
+   measured on ink rather than boxes. A reading icon's glyph has its own side bearing inside its
+   box (the thermometer 4px, the water drop 3.5px) and so does a leading "1"; each gets the
+   margin that puts its ink under the title's first letter. The margin depends only on the glyph,
+   not on where it sits, so it holds when a line wraps. */
+const INK = { ctx: undefined, units: new Map() };
+const inkCtx = () => {
+  if (INK.ctx === undefined)
+    INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  return INK.ctx;
+};
+const inkVisible = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+// The first thing drawn in el: a text node or an ha-icon.
+function inkLead(el) {
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) {
+      if (n.textContent.trim()) return { text: n };
+    } else if (n.nodeType === 1 && inkVisible(n)) {
+      if (n.localName === "ha-icon") return { icon: n };
+      const r = inkLead(n);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+// Left side bearing (px) of a text node's first character, in its own font.
+function inkText(node) {
+  const ctx = inkCtx();
+  if (!ctx) return null;
+  const cs = getComputedStyle(node.parentElement);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+// Left side bearing (px) of an icon's glyph; null until the icon has loaded.
+function inkIcon(hi) {
+  const svg = hi.shadowRoot?.querySelector("ha-svg-icon")?.shadowRoot?.querySelector("svg");
+  if (!svg) return null;
+  const name = hi.getAttribute("icon") || "";
+  let u = INK.units.get(name);
+  if (u === undefined) {
+    let b;
+    try {
+      b = (svg.querySelector("g") || svg).getBBox();
+    } catch (e) {
+      return null;
+    }
+    if (!b.width) return null;
+    u = b.x / (svg.viewBox?.baseVal?.width || 24);
+    if (name) INK.units.set(name, u);
+  }
+  return u * (parseFloat(getComputedStyle(svg).width) || 0);
+}
+const inkSet = (el, px) => {
+  const v = Math.abs(px) > 0.2 ? `${px.toFixed(2)}px` : "";
+  if (el.style.marginLeft !== v) el.style.marginLeft = v;
+};
+// Align every block (title line first, then its lines); false while an icon is still loading.
+function inkAlign(blocks) {
+  let done = true;
+  for (const b of blocks) {
+    const lines = [...b.children].filter(inkVisible);
+    const t = lines.length > 1 ? inkLead(lines[0]) : null;
+    if (!t || !t.text) continue;
+    const ref = inkText(t.text);
+    if (ref === null) return true; // no canvas (tests): leave the layout alone
+    for (const line of lines.slice(1)) {
+      for (const hi of line.querySelectorAll(".v > ha-icon")) {
+        const l = inkIcon(hi);
+        if (l === null) done = false;
+        else inkSet(hi, ref - l);
+      }
+      const lead = inkLead(line);
+      if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
+    }
+  }
+  return done;
+}
+// Re-align after a render, once per frame; retries while icons load, then calls after().
+function inkSchedule(host, selector, after) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const root = host.shadowRoot;
+    if (!root) return;
+    const done = inkAlign(root.querySelectorAll(selector));
+    if (after) after();
+    host._inkTries = done ? 0 : (host._inkTries || 0) + 1;
+    if (!done && host._inkTries < 20) setTimeout(() => inkSchedule(host, selector, after), 150);
+  });
+}
+
 class PrinterTempsCard extends HTMLElement {
   static getStubConfig() {
     return { prefix: "printer" };
@@ -3111,6 +3761,7 @@ class PrinterTempsCard extends HTMLElement {
   }
 
   _render() {
+    inkSchedule(this, ".txt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -3171,7 +3822,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== room-lights-card 1.3.6 ===== */
+/* ===== room-lights-card 1.3.7 ===== */
 (() => {
 /*
  * Room lights card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3184,7 +3835,7 @@ registerPrinterTempsCard();
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.6";
+const RLC_VERSION = "1.3.7";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -3677,6 +4328,7 @@ class RoomLightsCard extends HTMLElement {
   }
 
   _render() {
+    inkSchedule(this, ".tile .txt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const hass = this._hass;
@@ -3972,6 +4624,98 @@ const EDITOR_CSS = `
   button:focus-visible { outline: 2px solid var(--primary-color); }
 `;
 
+/* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
+   measured on ink rather than boxes. A reading icon's glyph has its own side bearing inside its
+   box (the thermometer 4px, the water drop 3.5px) and so does a leading "1"; each gets the
+   margin that puts its ink under the title's first letter. The margin depends only on the glyph,
+   not on where it sits, so it holds when a line wraps. */
+const INK = { ctx: undefined, units: new Map() };
+const inkCtx = () => {
+  if (INK.ctx === undefined)
+    INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  return INK.ctx;
+};
+const inkVisible = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+// The first thing drawn in el: a text node or an ha-icon.
+function inkLead(el) {
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) {
+      if (n.textContent.trim()) return { text: n };
+    } else if (n.nodeType === 1 && inkVisible(n)) {
+      if (n.localName === "ha-icon") return { icon: n };
+      const r = inkLead(n);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+// Left side bearing (px) of a text node's first character, in its own font.
+function inkText(node) {
+  const ctx = inkCtx();
+  if (!ctx) return null;
+  const cs = getComputedStyle(node.parentElement);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+// Left side bearing (px) of an icon's glyph; null until the icon has loaded.
+function inkIcon(hi) {
+  const svg = hi.shadowRoot?.querySelector("ha-svg-icon")?.shadowRoot?.querySelector("svg");
+  if (!svg) return null;
+  const name = hi.getAttribute("icon") || "";
+  let u = INK.units.get(name);
+  if (u === undefined) {
+    let b;
+    try {
+      b = (svg.querySelector("g") || svg).getBBox();
+    } catch (e) {
+      return null;
+    }
+    if (!b.width) return null;
+    u = b.x / (svg.viewBox?.baseVal?.width || 24);
+    if (name) INK.units.set(name, u);
+  }
+  return u * (parseFloat(getComputedStyle(svg).width) || 0);
+}
+const inkSet = (el, px) => {
+  const v = Math.abs(px) > 0.2 ? `${px.toFixed(2)}px` : "";
+  if (el.style.marginLeft !== v) el.style.marginLeft = v;
+};
+// Align every block (title line first, then its lines); false while an icon is still loading.
+function inkAlign(blocks) {
+  let done = true;
+  for (const b of blocks) {
+    const lines = [...b.children].filter(inkVisible);
+    const t = lines.length > 1 ? inkLead(lines[0]) : null;
+    if (!t || !t.text) continue;
+    const ref = inkText(t.text);
+    if (ref === null) return true; // no canvas (tests): leave the layout alone
+    for (const line of lines.slice(1)) {
+      for (const hi of line.querySelectorAll(".v > ha-icon")) {
+        const l = inkIcon(hi);
+        if (l === null) done = false;
+        else inkSet(hi, ref - l);
+      }
+      const lead = inkLead(line);
+      if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
+    }
+  }
+  return done;
+}
+// Re-align after a render, once per frame; retries while icons load, then calls after().
+function inkSchedule(host, selector, after) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const root = host.shadowRoot;
+    if (!root) return;
+    const done = inkAlign(root.querySelectorAll(selector));
+    if (after) after();
+    host._inkTries = done ? 0 : (host._inkTries || 0) + 1;
+    if (!done && host._inkTries < 20) setTimeout(() => inkSchedule(host, selector, after), 150);
+  });
+}
+
 class RoomLightsCardEditor extends HTMLElement {
   setConfig(config) {
     this._config = JSON.parse(JSON.stringify(config || {}));
@@ -4135,7 +4879,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== weather-presence-card 1.3.1 ===== */
+/* ===== weather-presence-card 1.3.2 ===== */
 (() => {
 /*
  * Weather & presence card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -4148,7 +4892,7 @@ registerRoomLightsCard();
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.3.1";
+const WPC_VERSION = "1.3.2";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -4236,6 +4980,98 @@ const CSS = `
   .pill:active, .wx:active { filter: brightness(.92); }
   .pill:focus-visible, .wx:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 `;
+
+/* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
+   measured on ink rather than boxes. A reading icon's glyph has its own side bearing inside its
+   box (the thermometer 4px, the water drop 3.5px) and so does a leading "1"; each gets the
+   margin that puts its ink under the title's first letter. The margin depends only on the glyph,
+   not on where it sits, so it holds when a line wraps. */
+const INK = { ctx: undefined, units: new Map() };
+const inkCtx = () => {
+  if (INK.ctx === undefined)
+    INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  return INK.ctx;
+};
+const inkVisible = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+// The first thing drawn in el: a text node or an ha-icon.
+function inkLead(el) {
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) {
+      if (n.textContent.trim()) return { text: n };
+    } else if (n.nodeType === 1 && inkVisible(n)) {
+      if (n.localName === "ha-icon") return { icon: n };
+      const r = inkLead(n);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+// Left side bearing (px) of a text node's first character, in its own font.
+function inkText(node) {
+  const ctx = inkCtx();
+  if (!ctx) return null;
+  const cs = getComputedStyle(node.parentElement);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+// Left side bearing (px) of an icon's glyph; null until the icon has loaded.
+function inkIcon(hi) {
+  const svg = hi.shadowRoot?.querySelector("ha-svg-icon")?.shadowRoot?.querySelector("svg");
+  if (!svg) return null;
+  const name = hi.getAttribute("icon") || "";
+  let u = INK.units.get(name);
+  if (u === undefined) {
+    let b;
+    try {
+      b = (svg.querySelector("g") || svg).getBBox();
+    } catch (e) {
+      return null;
+    }
+    if (!b.width) return null;
+    u = b.x / (svg.viewBox?.baseVal?.width || 24);
+    if (name) INK.units.set(name, u);
+  }
+  return u * (parseFloat(getComputedStyle(svg).width) || 0);
+}
+const inkSet = (el, px) => {
+  const v = Math.abs(px) > 0.2 ? `${px.toFixed(2)}px` : "";
+  if (el.style.marginLeft !== v) el.style.marginLeft = v;
+};
+// Align every block (title line first, then its lines); false while an icon is still loading.
+function inkAlign(blocks) {
+  let done = true;
+  for (const b of blocks) {
+    const lines = [...b.children].filter(inkVisible);
+    const t = lines.length > 1 ? inkLead(lines[0]) : null;
+    if (!t || !t.text) continue;
+    const ref = inkText(t.text);
+    if (ref === null) return true; // no canvas (tests): leave the layout alone
+    for (const line of lines.slice(1)) {
+      for (const hi of line.querySelectorAll(".v > ha-icon")) {
+        const l = inkIcon(hi);
+        if (l === null) done = false;
+        else inkSet(hi, ref - l);
+      }
+      const lead = inkLead(line);
+      if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
+    }
+  }
+  return done;
+}
+// Re-align after a render, once per frame; retries while icons load, then calls after().
+function inkSchedule(host, selector, after) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const root = host.shadowRoot;
+    if (!root) return;
+    const done = inkAlign(root.querySelectorAll(selector));
+    if (after) after();
+    host._inkTries = done ? 0 : (host._inkTries || 0) + 1;
+    if (!done && host._inkTries < 20) setTimeout(() => inkSchedule(host, selector, after), 150);
+  });
+}
 
 class WeatherPresenceCard extends HTMLElement {
   static getStubConfig(hass) {
@@ -4448,6 +5284,7 @@ class WeatherPresenceCard extends HTMLElement {
   }
 
   _render() {
+    inkSchedule(this, ".txt", () => this._fit());
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const hass = this._hass;

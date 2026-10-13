@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.6";
+const RLC_VERSION = "1.3.7";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -502,6 +502,7 @@ class RoomLightsCard extends HTMLElement {
   }
 
   _render() {
+    inkSchedule(this, ".tile .txt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const hass = this._hass;
@@ -796,6 +797,98 @@ const EDITOR_CSS = `
   button.add ha-icon { color: var(--primary-color); }
   button:focus-visible { outline: 2px solid var(--primary-color); }
 `;
+
+/* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
+   measured on ink rather than boxes. A reading icon's glyph has its own side bearing inside its
+   box (the thermometer 4px, the water drop 3.5px) and so does a leading "1"; each gets the
+   margin that puts its ink under the title's first letter. The margin depends only on the glyph,
+   not on where it sits, so it holds when a line wraps. */
+const INK = { ctx: undefined, units: new Map() };
+const inkCtx = () => {
+  if (INK.ctx === undefined)
+    INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  return INK.ctx;
+};
+const inkVisible = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+// The first thing drawn in el: a text node or an ha-icon.
+function inkLead(el) {
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) {
+      if (n.textContent.trim()) return { text: n };
+    } else if (n.nodeType === 1 && inkVisible(n)) {
+      if (n.localName === "ha-icon") return { icon: n };
+      const r = inkLead(n);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+// Left side bearing (px) of a text node's first character, in its own font.
+function inkText(node) {
+  const ctx = inkCtx();
+  if (!ctx) return null;
+  const cs = getComputedStyle(node.parentElement);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+// Left side bearing (px) of an icon's glyph; null until the icon has loaded.
+function inkIcon(hi) {
+  const svg = hi.shadowRoot?.querySelector("ha-svg-icon")?.shadowRoot?.querySelector("svg");
+  if (!svg) return null;
+  const name = hi.getAttribute("icon") || "";
+  let u = INK.units.get(name);
+  if (u === undefined) {
+    let b;
+    try {
+      b = (svg.querySelector("g") || svg).getBBox();
+    } catch (e) {
+      return null;
+    }
+    if (!b.width) return null;
+    u = b.x / (svg.viewBox?.baseVal?.width || 24);
+    if (name) INK.units.set(name, u);
+  }
+  return u * (parseFloat(getComputedStyle(svg).width) || 0);
+}
+const inkSet = (el, px) => {
+  const v = Math.abs(px) > 0.2 ? `${px.toFixed(2)}px` : "";
+  if (el.style.marginLeft !== v) el.style.marginLeft = v;
+};
+// Align every block (title line first, then its lines); false while an icon is still loading.
+function inkAlign(blocks) {
+  let done = true;
+  for (const b of blocks) {
+    const lines = [...b.children].filter(inkVisible);
+    const t = lines.length > 1 ? inkLead(lines[0]) : null;
+    if (!t || !t.text) continue;
+    const ref = inkText(t.text);
+    if (ref === null) return true; // no canvas (tests): leave the layout alone
+    for (const line of lines.slice(1)) {
+      for (const hi of line.querySelectorAll(".v > ha-icon")) {
+        const l = inkIcon(hi);
+        if (l === null) done = false;
+        else inkSet(hi, ref - l);
+      }
+      const lead = inkLead(line);
+      if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
+    }
+  }
+  return done;
+}
+// Re-align after a render, once per frame; retries while icons load, then calls after().
+function inkSchedule(host, selector, after) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const root = host.shadowRoot;
+    if (!root) return;
+    const done = inkAlign(root.querySelectorAll(selector));
+    if (after) after();
+    host._inkTries = done ? 0 : (host._inkTries || 0) + 1;
+    if (!done && host._inkTries < 20) setTimeout(() => inkSchedule(host, selector, after), 150);
+  });
+}
 
 class RoomLightsCardEditor extends HTMLElement {
   setConfig(config) {
