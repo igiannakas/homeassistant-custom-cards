@@ -10,6 +10,12 @@
 - **Today, Yesterday and the month so far** come from Home Assistant's
   long-term statistics for the energy sensor (the same numbers as the Energy
   dashboard), refreshed every two minutes.
+- **Today and the month tick live.** Statistics are written in 5-minute blocks,
+  so on their own they run a few minutes behind. The card adds what the meter
+  has counted since the latest block, so Today equals a daily meter's own
+  reading, and it still matches the Energy dashboard each time a block lands.
+  A meter that resets (daily meters at midnight) is handled the same way
+  Home Assistant's statistics handle it.
 - Costs use the grid price from **Settings → Energy** unless you set `price`.
   With no price anywhere, the card shows the numbers without costs.
 - Tap the card to open the Energy dashboard (or wherever `navigation_path` points).

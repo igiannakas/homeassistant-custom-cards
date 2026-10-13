@@ -4,11 +4,13 @@
  * One compact row: power now, and energy used today, yesterday and this month
  * so far, each with what it costs. Tap it for the full Energy dashboard.
  * Totals come from Home Assistant's long-term statistics, so they match the
- * Energy dashboard; the price comes from the Energy settings unless you set one.
+ * Energy dashboard; today and the month also add what the meter has counted
+ * since the latest 5-minute statistics, so they tick live instead of lagging.
+ * The price comes from the Energy settings unless you set one.
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.0.2";
+const ESC_VERSION = "1.1.0";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -29,6 +31,26 @@ function energy(kwh) {
   if (kwh === null) return ["–", "kWh"];
   const a = Math.abs(kwh);
   return [kwh.toFixed(a < 10 ? 2 : a < 100 ? 1 : 0), "kWh"];
+}
+
+/* The sensor's state in kWh, whatever energy unit it reports. */
+function kwhState(s) {
+  const v = num(s?.state);
+  if (v === null) return null;
+  const u = s.attributes?.unit_of_measurement;
+  return u === "Wh" ? v / 1000 : u === "MWh" ? v * 1000 : v;
+}
+
+/*
+ * What the meter has counted since the statistics stop (the end of the latest
+ * 5-minute block, when it read `anchor`). A meter that has dropped by more than
+ * 10% was reset – a daily meter at midnight – so everything it shows is new;
+ * that is the same rule Home Assistant's statistics use.
+ */
+function sinceStats(live, anchor) {
+  if (live === null || anchor === null) return 0;
+  if (live < anchor * 0.9) return live;
+  return Math.max(0, live - anchor);
 }
 
 function money(v, currency, locale) {
@@ -131,7 +153,7 @@ class EnergySummaryCard extends HTMLElement {
     if (!config?.power && !config?.energy) throw new Error("Set power and/or energy");
     this._config = { ...config };
     this._built = false;
-    this._totals = { today: null, yesterday: null, month: null };
+    this._totals = { today: null, yesterday: null, month: null, anchor: null };
     this._price = undefined;
     this._fetchedAt = 0;
     if (this._hass) {
@@ -169,20 +191,43 @@ class EnergySummaryCard extends HTMLElement {
     const id = this._config?.energy;
     if (!hass || !id) return;
     if (this._price === undefined) this._price = await findPrice(hass, this._config);
+    const units = { energy: "kWh" };
     const change = async (calendar) => {
       try {
-        const r = await hass.callWS({ type: "recorder/statistic_during_period", statistic_id: id, calendar, types: ["change"] });
+        const r = await hass.callWS({ type: "recorder/statistic_during_period", statistic_id: id, calendar, types: ["change"], units });
         return num(r?.change);
       } catch (e) {
         return null;
       }
     };
-    const [today, yesterday, month] = await Promise.all([
+    // Where the statistics stop: the latest 5-minute block and what the meter read at its end.
+    const tail = async () => {
+      try {
+        const r = await hass.callWS({
+          type: "recorder/statistics_during_period",
+          start_time: new Date(Date.now() - 3600000).toISOString(),
+          statistic_ids: [id],
+          period: "5minute",
+          types: ["state"],
+          units,
+        });
+        const rows = r?.[id] || [];
+        const last = rows[rows.length - 1];
+        return last && num(last.state) !== null ? { end: last.end, state: num(last.state) } : null;
+      } catch (e) {
+        return null;
+      }
+    };
+    const before = await tail();
+    let [today, yesterday, month] = await Promise.all([
       change({ period: "day" }),
       change({ period: "day", offset: -1 }),
       change({ period: "month" }),
     ]);
-    this._totals = { today, yesterday, month };
+    const after = await tail();
+    // A block landed mid-refresh: read today and the month again so they end where `after` does.
+    if (before?.end !== after?.end) [today, month] = await Promise.all([change({ period: "day" }), change({ period: "month" })]);
+    this._totals = { today, yesterday, month, anchor: after ? after.state : null };
     this._render();
   }
 
@@ -223,11 +268,16 @@ class EnergySummaryCard extends HTMLElement {
     const cost = (kwh) => (kwh === null || price === null ? "" : money(kwh * price, currency, locale));
     const w = num(hass.states[this._config.power]?.state);
     const month = new Date().toLocaleDateString(locale || "en-GB", { month: "long" });
+    // Today and the month run live: statistics up to the latest block, plus the meter since then.
+    const extra = sinceStats(kwhState(hass.states[this._config.energy]), this._totals.anchor);
+    const live = (v) => (v === null ? null : v + extra);
+    const today = live(this._totals.today);
+    const monthSoFar = live(this._totals.month);
     const rows = {
       now: ["Now", power(w), w === null || price === null ? "" : perHour((w / 1000) * price, currency, locale)],
-      today: ["Today", energy(this._totals.today), cost(this._totals.today)],
+      today: ["Today", energy(today), cost(today)],
       yesterday: ["Yesterday", energy(this._totals.yesterday), cost(this._totals.yesterday)],
-      month: [month.charAt(0).toUpperCase() + month.slice(1), energy(this._totals.month), cost(this._totals.month)],
+      month: [month.charAt(0).toUpperCase() + month.slice(1), energy(monthSoFar), cost(monthSoFar)],
     };
     root.querySelector(".shape ha-icon").setAttribute("icon", this._config.icon || "mdi:home-lightning-bolt");
     for (const [key, [label, [value, unit], money_]] of Object.entries(rows)) {

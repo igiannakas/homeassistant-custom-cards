@@ -16,13 +16,16 @@ let prefs = {
   energy_sources: [{ type: "grid", stat_energy_from: "sensor.daily", number_energy_price: 0.2372, entity_energy_price: null }],
 };
 const changes = { day0: 7.98687791824341, "day-1": 9.069001197814941, month0: 86.60705327987682 };
-function hass(power = "616.44") {
+// The latest 5-minute statistics block: when it ended and what the meter read then.
+// A function, so a test can make a new block land between two reads.
+let tailRows = () => [{ start: 1000, end: 2000, state: 7.98 }];
+function hass(power = "616.44", daily = "7.98", dailyUnit = "kWh") {
   return {
     config: { currency: "GBP" },
     locale: { language: "en-GB" },
     states: {
       "sensor.power": { state: power, attributes: {} },
-      "sensor.daily": { state: "7.98", attributes: {} },
+      "sensor.daily": { state: daily, attributes: { unit_of_measurement: dailyUnit } },
       "sensor.price": { state: "0.30", attributes: {} },
     },
     callWS: async (msg) => {
@@ -32,6 +35,7 @@ function hass(power = "616.44") {
         const key = `${msg.calendar.period}${msg.calendar.offset || 0}`;
         return { change: changes[key === "day0" ? "day0" : key] };
       }
+      if (msg.type === "recorder/statistics_during_period") return { [msg.statistic_ids[0]]: tailRows() };
       throw new Error("unexpected " + msg.type);
     },
   };
@@ -61,7 +65,11 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
   const stats = ws.filter((m) => m.type === "recorder/statistic_during_period");
   assert.deepStrictEqual(stats.map((m) => JSON.stringify(m.calendar)).sort(),
     ['{"period":"day","offset":-1}', '{"period":"day"}', '{"period":"month"}'].sort());
-  assert(stats.every((m) => m.statistic_id === "sensor.daily" && m.types[0] === "change"));
+  assert(stats.every((m) => m.statistic_id === "sensor.daily" && m.types[0] === "change" && m.units.energy === "kWh"));
+  // The latest 5-minute block is read before and after, to know where the statistics stop.
+  const tails = ws.filter((m) => m.type === "recorder/statistics_during_period");
+  assert.strictEqual(tails.length, 2);
+  assert(tails.every((m) => m.period === "5minute" && m.statistic_ids[0] === "sensor.daily" && m.types[0] === "state"));
 
   // Values and costs at the Energy settings' £0.2372/kWh.
   assert.deepStrictEqual(stat("now"), ["Now", "616W", "15p/h"]);
@@ -78,6 +86,26 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
   card.hass = hass("unavailable");
   assert.deepStrictEqual(stat("now"), ["Now", "–W", ""]);
   assert.strictEqual(ws.length, n, "no extra websocket calls on state updates");
+
+  // Today and the month tick live: statistics up to the latest block (meter 7.98 there)
+  // plus whatever the meter has counted since. Yesterday is a closed day and stays put.
+  card.hass = hass("616.44", "8.10");
+  assert.deepStrictEqual(stat("today"), ["Today", "8.11kWh", "£1.92"]);
+  assert.deepStrictEqual(stat("month"), [month, "86.7kWh", "£20.57"]);
+  assert.deepStrictEqual(stat("yesterday"), ["Yesterday", "9.07kWh", "£2.15"]);
+  // A daily meter reset at midnight: everything it shows is new.
+  card.hass = hass("616.44", "0.05");
+  assert.deepStrictEqual(stat("today"), ["Today", "8.04kWh", "£1.91"]);
+  // A small dip is noise, not a reset: nothing added, nothing taken away.
+  card.hass = hass("616.44", "7.95");
+  assert.deepStrictEqual(stat("today"), ["Today", "7.99kWh", "£1.89"]);
+  // A meter in Wh is converted before it is added.
+  card.hass = hass("616.44", "8100", "Wh");
+  assert.deepStrictEqual(stat("today"), ["Today", "8.11kWh", "£1.92"]);
+  card.hass = hass("616.44", "unavailable");
+  assert.deepStrictEqual(stat("today"), ["Today", "7.99kWh", "£1.89"]);
+  assert.strictEqual(ws.length, n, "live updates never call the websocket");
+  card.hass = hass();
 
   // Tap → Energy dashboard.
   const navs = [];
@@ -109,6 +137,31 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
   await tick(10);
   assert.strictEqual(c4.shadowRoot.querySelector(".stat.today .v").textContent, "7.99kWh");
   assert.strictEqual(c4.shadowRoot.querySelector(".stat.today .c").textContent, "");
+
+  // A block lands between the two reads of the latest block: today and the month are
+  // read again, so the statistics and the meter reading end at the same moment.
+  prefs = { energy_sources: [] };
+  let reads = 0;
+  tailRows = () => (++reads === 1 ? [{ start: 1000, end: 2000, state: 7.9 }] : [{ start: 2000, end: 3000, state: 7.98 }]);
+  const before = ws.length;
+  const c5 = document.createElement("energy-summary-card");
+  document.body.appendChild(c5);
+  c5.setConfig(cfg);
+  c5.hass = hass();
+  await tick(10);
+  const again = ws.slice(before).filter((m) => m.type === "recorder/statistic_during_period");
+  assert.deepStrictEqual(again.map((m) => JSON.stringify(m.calendar)).sort(),
+    ['{"period":"day","offset":-1}', '{"period":"day"}', '{"period":"day"}', '{"period":"month"}', '{"period":"month"}'].sort());
+  assert.strictEqual(c5.shadowRoot.querySelector(".stat.today .v").textContent, "7.99kWh", "anchored to the newer block (7.98)");
+
+  // No recent statistics (Home Assistant was down): the statistics alone, as before.
+  tailRows = () => [];
+  const c6 = document.createElement("energy-summary-card");
+  document.body.appendChild(c6);
+  c6.setConfig(cfg);
+  c6.hass = hass("616.44", "9.50");
+  await tick(10);
+  assert.strictEqual(c6.shadowRoot.querySelector(".stat.today .v").textContent, "7.99kWh");
 
   assert.throws(() => new Card().setConfig({}));
   console.log("ALL ENERGY-SUMMARY TESTS PASSED");
