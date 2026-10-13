@@ -109,6 +109,35 @@ const cfg = {
   assert(!c3.shadowRoot.querySelector(".pill"));
   eq([...c3.shadowRoot.querySelectorAll(".sc .v")].map((v) => v.textContent), ["Forecast 14.6°C"]);
 
+  // link.hide drops the link pill but keeps presence; the presence pill gets the whole row.
+  assert(form.includes(`"name":"hide"`), "hide toggle in the editor");
+  const c4 = document.createElement("weather-presence-card");
+  document.body.appendChild(c4);
+  c4.setConfig({ ...cfg, link: { ...cfg.link, hide: true } });
+  c4.hass = hass();
+  const r4 = c4.shadowRoot;
+  assert(!r4.querySelector(".link"), "hidden link pill is not rendered");
+  assert.strictEqual(r4.querySelector(".pres span").textContent, "Home");
+  assert(r4.querySelector(".pills").getAttribute("style").includes("--np:1"), "one pill → one column");
+  assert(!r4.querySelector(".pills").getAttribute("style").includes("display:none"));
+  // Turning it back on (editor toggle off) brings the pill back with its kept settings.
+  c4.setConfig({ ...cfg, link: { ...cfg.link, hide: false } });
+  assert.strictEqual(r4.querySelector(".link span").textContent, "Climate");
+  assert(r4.querySelector(".pills").getAttribute("style").includes("--np:2"));
+
+  // A link with nowhere to go (editor-cleared {} or a name without a path) is not a dead "Open" pill.
+  for (const link of [{}, { name: "Climate" }, { hide: false }]) {
+    const c5 = document.createElement("weather-presence-card");
+    c5.setConfig({ ...cfg, link });
+    c5.hass = hass();
+    assert(!c5.shadowRoot.querySelector(".link"), JSON.stringify(link));
+  }
+  // Only the link hidden, no presence → no pill row at all.
+  const c6 = document.createElement("weather-presence-card");
+  c6.setConfig({ weather: "weather.mo", link: { ...cfg.link, hide: true } });
+  c6.hass = hass();
+  assert(c6.shadowRoot.querySelector(".pills").getAttribute("style").includes("display:none"));
+
   console.log("ALL WEATHER-PRESENCE TESTS PASSED");
   process.exit(0);
 })().catch((e) => {

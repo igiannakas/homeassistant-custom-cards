@@ -13,7 +13,9 @@
   not, with how long the house has been empty. That time comes from the
   history, so a Home Assistant restart does not reset it. Tap goes to
   `presence.navigation_path` (or opens the entity).
-- **Link pill**: a plain "go there" pill, e.g. to your climate dashboard.
+- **Link pill**: a plain "go there" pill, e.g. to your climate dashboard. Turn on
+  **Hide this pill** to drop it where it makes no sense, such as on the climate
+  dashboard itself; its name, icon and path are kept for when you turn it back on.
 - The pills are finger-sized buttons (36px). On a phone the weather takes the
   first line and the two pills become a row of wide 44px buttons underneath.
 
@@ -43,4 +45,5 @@ link:
 | `weather_name` | Label for the weather service's temperature (default `Forecast`). |
 | `presence.entity` | Someone home: `input_boolean` / `binary_sensor` on, `person` home, or `zone` count above 0. |
 | `presence.navigation_path` | Where tapping the presence pill goes. |
-| `link.name`, `link.icon`, `link.navigation_path` | The link pill. Leave `link` out to hide it. |
+| `link.name`, `link.icon`, `link.navigation_path` | The link pill. Shown only when it has a `navigation_path`; leave `link` out to drop it. |
+| `link.hide` | `true` hides the link pill but keeps its settings (editor: **Hide this pill**). The presence pill then takes the whole row on a phone. |

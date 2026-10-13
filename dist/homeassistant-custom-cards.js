@@ -4082,7 +4082,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== weather-presence-card 1.1.1 ===== */
+/* ===== weather-presence-card 1.2.0 ===== */
 (() => {
 /*
  * Weather & presence card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -4090,11 +4090,12 @@ registerRoomLightsCard();
  * A slim block for the top of a climate section: the weather (condition, your own
  * outdoor sensor and the forecast service's temperature) with two pills on the
  * right – who is home (tap for e.g. the security dashboard) and a link pill (tap
- * for e.g. the climate dashboard).
+ * for e.g. the climate dashboard). Either pill can be left out, e.g. the link pill
+ * on the very dashboard it would link to.
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.1.1";
+const WPC_VERSION = "1.2.0";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -4198,6 +4199,7 @@ class WeatherPresenceCard extends HTMLElement {
           { name: "navigation_path", selector: { navigation: {} } },
         ] },
         { type: "expandable", name: "link", title: "Link pill", icon: "mdi:link-variant", expanded: true, schema: [
+          { name: "hide", selector: { boolean: {} } },
           { type: "grid", name: "", schema: [
             { name: "name", selector: { text: {} } },
             { name: "icon", selector: { icon: {} } },
@@ -4215,9 +4217,13 @@ class WeatherPresenceCard extends HTMLElement {
           navigation_path: "Tap goes to",
           name: "Name",
           icon: "Icon",
+          hide: "Hide this pill",
         })[s.name] ?? s.name,
       computeHelper: (s) =>
-        ({ weather: "Tap the weather for the forecast; long-press for your own sensor." })[s.name],
+        ({
+          weather: "Tap the weather for the forecast; long-press for your own sensor.",
+          hide: "E.g. on the dashboard it links to. Its settings below are kept.",
+        })[s.name],
     };
   }
 
@@ -4250,6 +4256,12 @@ class WeatherPresenceCard extends HTMLElement {
 
   disconnectedCallback() {
     clearInterval(this._tick);
+  }
+
+  /* The link pill, or null when it is hidden or has nowhere to go (an editor-cleared link is {}). */
+  _link() {
+    const l = this._config.link;
+    return l && typeof l === "object" && !l.hide && l.navigation_path ? l : null;
   }
 
   _presenceId() {
@@ -4301,7 +4313,7 @@ class WeatherPresenceCard extends HTMLElement {
 
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
-    const link = this._config.link;
+    const link = this._link();
     const np = (this._presenceId() ? 1 : 0) + (link ? 1 : 0);
     root.innerHTML = `<style>${CSS}</style><ha-card><div class="wrap">
       <div class="wx" role="button" tabindex="0"><div class="shape"><ha-icon></ha-icon></div>
@@ -4373,9 +4385,10 @@ class WeatherPresenceCard extends HTMLElement {
       set(pres.querySelector("span"), label);
     }
     const link = root.querySelector(".link");
-    if (link) {
-      link.querySelector("ha-icon").setAttribute("icon", this._config.link.icon || "mdi:arrow-right");
-      set(link.querySelector("span"), this._config.link.name || "Open");
+    const lc = this._link();
+    if (link && lc) {
+      link.querySelector("ha-icon").setAttribute("icon", lc.icon || "mdi:arrow-right");
+      set(link.querySelector("span"), lc.name || "Open");
     }
   }
 
