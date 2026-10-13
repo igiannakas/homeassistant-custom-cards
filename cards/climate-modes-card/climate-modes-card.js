@@ -12,7 +12,7 @@
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.3.3";
+const CMC_VERSION = "1.3.4";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -27,6 +27,10 @@ const esc = (s) =>
 const list = (v) => (v === undefined || v === null || v === "" ? [] : Array.isArray(v) ? v : [v]);
 
 const DIALOG_CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
     font-family: var(--ha-font-family-body, Roboto, sans-serif); }
   .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
@@ -158,6 +162,10 @@ function activeIndex(hass, cfg) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).

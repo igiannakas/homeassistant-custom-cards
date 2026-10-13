@@ -9,7 +9,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.5";
+const RLC_VERSION = "1.3.6";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -146,6 +146,10 @@ async function loadView(hass, path) {
 // Same look as the other pop-ups on the dashboard (Boost heating, alarm): 20px title, 56px
 // pill rows with a 36px icon on the left and 16px semibold text, 20px between blocks.
 const SHEET_CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
     font-family: var(--ha-font-family-body, Roboto, sans-serif); }
   .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
@@ -298,6 +302,10 @@ class RoomLampsSheet {
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   /* Spacing follows Mushroom: everything inside starts 10px from the card edge. */
   ha-card { padding: 10px; }

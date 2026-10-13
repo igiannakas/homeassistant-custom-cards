@@ -15,7 +15,7 @@
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.5.0";
+const PSC_VERSION = "1.5.1";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -166,6 +166,10 @@ function actions(key) {
 /* ------------------------------------------------------------------------ */
 
 const DIALOG_CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
     font-family: var(--ha-font-family-body, Roboto, sans-serif); }
   .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
@@ -234,6 +238,10 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   /* Compact layout (overview page): one row, icon and watts centred on the whole text block
      (which may wrap to two lines and carry a progress bar). The whole card is one tap target. */
@@ -295,7 +303,8 @@ const CSS = `
   .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; }
   .acts:empty { display: none; }
-  .act { all: unset; box-sizing: border-box; height: 44px; border-radius: 22px; cursor: pointer; display: flex; align-items: center;
+  /* Primary pills: 36px, the height of the icon circle (one size for every main action). */
+  .act { all: unset; box-sizing: border-box; height: 36px; border-radius: 18px; cursor: pointer; display: flex; align-items: center;
     justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--primary-text-color);
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
   .act ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }

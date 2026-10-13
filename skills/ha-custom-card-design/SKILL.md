@@ -85,7 +85,9 @@ exactly rather than "close enough".
   everything else neutral (`rgba(primary-text-rgb, .04)`) so the glow carries meaning.
 - **Coloured text** is mixed toward the text colour so it stays readable:
   `color-mix(in srgb, var(--amber-color) 70%, var(--primary-text-color))`.
-- **Pills:** 36px high (40px on phones), radius 18. Use them for links and toggles
+- **Pills come in two sizes only:** primary 36px – the icon circle's height, on every screen – for a
+  row's main action, link or state; secondary 30px for chips and quick toggles (see the size tiers in
+  `design-tokens.md`). Use them for links and toggles
   in a header (presence, climate, power). A split pill does two things: the left half
   toggles and the right half opens the reading.
 - **Spacing follows Mushroom:** every card's content starts 10px from its edges (card padding
@@ -118,6 +120,12 @@ visual change ends with a measured alignment check – not a look at a screensho
   (switch, pill) share one centre line. Compare the three centres numerically.
 - **Across cards:** stacked cards keep the same insets (a custom card under a Mushroom card must
   not start its title 2px earlier).
+- **One centre line per row:** icon circle, text block (title + secondary lines in one element)
+  and trailing pills / chips / switches. Never pin the icon to the top or hang a chip on only the
+  first line of a multi-line block.
+- **Icons centre by flex:** every card's CSS starts with
+  `ha-icon { display: inline-flex; align-items: center; justify-content: center; }` – as a plain
+  block the glyph sits 0.4–3px low on a text line. Audit every ha-icon's svg centre against its box.
 - Report the numbers ("glyph 16, title 56, centres 30/30/30") and fix before shipping.
 
 ## Interaction rules

@@ -9,7 +9,7 @@
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.3.0";
+const WPC_VERSION = "1.3.1";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -52,6 +52,10 @@ function ago(ms) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   /* Spacing follows Mushroom: content starts 10px from the card edge. */
   ha-card { padding: 12px 10px; container-type: inline-size; }
@@ -71,17 +75,14 @@ const CSS = `
   .v.real ha-icon { color: color-mix(in srgb, ${C.orange} 55%, ${C.grey}); }
   .v.fc ha-icon { color: color-mix(in srgb, ${C.blue} 55%, ${C.grey}); }
   .pills { flex: none; display: flex; gap: 8px; align-items: center; }
-  /* Pills are finger-sized (36px, 40px on a phone) – they are the card's buttons. */
+  /* Primary pills: 36px – the height of the icon circle – on every screen, so circle, text block
+     and pills share one centre line and the pills' edges line up with the circle. */
   .pill { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     height: 36px; padding: 0 14px 0 10px; border-radius: 18px; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: .2px;
     white-space: nowrap;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
     -webkit-tap-highlight-color: transparent; }
   .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
-  /* Phone: pills are 40px (44 read as too large, 36 as too small to hit). */
-  @container (max-width: 440px) {
-    .pill { height: 40px; border-radius: 20px; }
-  }
   /* The pills stay beside the weather whenever they fit there (the readings may wrap onto two
      lines). Only when they don't – measured in _fit() – do they move to a row of wide buttons
      below it, e.g. two pills on a 375px phone. */

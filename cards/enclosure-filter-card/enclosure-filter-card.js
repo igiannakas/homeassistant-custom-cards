@@ -8,7 +8,7 @@
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.1.5";
+const EFC_VERSION = "1.1.6";
 const EFC_TAG = "enclosure-filter-card";
 
 const C = {
@@ -40,6 +40,10 @@ function optionLabel(o) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).

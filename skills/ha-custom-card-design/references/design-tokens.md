@@ -80,19 +80,56 @@ Everything inherits `var(--ha-font-family-body, Roboto, sans-serif)`.
   Decorative icons stay bare – the circle is the tap signal.
 - **Tile:** radius 10, padding 8–10, a 36px shape and text block with a 10px gap.
   `grid-auto-rows: 1fr` keeps rows level.
-- **Pill:** height 36, radius 18, padding `0 14px 0 10px`, 18px icon. On phones (container
-  ≤ 440px) use 40px high and full-width grid cells. A **split pill** puts two buttons in
-  one rounded box with a 1px divider in `color-mix(currentColor 25%, transparent)`.
+- **Pills:** see *Size tiers* below – primary 36 (the icon circle), secondary 30.
 - **Segmented selector:** a track with 3px padding, radius 12. Segments are 32px high
   with radius 9, and the selected one has the card background plus
   `box-shadow: 0 1px 3px rgba(0,0,0,.15)`.
-- **Action buttons:** height 44, radius 22, 13px / 600, 18px icon. Use orange icons for
-  destructive actions.
+- **Action buttons** (card-bottom actions) are primary pills: 36, radius 18, 13px / 600, 18px
+  icon. Use orange icons for destructive actions.
 - **Progress / power bar:** 4px (8px for a job progress bar), radius half the height,
   track `rgba(primary-text-rgb, .08)`.
 - **Switch (in sheets):** 44×26 track, 20px knob, coloured when on.
 - **Two-line label row** (title + a status line under it): a grid `36px | 1fr | auto` with areas
   `"icon title sw" "icon status sw"`, `row-gap: 0`; icon and switch are centred on both lines.
+
+## Size tiers: icons, pills and tap targets
+
+Every control on a card is one of these sizes. Nothing in between, and no phone-only
+enlargements: on a phone a tap gets easier through width (stacked pills become full-width grid
+cells) and 8px gaps, never through extra height.
+
+| Tier | Height | Radius | Icon | Text | Use for |
+|---|---|---|---|---|---|
+| **Icon circle** (shape) | 36 | 50% | 24px glyph | – | A row's anchor: room, weather, presence, a tappable header icon. |
+| **Primary pill** | 36 – the icon circle's height | 18 | 18px | 13px / 600 / .2px | A row's main action, link or state: presence, links to other dashboards, power / plug, watts, card-bottom actions (Power on, Light). Padding `0 14px 0 10px`. |
+| **Secondary pill / chip** | 30 | 15 | 16px | 12px / 500–600 | State chips (Armed), quick toggles in a grid (Door, TV, A/C), message rows (`min-height: 30px`). |
+| Switch | 40×24 in a label row, 44×26 in sheets | 12 / 13 | – | – | On/off of a whole card or group. |
+| Segment | 32 in a 38px track (3px padding) | 9 / 12 | – | 12px | Segmented selectors. |
+| Dialog / sheet row | 56 | 28 | 36px circle | 16px / 600 | Bubble-style pop-up rows. |
+
+- A primary pill equals the icon circle, so in a row its top and bottom edges line up with the
+  circle exactly. One row uses one pill tier.
+- A **split pill** puts two buttons in one rounded box with a 1px divider in
+  `color-mix(currentColor 25%, transparent)`; it keeps its tier's height.
+- Pills stay beside the row's content whenever they fit (secondary text may wrap first) and
+  move to a row of full-width cells below only when they don't – decided by measuring natural
+  widths (ResizeObserver), not by counting pills or by a breakpoint.
+
+## Vertical alignment (measured on every change)
+
+- **One centre line per row:** the icon circle, the text block (title + its secondary lines,
+  wrapped in one element) and the trailing controls (pills, chips, switches) share one centre.
+  Lay a row out as `[circle] [text block] [controls]` with `align-items: center`. Never pin the
+  icon to the top, and never put a control on only one line of a multi-line text block.
+- **Icons are centred by flex, never by a text line.** Every card's CSS starts with
+  `ha-icon { display: inline-flex; align-items: center; justify-content: center; }` (plus
+  `ha-icon[hidden] { display: none; }`). As a plain block, ha-icon lays its glyph out on a
+  line of the parent's line-height and the glyph sits 0.4–3px low – it was 2px under the
+  weather card's readings and 3px on its pill chevron.
+- Small reading icons (14px) sit centred on their own line of text.
+- **Check:** the icon audit (every ha-icon's svg centre against its own box, all cards, must be
+  under 0.3px), the row check (circle, text-block and control centres equal), and a pixel check
+  of a phone-width screenshot (ink centres within 1px). Report the numbers.
 
 ## Dialogs and sheets (Bubble Card look)
 

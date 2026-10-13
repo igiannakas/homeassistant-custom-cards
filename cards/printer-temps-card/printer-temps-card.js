@@ -8,7 +8,7 @@
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.6";
+const PTC_VERSION = "1.1.7";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -71,6 +71,10 @@ function fans(hass, cfg) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).

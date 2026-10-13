@@ -10,7 +10,7 @@
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.1.0";
+const ESC_VERSION = "1.1.1";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -92,6 +92,10 @@ async function findPrice(hass, cfg) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   /* Spacing follows Mushroom: content starts 10px from the card edge. */

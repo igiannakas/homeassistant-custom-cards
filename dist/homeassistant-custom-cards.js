@@ -4,7 +4,7 @@
  * air-quality-card, climate-modes-card, enclosure-filter-card, energy-summary-card, home-status-card, mmu-lanes-card, printer-status-card, printer-temps-card, room-lights-card, weather-presence-card
  */
 
-/* ===== air-quality-card 1.1.10 ===== */
+/* ===== air-quality-card 1.1.11 ===== */
 (() => {
 /*
  * Air quality card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -17,7 +17,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.1.10";
+const AQC_VERSION = "1.1.11";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -92,6 +92,10 @@ function roomModel(hass, room, thresholds = {}) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
@@ -309,7 +313,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== climate-modes-card 1.3.3 ===== */
+/* ===== climate-modes-card 1.3.4 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -325,7 +329,7 @@ registerAirQualityCard();
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.3.3";
+const CMC_VERSION = "1.3.4";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -340,6 +344,10 @@ const esc = (s) =>
 const list = (v) => (v === undefined || v === null || v === "" ? [] : Array.isArray(v) ? v : [v]);
 
 const DIALOG_CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
     font-family: var(--ha-font-family-body, Roboto, sans-serif); }
   .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
@@ -471,6 +479,10 @@ function activeIndex(hass, cfg) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
@@ -776,7 +788,7 @@ async function registerClimateModesCard() {
 registerClimateModesCard();
 })();
 
-/* ===== enclosure-filter-card 1.1.5 ===== */
+/* ===== enclosure-filter-card 1.1.6 ===== */
 (() => {
 /*
  * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -788,7 +800,7 @@ registerClimateModesCard();
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.1.5";
+const EFC_VERSION = "1.1.6";
 const EFC_TAG = "enclosure-filter-card";
 
 const C = {
@@ -820,6 +832,10 @@ function optionLabel(o) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
@@ -1029,7 +1045,7 @@ async function registerEnclosureFilterCard() {
 registerEnclosureFilterCard();
 })();
 
-/* ===== energy-summary-card 1.1.0 ===== */
+/* ===== energy-summary-card 1.1.1 ===== */
 (() => {
 /*
  * Energy summary card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1043,7 +1059,7 @@ registerEnclosureFilterCard();
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.1.0";
+const ESC_VERSION = "1.1.1";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -1125,6 +1141,10 @@ async function findPrice(hass, cfg) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   /* Spacing follows Mushroom: content starts 10px from the card edge. */
@@ -1359,7 +1379,7 @@ async function registerEnergySummaryCard() {
 registerEnergySummaryCard();
 })();
 
-/* ===== home-status-card 1.2.2 ===== */
+/* ===== home-status-card 1.2.3 ===== */
 (() => {
 /*
  * Home status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1371,7 +1391,7 @@ registerEnergySummaryCard();
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.2.2";
+const HSC_VERSION = "1.2.3";
 const HSC_TAG = "home-status-card";
 
 const C = {
@@ -1498,6 +1518,10 @@ function model(hass, cfg) {
 /* ------------------------------------------------------------------------ */
 
 const DIALOG_CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
     font-family: var(--ha-font-family-body, Roboto, sans-serif); }
   .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
@@ -1566,26 +1590,31 @@ function confirmDialog({ title, icon, color, bodyIcon, primary, secondary, confi
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   /* Spacing follows Mushroom: content starts 10px from the card edge; a little more air vertically. */
   ha-card { container-type: inline-size; padding: 12px 10px; display: grid; gap: 10px; }
-  /* Icon on the left across both lines; title and alarm switch share the first line, so the
-     presence text below gets the full width. */
-  .head { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "s n a" "s d d";
-    column-gap: 10px; align-items: center; }
+  /* Alignment rule: icon circle, text block (title + detail) and the alarm chip share one centre
+     line, like every other card's row (measured, not eyeballed). */
+  .head { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; column-gap: 10px; align-items: center; }
+  .tb { min-width: 0; }
   .who { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .shape { grid-area: s; align-self: start; width: 36px; height: 36px; border-radius: 50%; display: flex;
+  .shape { width: 36px; height: 36px; border-radius: 50%; display: flex;
     align-items: center; justify-content: center; transition: background-color 180ms; }
   /* Same size as Mushroom / tile card icons: 36 px circle, 24 px icon. */
   .shape ha-icon { --mdc-icon-size: 24px; transition: color 180ms; }
   /* Text matches Mushroom / tile cards: name 14px medium, detail 12px regular, same colour. */
-  .name { grid-area: n; min-width: 0; font-size: 14px; line-height: 18px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+  .name { min-width: 0; font-size: 14px; line-height: 18px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .name .state { font-weight: 400; color: var(--secondary-text-color); }
-  .detail { grid-area: d; min-width: 0; font-size: 12px; line-height: 15px; color: var(--primary-text-color);
+  .detail { min-width: 0; font-size: 12px; line-height: 15px; color: var(--primary-text-color);
     letter-spacing: .4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .alarm { all: unset; grid-area: a; box-sizing: border-box; display: flex; align-items: center; gap: 5px; height: 28px;
-    padding: 0 10px 0 7px; border-radius: 14px; cursor: pointer; font-size: 12px; font-weight: 600;
+  /* Secondary pill (30px, like the status buttons below): a state chip, not the card's main action. */
+  .alarm { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 5px; height: 30px;
+    padding: 0 10px 0 7px; border-radius: 15px; cursor: pointer; font-size: 12px; font-weight: 600;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
     transition: background-color 180ms, color 180ms; -webkit-tap-highlight-color: transparent; }
   .alarm ha-icon { --mdc-icon-size: 16px; color: var(--grey-color, #9e9e9e); }
@@ -1715,9 +1744,8 @@ class HomeStatusCard extends HTMLElement {
       <ha-card>
         <div class="head">
           <div class="shape who" role="button" tabindex="0"><ha-icon></ha-icon></div>
-          <div class="name who"></div>
+          <div class="tb"><div class="name who"></div><div class="detail who"></div></div>
           <button class="alarm" aria-pressed="false"><ha-icon></ha-icon><span class="txt"></span></button>
-          <div class="detail who"></div>
         </div>
         <div class="tiles"></div>
         <button class="msg"><ha-icon icon="mdi:message-text-outline"></ha-icon><span></span></button>
@@ -1850,7 +1878,7 @@ async function registerHomeStatusCard() {
 registerHomeStatusCard();
 })();
 
-/* ===== mmu-lanes-card 1.1.5 ===== */
+/* ===== mmu-lanes-card 1.1.6 ===== */
 (() => {
 /*
  * MMU lanes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1863,7 +1891,7 @@ registerHomeStatusCard();
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.1.5";
+const MLC_VERSION = "1.1.6";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
@@ -1927,6 +1955,10 @@ function lanes(hass, cfg) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { padding: 10px; container-type: inline-size; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
@@ -2088,7 +2120,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.5.0 ===== */
+/* ===== printer-status-card 1.5.1 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2107,7 +2139,7 @@ registerMmuLanesCard();
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.5.0";
+const PSC_VERSION = "1.5.1";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -2258,6 +2290,10 @@ function actions(key) {
 /* ------------------------------------------------------------------------ */
 
 const DIALOG_CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
     font-family: var(--ha-font-family-body, Roboto, sans-serif); }
   .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
@@ -2326,6 +2362,10 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   /* Compact layout (overview page): one row, icon and watts centred on the whole text block
      (which may wrap to two lines and carry a progress bar). The whole card is one tap target. */
@@ -2387,7 +2427,8 @@ const CSS = `
   .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; }
   .acts:empty { display: none; }
-  .act { all: unset; box-sizing: border-box; height: 44px; border-radius: 22px; cursor: pointer; display: flex; align-items: center;
+  /* Primary pills: 36px, the height of the icon circle (one size for every main action). */
+  .act { all: unset; box-sizing: border-box; height: 36px; border-radius: 18px; cursor: pointer; display: flex; align-items: center;
     justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--primary-text-color);
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
   .act ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
@@ -2856,7 +2897,7 @@ async function registerPrinterStatusCard() {
 registerPrinterStatusCard();
 })();
 
-/* ===== printer-temps-card 1.1.6 ===== */
+/* ===== printer-temps-card 1.1.7 ===== */
 (() => {
 /*
  * Printer temperatures card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2868,7 +2909,7 @@ registerPrinterStatusCard();
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.6";
+const PTC_VERSION = "1.1.7";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -2931,6 +2972,10 @@ function fans(hass, cfg) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
@@ -3126,7 +3171,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== room-lights-card 1.3.5 ===== */
+/* ===== room-lights-card 1.3.6 ===== */
 (() => {
 /*
  * Room lights card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3139,7 +3184,7 @@ registerPrinterTempsCard();
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.5";
+const RLC_VERSION = "1.3.6";
 const RLC_TAG = "room-lights-card";
 
 const C = {
@@ -3276,6 +3321,10 @@ async function loadView(hass, path) {
 // Same look as the other pop-ups on the dashboard (Boost heating, alarm): 20px title, 56px
 // pill rows with a 36px icon on the left and 16px semibold text, 20px between blocks.
 const SHEET_CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
     font-family: var(--ha-font-family-body, Roboto, sans-serif); }
   .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
@@ -3428,6 +3477,10 @@ class RoomLampsSheet {
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   /* Spacing follows Mushroom: everything inside starts 10px from the card edge. */
   ha-card { padding: 10px; }
@@ -4082,7 +4135,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== weather-presence-card 1.3.0 ===== */
+/* ===== weather-presence-card 1.3.1 ===== */
 (() => {
 /*
  * Weather & presence card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -4095,7 +4148,7 @@ registerRoomLightsCard();
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.3.0";
+const WPC_VERSION = "1.3.1";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -4138,6 +4191,10 @@ function ago(ms) {
 }
 
 const CSS = `
+  /* Icons centre their glyph with flex. As a plain block, ha-icon lays its glyph out on a text line
+     and it sits 0.4–3px low (design rule: glyphs are centred on their row, measured). */
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  ha-icon[hidden] { display: none; }
   :host { display: block; }
   /* Spacing follows Mushroom: content starts 10px from the card edge. */
   ha-card { padding: 12px 10px; container-type: inline-size; }
@@ -4157,17 +4214,14 @@ const CSS = `
   .v.real ha-icon { color: color-mix(in srgb, ${C.orange} 55%, ${C.grey}); }
   .v.fc ha-icon { color: color-mix(in srgb, ${C.blue} 55%, ${C.grey}); }
   .pills { flex: none; display: flex; gap: 8px; align-items: center; }
-  /* Pills are finger-sized (36px, 40px on a phone) – they are the card's buttons. */
+  /* Primary pills: 36px – the height of the icon circle – on every screen, so circle, text block
+     and pills share one centre line and the pills' edges line up with the circle. */
   .pill { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     height: 36px; padding: 0 14px 0 10px; border-radius: 18px; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: .2px;
     white-space: nowrap;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
     -webkit-tap-highlight-color: transparent; }
   .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
-  /* Phone: pills are 40px (44 read as too large, 36 as too small to hit). */
-  @container (max-width: 440px) {
-    .pill { height: 40px; border-radius: 20px; }
-  }
   /* The pills stay beside the weather whenever they fit there (the readings may wrap onto two
      lines). Only when they don't – measured in _fit() – do they move to a row of wide buttons
      below it, e.g. two pills on a 375px phone. */
