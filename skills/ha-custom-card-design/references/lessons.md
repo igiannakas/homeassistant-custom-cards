@@ -63,7 +63,8 @@ Most of them generalise to any dashboard.
 - Think about the scroll order (context → shortcuts → per-room controls → later sections). Link deeper dashboards from a pill rather than embedding them.
 - Global switches go in the section header, not in the tile grid.
 - Design for what's coming next, but build only what was asked.
-- A wrapped name makes every tile taller (equal rows). Before wrapping, win the space back: tighten the tile spacing (to the phone 6px) when that keeps every name on one line. Never shrink the font, never cut the name.
+- One line that wraps in one tile makes every tile taller (equal rows). Before letting it wrap, win the space back by measuring: the card's phone spacing (room lights 6px, air quality 8px tile sides) when that keeps every name and reading line whole. Never shrink the font, never cut the text.
+- Lines that wrap keep their groups: a status and its readings share a line only if all fit; otherwise the status gets its own line and the readings stay together on the next (never a lone "VOC 80").
 
 ## Robot vacuum (Oct 2026)
 

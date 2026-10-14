@@ -170,6 +170,9 @@ const cfg = {
   assert(!/11\.5px/.test(css), "no 11.5px text");
   assert(!/small \{ display: none/.test(css), "ppm is never hidden");
   assert(/@container rooms \(max-width: 400px\) \{ \.room \{ padding: 11px 8px; \} \}/.test(css), "narrow tiles keep the 10px gap");
+  assert(/\.tight \.room \{ padding: 11px 8px; \}/.test(css), "a line that would wrap gets the phone spacing first");
+  assert(/\.split \.row:not\(\.pm\) \.st \{ flex-basis: 100%; \}/.test(css), "status alone, gases together, when they don't all fit");
+  assert(!/\.(tight|split)[^{]*\{[^}]*font-size/.test(css), "fitting never shrinks text");
   assert(/\.room:active \{ filter: brightness\(\.92\); \}/.test(css));
   assert(/\.rooms \{ display: grid; grid-template-columns: repeat\(var\(--cols, 2\), minmax\(0, 1fr\)\)/.test(css), "columns even, two by default");
   // The particle grid is fitted to the readings (stubbed widths: jsdom has no layout).

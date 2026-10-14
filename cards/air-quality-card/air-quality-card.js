@@ -10,7 +10,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.3.2";
+const AQC_VERSION = "1.3.3";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -139,8 +139,15 @@ const CSS = `
   .v.hot small { color: inherit; }
   .room:active { filter: brightness(.92); }
   .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  /* Phone width: 8px tile sides (the shape–text gap stays 10px, so names stay at edge + 46). */
+  /* Phone width: 8px tile sides (the shape–text gap stays 10px, so names stay at edge + 46). The
+     same when a room's name, or its CO₂ and VOC, would otherwise need a second line (measured):
+     "CO₂ 655 ppm  VOC 146" is 1.4px too wide for a 440px phone's tile, and one taller tile makes
+     every tile taller. Text sizes never change. */
   @container rooms (max-width: 400px) { .room { padding: 11px 8px; } }
+  .tight .room { padding: 11px 8px; }
+  .measure .nm { white-space: nowrap; }
+  /* Status and gases on one line only when all fit; else the status alone, the gases together. */
+  .split .row:not(.pm) .st { flex-basis: 100%; }
 `;
 
 /* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
@@ -329,14 +336,56 @@ class AirQualityCard extends HTMLElement {
     );
     this._built = true;
     if (typeof ResizeObserver !== "undefined") {
-      this._ro = new ResizeObserver(() => this._fitPm());
+      this._ro = new ResizeObserver(() => this._fit());
       this._ro.observe(root.querySelector(".rooms"));
     }
-    this.ownerDocument.fonts?.ready?.then(() => this._fitPm());
+    this.ownerDocument.fonts?.ready?.then(() => this._fit());
   }
 
   /* The particle grid per tile: 4 across, else 2×2 (never 3 + 1), else one per line – from the
      readings' natural widths against the space the tile has. Without a layout nothing changes. */
+  /* Fit the tiles to what they hold, measured, the same for every tile (equal rows):
+     - the status and the gases share a line only when all of them fit; otherwise the status gets
+       its own line and CO₂ and VOC the next ("Excellent" / "CO₂ 655 ppm  VOC 146") – never a
+       ragged split with VOC left on its own;
+     - the phone's 8px tile sides whenever a room's name or its CO₂ and VOC wouldn't otherwise fit
+       on one line, so no tile – and with equal rows no row – grows a line for a pixel or two;
+     - then each particle grid.
+     Font sizes never change; a line that doesn't fit even then wraps between readings. */
+  _fit() {
+    const root = this.shadowRoot;
+    const card = root?.querySelector("ha-card");
+    if (!card || !card.isConnected) return;
+    const measure = () => {
+      card.classList.add("measure");
+      const r = { name: false, gases: false, all: false };
+      for (const t of root.querySelectorAll(".room")) {
+        const nm = t.querySelector(".nm");
+        if (nm && nm.scrollWidth > nm.clientWidth + 1) r.name = true;
+        const row = t.querySelector(".row:not(.pm)");
+        const avail = t.querySelector(".txt")?.clientWidth;
+        if (!row || !avail) continue;
+        const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+        const span = (els) => els.reduce((a, c) => a + c.getBoundingClientRect().width, 0) + gap * Math.max(0, els.length - 1);
+        const kids = [...row.children];
+        if (span(kids.filter((c) => !c.classList.contains("st"))) > avail + 0.5) r.gases = true;
+        if (span(kids) > avail + 0.5) r.all = true;
+      }
+      card.classList.remove("measure");
+      return r;
+    };
+    card.classList.remove("tight", "split");
+    let m = measure();
+    if (m.name || m.gases) {
+      card.classList.add("tight");
+      const t = measure();
+      if ((t.name && t.gases) || (t.name === m.name && t.gases === m.gases)) card.classList.remove("tight"); // no help: roomy
+      else m = t;
+    }
+    card.classList.toggle("split", m.all);
+    this._fitPm();
+  }
+
   _fitPm() {
     for (const pm of this.shadowRoot?.querySelectorAll(".row.pm") || []) {
       const avail = pm.parentElement?.clientWidth;
@@ -364,7 +413,7 @@ class AirQualityCard extends HTMLElement {
     inkSchedule(this, ".txt, .lt", () => {
       if (!this._pmDirty) return;
       this._pmDirty = false;
-      this._fitPm();
+      this._fit();
     });
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
