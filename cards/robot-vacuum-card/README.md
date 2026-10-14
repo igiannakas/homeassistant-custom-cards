@@ -46,12 +46,13 @@
   `off` and `custom` only show when they are the current setting.
 - **Buttons** for the state: Clean all (or Clean N rooms) when idle, Pause and Dock while
   cleaning, Resume and Dock when paused, Pause while returning. Dock only shows when the
-  robot is away from the dock. Nothing asks first.
+  robot is away from the dock. None of these ask first.
 - **Auto clean** (optional, `auto_clean`): a pill that glows teal while your automation
   (or switch) is on; a tap turns it off or on, a hold opens its more-info.
 - **Dock jobs** (while the robot is on the dock): **Empty**, **Wash mop** and **Dry** chips
   for the dock's own switches – handy after stopping a clean early with Dock. Each glows
-  blue while it runs ("Drying · 2 h 10 min"); a tap starts or stops it at once.
+  blue while it runs ("Drying · 2 h 10 min"). Empty and Wash mop ask first; Dry starts at
+  once, and a tap on a running job stops it at once.
 
 ## Configuration
 

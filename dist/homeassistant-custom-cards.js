@@ -3844,7 +3844,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 1.1.1 ===== */
+/* ===== robot-vacuum-card 1.2.0 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3864,7 +3864,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "1.1.1";
+const RVC_VERSION = "1.2.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -4199,6 +4199,63 @@ const SHEET_CSS = `
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
 
+/* Confirmation dialog – same look as the other cards' dialogs. */
+function confirmDialog({ title, icon, color, primary, secondary, confirmLabel }) {
+  return new Promise((resolve) => {
+    const host = document.createElement("rvc-confirm-dialog");
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>${SHEET_CSS}
+      .body { margin-top: 20px; }
+      .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
+      .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; color: var(--secondary-text-color); }
+      .buttons { margin-top: 20px; display: grid; gap: 8px; }
+      .buttons button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
+        border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
+        background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
+      .buttons .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
+      .buttons .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
+      .buttons .confirm { color: #fff; }
+      .buttons .confirm .glyph { background: rgba(255,255,255,.2); }
+      .buttons .confirm .glyph ha-icon { color: #fff; }</style>
+      <div class="backdrop"></div>
+      <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+        <div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(icon)}" style="color:${color}"></ha-icon></div>
+          <div class="title">${esc(title)}</div></div>
+        <div class="row body"><div class="glyph"><ha-icon icon="mdi:robot-vacuum" style="color:${color}"></ha-icon></div>
+          <div><div class="primary">${esc(primary)}</div><div class="secondary">${esc(secondary)}</div></div></div>
+        <div class="buttons">
+          <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
+          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+        </div></div>`;
+    const done = (ok) => {
+      document.removeEventListener("keydown", onKey, true);
+      host.remove();
+      resolve(ok);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        done(false);
+      }
+    };
+    root.querySelector(".backdrop").addEventListener("click", () => done(false));
+    root.querySelector(".cancel").addEventListener("click", () => done(false));
+    root.querySelector(".confirm").addEventListener("click", () => done(true));
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(host);
+    root.querySelector(".confirm").focus();
+  });
+}
+
+/* Dock jobs that ask before they start (the user's choice): emptying is loud, washing uses
+   clean water and fills the dirty tank. Drying starts at once; stopping any job is immediate. */
+const DOCK_CONFIRM = {
+  empty_sw: { title: "Empty the bin", icon: "mdi:delete-empty-outline", label: "Empty",
+    text: "The dock empties the robot's dust bin into its bag now. It's loud for about half a minute." },
+  wash_sw: { title: "Wash the mop", icon: "mdi:water-sync", label: "Wash mop",
+    text: "The dock washes the mop now, with clean water from its tank. The dirty water goes to the dirty tank." },
+};
+
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
@@ -4498,9 +4555,8 @@ class RobotVacuumCard extends HTMLElement {
     if (t.closest(".sets .chip")) return this._openSheet();
     const job = t.closest("[data-dock]");
     if (job) {
-      if (job.disabled) return;
-      const id = this._found[job.dataset.dock];
-      return this._call("switch", this._hass.states[id]?.state === "on" ? "turn_off" : "turn_on", { entity_id: id });
+      if (!job.disabled) this._dockJob(job.dataset.dock);
+      return;
     }
     const act = t.closest(".acts .pill");
     if (act) {
@@ -4804,6 +4860,15 @@ class RobotVacuumCard extends HTMLElement {
     ctx.imageSmoothingQuality = "high";
     ctx.clearRect(0, 0, cv.width, cv.height);
     ctx.drawImage(img, c.x, c.y, c.w, c.h, 0, 0, cv.width, cv.height);
+  }
+
+  async _dockJob(k) {
+    const id = this._found[k];
+    if (this._hass.states[id]?.state === "on") return this._call("switch", "turn_off", { entity_id: id });
+    const c = DOCK_CONFIRM[k];
+    if (c && !(await confirmDialog({ title: c.title, icon: c.icon, color: C.blue, primary: this._m?.name || "Vacuum", secondary: c.text, confirmLabel: c.label })))
+      return;
+    return this._call("switch", "turn_on", { entity_id: id });
   }
 
   async _action(k) {

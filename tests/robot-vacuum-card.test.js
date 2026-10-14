@@ -167,9 +167,44 @@ const cfg = {
   // The dock's jobs while docked: Empty, Wash mop, Dry – a tap starts one at once.
   const dock = () => all(".dock .chip").map((b) => b.textContent.trim() + (b.classList.contains("run") ? "*" : ""));
   eq(dock(), ["Empty", "Wash mop", "Dry"]);
+  // Empty and Wash mop ask first; Cancel does nothing.
+  const dlg = () => document.querySelector("rvc-confirm-dialog");
+  const n1 = calls.length;
   all(".dock .chip")[1].click();
   await tick();
+  assert(dlg(), "Wash mop asks first");
+  assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, "Wash the mop");
+  dlg().shadowRoot.querySelector(".cancel").click();
+  await tick();
+  assert(!dlg() && calls.length === n1, "Cancel: nothing happens");
+  all(".dock .chip")[1].click();
+  await tick();
+  dlg().shadowRoot.querySelector(".confirm").click();
+  await tick();
   eq(calls.pop(), ["switch", "turn_on", { entity_id: "switch.vacuum_cleaner_dock_mop_washing" }]);
+  all(".dock .chip")[0].click();
+  await tick();
+  assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, "Empty the bin");
+  document.dispatchEvent(new t.window.KeyboardEvent("keydown", { key: "Escape" }));
+  await tick();
+  assert(!dlg() && calls.length === n1, "Escape cancels");
+  all(".dock .chip")[0].click();
+  await tick();
+  dlg().shadowRoot.querySelector(".confirm").click();
+  await tick();
+  eq(calls.pop(), ["switch", "turn_on", { entity_id: "switch.vacuum_cleaner_dock_dust_emptying" }]);
+  // Dry starts at once.
+  all(".dock .chip")[2].click();
+  await tick();
+  assert(!dlg(), "Dry doesn't ask");
+  eq(calls.pop(), ["switch", "turn_on", { entity_id: "switch.vacuum_cleaner_dock_mop_drying" }]);
+  // Stopping a running job is immediate.
+  card.hass = full(states({ "switch.vacuum_cleaner_dock_mop_washing": st("on") }));
+  eq(dock(), ["Empty", "Washing*", "Dry"]);
+  all(".dock .chip")[1].click();
+  await tick();
+  assert(!dlg());
+  eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.vacuum_cleaner_dock_mop_washing" }]);
   card.hass = full(states({ "switch.vacuum_cleaner_dock_mop_drying": st("on"), "sensor.vacuum_cleaner_mop_drying_remaining_time": st(7800, { unit_of_measurement: "s" }) }));
   eq(dock(), ["Empty", "Wash mop", "Drying · 2 h 10 min*"]);
   all(".dock .chip")[2].click();
