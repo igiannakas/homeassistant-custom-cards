@@ -515,7 +515,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== climate-modes-card 1.4.0 ===== */
+/* ===== climate-modes-card 1.4.1 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -533,7 +533,7 @@ registerAirQualityCard();
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.4.0";
+const CMC_VERSION = "1.4.1";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -545,8 +545,11 @@ const GREY = color("grey");
 // Teal = you can tap / pick this (design tokens → Colours): the switch is teal when on unless it
 // has a colour of its own, and a tile or switch without a state colour of its own – none, or
 // grey (Off, Away) – asks in teal: a filled grey button would read as disabled. (Such a tile
-// still glows grey when it is the mode.)
+// glows teal when it is the mode – see pickColor.)
 const TEAL = color("teal");
+// The active tile glows in its mode's colour; a mode without a state colour of its own (none, or
+// grey – Off, Away) glows teal instead, as "what you picked", or nothing would show it's active.
+const pickColor = (c) => (!c || c === "grey" || c === "gray" ? TEAL : color(c));
 const askColor = (m) => {
   const c = m?.color ? color(m.color) : TEAL;
   return c === GREY ? TEAL : c;
@@ -907,7 +910,7 @@ class ClimateModesCard extends HTMLElement {
         ${c.switch ? `<button class="switch" role="switch" style="--sw-color:${c.switch_color ? color(c.switch_color) : TEAL}"><span class="swl"></span><span class="sw"></span></button>` : ""}</div>` : ""}
       <div class="modes">
         ${c.modes
-          .map((m, i) => `<button class="mode" data-i="${i}" style="--c:${color(m.color)}" aria-pressed="false">
+          .map((m, i) => `<button class="mode" data-i="${i}" style="--c:${pickColor(m.color)}" aria-pressed="false">
             <span class="shape"><ha-icon icon="${esc(m.icon || "mdi:thermostat")}"></ha-icon></span><span class="name">${esc(m.name || "")}</span></button>`)
           .join("")}
       </div></ha-card>`;

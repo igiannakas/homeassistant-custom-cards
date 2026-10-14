@@ -24,8 +24,8 @@
   the mode.
 - The line under the title is never cut off: it wraps, and only between its parts
   ("All rooms" and "Night" each stay whole).
-- A tile per mode. The active one glows in its own colour (a tile without a colour
-  glows grey).
+- A tile per mode. The active one glows in its own colour; a mode without one (or a
+  grey one, like Off) glows teal – "what you picked" – so you can always see which is on.
 - **Tile names are never cut off or shrunk.** The tiles share one row at equal widths
   while every name fits; otherwise the card measures the names and lays the tiles out
   in even, balanced rows (six tiles on a phone become 3 + 3, not 5 + 1). It fits again

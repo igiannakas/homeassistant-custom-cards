@@ -290,11 +290,12 @@ const cfg = {
   assert(head().includes("--grey-color"), "mixed → grey");
   dc.hass = hass(Array(4).fill("frost_protection"));
   assert(head().includes("--grey-color"), "Off (grey) → grey");
-  // A tile with no colour of its own still glows grey (header grey too), but asks in teal (not
-  // blue); its old subject stands in for the missing text.
+  // A tile with no colour of its own glows teal when it is the mode ("what you picked" – grey
+  // wouldn't show), the header stays grey, and it asks in teal; its old subject stands in for
+  // the missing text.
   dc.hass = hass(Array(4).fill("plain"));
   const plain = dr.querySelectorAll(".mode")[4];
-  assert(plain.getAttribute("style").includes("--grey-color") && plain.classList.contains("on"));
+  assert(plain.getAttribute("style").includes("--teal-color") && plain.classList.contains("on"));
   assert(head().includes("--grey-color"));
   plain.click();
   await tick(); await tick();
@@ -309,7 +310,7 @@ const cfg = {
   grey.setConfig({ ...cfg, modes: [{ name: "Away", icon: "mdi:home-export-outline", color: "grey", preset: "away",
     tap_action: { ...run("script.away"), confirmation: { title: "Away mode", text: "Every room drops to its away temperature." } } }] });
   grey.hass = hass(Array(4).fill("away"));
-  assert(grey.shadowRoot.querySelector(".mode").getAttribute("style").includes("--grey-color"), "glows grey");
+  assert(grey.shadowRoot.querySelector(".mode").getAttribute("style").includes("--teal-color"), "a grey mode glows teal when active");
   grey.shadowRoot.querySelector(".mode").click();
   await tick(); await tick();
   dlg = document.querySelector("cmc-confirm-dialog");
