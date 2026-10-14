@@ -19,7 +19,7 @@
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.7.0";
+const PSC_VERSION = "1.7.1";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -317,7 +317,10 @@ const CSS = `
   .pill.on { background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
   .pill.on ha-icon { color: ${C.orange}; }
   [data-e] { cursor: pointer; }
-  .jt [data-e], .stats [data-e], .txt [data-e] { border-radius: 4px; -webkit-tap-highlight-color: transparent; }
+  .jt [data-e], .txt [data-e] { border-radius: 4px; -webkit-tap-highlight-color: transparent; }
+  /* The stats are split by straight 1px dividers (like the maintenance numbers): no radius on the
+     cells, or their left borders curve. */
+  .stats [data-e] { -webkit-tap-highlight-color: transparent; }
   [data-e]:active { filter: brightness(.85); }
   .job { display: flex; gap: 10px; margin: 0 0 10px; }
   .thumb { flex: 0 0 64px; height: 64px; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05);

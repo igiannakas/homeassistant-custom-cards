@@ -457,6 +457,10 @@ const cfg = {
     uc.hass = hass(states({ "switch.voron": { state: "off", attributes: {} }, [up]: { state: "off", attributes: {} }, "sensor.tasmota_energy_power_2": { state: "0", attributes: {} } }));
     assert(ur.querySelector(".watts").hidden, "none once the strip is off");
   }
+  {
+    const css = [...document.querySelectorAll("printer-status-card")].map((c) => c.shadowRoot.querySelector("style").textContent)[0];
+    if (!css || /\.stats \[data-e\][^{]*\{[^}]*border-radius/.test(css)) throw new Error("stat dividers must stay straight (no radius on the cells)");
+  }
 console.log("printer-status-card: all tests passed");
   process.exit(0); // feed checks leave timers running
 })().catch((e) => {
