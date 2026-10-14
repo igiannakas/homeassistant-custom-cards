@@ -115,26 +115,21 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
   r.querySelector("ha-card").click();
   await tick();
   assert.deepStrictEqual(navs, ["/lovelace/energy"]);
-  // The circle and the empty area navigate too; each number opens its own sensor and does not navigate.
+  // One tap target: the circle, a number, a label or a cost all open the Energy dashboard.
   r.querySelector(".shape").click();
   r.querySelector(".stat.today .k").click();
   r.querySelector(".stat.today .c").click();
-  assert.deepStrictEqual(navs, ["/lovelace/energy", "/lovelace/energy", "/lovelace/energy", "/lovelace/energy"]);
   r.querySelector(".stat.now .v").click();
-  r.querySelector(".stat.today .v small").click();
-  r.querySelector(".stat.yesterday .v").click();
   r.querySelector(".stat.month .v").click();
   await tick();
-  assert.deepStrictEqual(more, ["sensor.power", "sensor.daily", "sensor.daily", "sensor.daily"], "each number → its own more-info");
-  assert.strictEqual(navs.length, 4, "a number never navigates");
-  // Keyboard: Enter / Space on the card navigates; the numbers are buttons, so they handle their own keys.
+  assert.strictEqual(navs.length, 6);
+  assert.deepStrictEqual(more, [], "no number opens its own dialog");
+  assert(!r.querySelector("[data-e], .stats button"), "numbers aren't buttons");
+  // Keyboard: Enter / Space on the card navigates.
   const K = (key) => new window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
   r.querySelector("ha-card").dispatchEvent(K("Enter"));
   r.querySelector("ha-card").dispatchEvent(K(" "));
-  assert.strictEqual(navs.length, 6);
-  r.querySelector(".stat.now .v").dispatchEvent(K("Enter"));
-  assert.strictEqual(navs.length, 6, "Enter on a number is the number's");
-  assert.strictEqual(r.querySelector(".stat.now .v").localName, "button");
+  assert.strictEqual(navs.length, 8);
   assert.strictEqual(r.querySelector("ha-card").getAttribute("tabindex"), "0");
 
   // Design rules: nothing cut, the circle stays on phones, no colour on values, captions/units ≥ 11px.
@@ -147,7 +142,7 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
   assert(/\.v \{[^}]*color: var\(--primary-text-color\)/.test(css));
   assert(/\.c \{[^}]*color: var\(--secondary-text-color\)/.test(css), "costs in the secondary colour");
   assert(/\.row \{[^}]*gap: 10px; padding: 12px 10px/.test(css), "first text at edge + 46");
-  assert(/ha-card:active, \.v:active \{ filter: brightness\(\.92\); \}/.test(css));
+  assert(/ha-card:active \{ filter: brightness\(\.92\); \}/.test(css));
   assert(r.querySelector(".shape").getAttribute("style").includes("--teal-color"), "the circle keeps its teal");
 
   // Own price overrides the Energy settings; a price entity is read live.
@@ -207,7 +202,7 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
   c7.hass = hass();
   await tick(10);
   assert.strictEqual(c7.shadowRoot.querySelector(".stat.month .v").textContent, "1,204kWh");
-  // Without a navigation path, the card opens the power sensor (and a number still its own).
+  // Without a navigation path, the card opens the power sensor, wherever it's tapped.
   const c8 = document.createElement("energy-summary-card");
   document.body.appendChild(c8);
   c8.setConfig({ power: "sensor.power", energy: "sensor.daily" });
@@ -216,7 +211,7 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
   c8.addEventListener("hass-more-info", (e) => more8.push(e.detail.entityId));
   c8.shadowRoot.querySelector("ha-card").click();
   c8.shadowRoot.querySelector(".stat.today .v").click();
-  assert.deepStrictEqual(more8, ["sensor.power", "sensor.daily"]);
+  assert.deepStrictEqual(more8, ["sensor.power", "sensor.power"]);
 
   assert.throws(() => new Card().setConfig({}));
   console.log("ALL ENERGY-SUMMARY TESTS PASSED");

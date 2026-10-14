@@ -11,7 +11,7 @@
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.2.0";
+const ESC_VERSION = "1.3.0";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -119,18 +119,14 @@ const CSS = `
   /* Captions under the numbers: 11px. */
   .k { font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: .02em; color: var(--secondary-text-color); }
   /* Text matches Mushroom / tile cards: values 14px medium in the primary colour (no colour on
-     values), costs 12px regular in the secondary colour. Every number is its own tap target. */
-  .v { all: unset; box-sizing: border-box; display: block; width: fit-content; font-size: 14px; line-height: 20px; font-weight: 500;
-    letter-spacing: .1px; color: var(--primary-text-color); white-space: nowrap; cursor: pointer; border-radius: 4px;
-    -webkit-tap-highlight-color: transparent; }
+     values), costs 12px regular in the secondary colour. The whole card is one tap target: it
+     opens the Energy dashboard, which has every detail. */
+  .v { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); white-space: nowrap; }
   .v small { font-size: 11px; font-weight: 400; color: var(--secondary-text-color); margin-left: 2px; }
   .c { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .c:empty::before { content: "\\00a0"; }
-  ha-card:active, .v:active { filter: brightness(.92); }
-  /* Pressing a number darkens only the number: the tap goes to it, not to the card. */
-  ha-card:has(.v:active) { filter: none; }
+  ha-card:active { filter: brightness(.92); }
   ha-card:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  .v:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   /* Phone width: a little less air between the numbers, so all four still fit on one row more often. */
   @container (max-width: 400px) {
     .stats { --pl: 8px; }
@@ -349,26 +345,16 @@ class EnergySummaryCard extends HTMLElement {
 
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
-    // Each number is a button for its own sensor: Now → the power sensor, the rest → the energy sensor.
-    const sensor = (key) => (key === "now" ? this._config.power : this._config.energy) || "";
-    const stat = (key) =>
-      `<div class="stat ${key}"><div class="k"></div><button class="v" data-e="${esc(sensor(key))}"></button><div class="c"></div></div>`;
+    const stat = (key) => `<div class="stat ${key}"><div class="k"></div><div class="v"></div><div class="c"></div></div>`;
     root.innerHTML = `<style>${CSS}</style>
       <ha-card role="button" tabindex="0"><div class="row">
         <div class="shape" style="background:${tint(TEAL, 20)}"><ha-icon style="color:${TEAL}"></ha-icon></div>
         <div class="stats">${["now", "today", "yesterday", "month"].map(stat).join("")}</div>
       </div></ha-card>`;
     const card = root.querySelector("ha-card");
-    // A number opens its own sensor and stops there; the circle and everywhere else navigate.
-    root.querySelectorAll(".v").forEach((b) =>
-      b.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this._more(b.dataset.e);
-      }),
-    );
+    // One tap target: anywhere on the card opens the Energy dashboard (or the power sensor).
     card.addEventListener("click", () => this._tap());
     card.addEventListener("keydown", (e) => {
-      if (e.target !== card) return; // a focused number handles its own Enter / Space (it's a button)
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         this._tap();

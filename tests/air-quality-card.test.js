@@ -58,15 +58,15 @@ const cfg = {
   eq(tiles().map((t) => t.querySelector(".nm").textContent), ["Living Room", "Study", "Bedroom", "Second Bedroom"]);
   // Living room: CO₂ 956 and VOC 166 elevated (amber), PM2.5 fine.
   assert.strictEqual(st(0), "Elevated");
-  eq(vals(0), ["*CO₂956 ppm", "*VOC166", "PM12.3 µg/m³", "PM2.55.0 µg/m³", "PM47.1 µg/m³", "PM108.1 µg/m³"]);
+  eq(vals(0), ["*CO₂956 ppm", "*VOC166", "PM12.3", "PM2.55.0", "PM47.1", "PM108.1"]);
   assert.strictEqual(tiles()[0].querySelector(".shape ha-icon").getAttribute("icon"), "mdi:information-outline");
   // Study all good: leaf, Excellent, nothing highlighted.
   assert.strictEqual(st(1), "Excellent");
-  eq(vals(1), ["CO₂612 ppm", "VOC96", "PM10.5 µg/m³", "PM2.51.1 µg/m³", "PM41.6 µg/m³", "PM101.9 µg/m³"]);
+  eq(vals(1), ["CO₂612 ppm", "VOC96", "PM10.5", "PM2.51.1", "PM41.6", "PM101.9"]);
   assert.strictEqual(tiles()[1].querySelector(".shape ha-icon").getAttribute("icon"), "mdi:leaf");
   // Second bedroom: VOC 268 → Poor (orange, alert).
   assert.strictEqual(st(3), "Poor");
-  eq(vals(3), ["CO₂702 ppm", "*VOC268", "PM10.5 µg/m³", "PM2.51.0 µg/m³", "PM41.5 µg/m³", "PM101.7 µg/m³"]);
+  eq(vals(3), ["CO₂702 ppm", "*VOC268", "PM10.5", "PM2.51.0", "PM41.5", "PM101.7"]);
   assert.strictEqual(tiles()[3].querySelector(".shape ha-icon").getAttribute("icon"), "mdi:alert-outline");
   assert.strictEqual(r.querySelector(".s").textContent, "Poor in Second Bedroom");
   assert(!tiles().some((t) => t.classList.contains("alarm")), "no glow below ventilate");
@@ -81,7 +81,7 @@ const cfg = {
   // Particles at the top level → also "Ventilate" (the words differ by level, not by cause), and the cause (PM10) is added.
   card.hass = hass({ "sensor.bedroom_air_quality_pm10": { state: "60", attributes: {} } });
   assert.strictEqual(st(2), "Ventilate");
-  eq(vals(2), ["*CO₂841 ppm", "VOC124", "PM10.2 µg/m³", "PM2.50.4 µg/m³", "PM40.6 µg/m³", "*PM1060.0 µg/m³"]);
+  eq(vals(2), ["*CO₂841 ppm", "VOC124", "PM10.2", "PM2.50.4", "PM40.6", "*PM1060.0"]);
   assert.strictEqual(tiles()[2].querySelector(".shape ha-icon").getAttribute("icon"), "mdi:window-open-variant");
   assert(tiles()[2].classList.contains("alarm"));
 
@@ -110,7 +110,7 @@ const cfg = {
 
   // Unavailable sensor shows "–" and does not raise the level; unchanged values are not rewritten.
   card.hass = hass({ "sensor.study_air_quality_co2": { state: "unavailable", attributes: {} } });
-  eq(vals(1), ["CO₂– ppm", "VOC96", "PM10.5 µg/m³", "PM2.51.1 µg/m³", "PM41.6 µg/m³", "PM101.9 µg/m³"]);
+  eq(vals(1), ["CO₂– ppm", "VOC96", "PM10.5", "PM2.51.1", "PM41.6", "PM101.9"]);
   const node = tiles()[1].querySelector(".m").firstChild;
   card.hass = hass({ "sensor.study_air_quality_co2": { state: "unavailable", attributes: {} } });
   assert.strictEqual(tiles()[1].querySelector(".m").firstChild, node);
@@ -130,7 +130,7 @@ const cfg = {
   card.setConfig({ ...cfg, thresholds: { co2: [1000, null, 1500] } });
   card.hass = hass();
   assert.strictEqual(st(0), "Elevated", "VOC 166 still elevated");
-  eq(vals(0), ["CO₂956 ppm", "*VOC166", "PM12.3 µg/m³", "PM2.55.0 µg/m³", "PM47.1 µg/m³", "PM108.1 µg/m³"], "CO₂ 956 fine with a 1000 threshold");
+  eq(vals(0), ["CO₂956 ppm", "*VOC166", "PM12.3", "PM2.55.0", "PM47.1", "PM108.1"], "CO₂ 956 fine with a 1000 threshold");
 
   // Editor: columns and thresholds can be set there too.
   const form = JSON.stringify(Card.getConfigForm().schema);
@@ -151,20 +151,18 @@ const cfg = {
   assert.strictEqual(r.querySelector(".s").textContent, "Ventilate Study");
   assert(r.querySelector(".slot ha-icon").style.color.includes("--red-color"));
 
-  // Every reading is its own tap target and does not navigate; the rest of the tile still does.
+  // The whole tile is one tap target: a reading, the name or the status all open the room's
+  // dashboard (every detail is there) – no reading opens its own dialog.
   navs.length = 0;
   more.length = 0;
   card.hass = hass();
-  tiles()[1].querySelector(".v").click(); // Study CO₂
-  tiles()[1].querySelector(".row.pm .v small").click(); // Study PM1 (its unit)
-  tiles()[0].querySelector(".v.hot .k").click(); // Living Room CO₂ (its label)
-  await tick();
-  eq(more, ["sensor.study_air_quality_co2", "sensor.study_air_quality_pm1", "sensor.living_room_air_quality_co2"]);
-  eq(navs, [], "a reading never navigates");
+  assert(!r.querySelector("[data-e]"), "no per-reading tap targets");
+  tiles()[1].querySelector(".v").click();
   tiles()[1].querySelector(".nm").click();
   tiles()[1].querySelector(".st").click();
   await tick();
-  eq(navs, ["/lovelace/study-air-quality", "/lovelace/study-air-quality"]);
+  eq(more, [], "a reading never opens its own dialog");
+  eq(navs, ["/lovelace/study-air-quality", "/lovelace/study-air-quality", "/lovelace/study-air-quality"]);
 
   // Design rules: nothing cut, no off-scale text, units never hidden, press .92, tile gap stays 10px.
   const css = r.querySelector("style").textContent;
@@ -172,84 +170,13 @@ const cfg = {
   assert(!/11\.5px/.test(css), "no 11.5px text");
   assert(!/small \{ display: none/.test(css), "ppm is never hidden");
   assert(/@container rooms \(max-width: 400px\) \{ \.room \{ padding: 11px 8px; \} \}/.test(css), "narrow tiles keep the 10px gap");
-  assert(/\.room:active, \.v:active \{ filter: brightness\(\.92\); \}/.test(css));
+  assert(/\.room:active \{ filter: brightness\(\.92\); \}/.test(css));
+  assert(/\.rooms \{ display: grid; grid-template-columns: repeat\(var\(--cols, 2\), minmax\(0, 1fr\)\)/.test(css), "columns even, two by default");
+  assert(/@container \(min-width: 300px\) \{ \.row\.pm \{ grid-template-columns: repeat\(4, max-content\); \} \}/.test(css), "PM four across on wide tiles");
   assert(/\.s \.p \{ white-space: nowrap; \}/.test(css));
   assert(!/18px icon/.test(src), "comment fixed");
 
-  // Fitting the tiles (simulated layout: jsdom measures nothing, so the widths are stubbed).
-  const proto = window.HTMLElement.prototype;
-  const saved = {
-    rect: window.Element.prototype.getBoundingClientRect,
-    cw: Object.getOwnPropertyDescriptor(window.Element.prototype, "clientWidth"),
-    ow: Object.getOwnPropertyDescriptor(proto, "offsetWidth"),
-    gcs: window.getComputedStyle,
-  };
-  let gridW = 339;
-  let pmW = 277;
-  const NAMES = { "Living Room": 85, Study: 40, Bedroom: 58, "Second Bedroom": 110 };
-  window.Element.prototype.getBoundingClientRect = function () {
-    const width = this.classList.contains("nm") ? NAMES[this.textContent] : this.closest(".row.pm") ? 70 : 60;
-    return { width, height: 16, left: 0, top: 0, right: width, bottom: 16 };
-  };
-  Object.defineProperty(window.Element.prototype, "clientWidth", {
-    configurable: true,
-    get() { return this.classList.contains("rooms") ? gridW : this.classList.contains("pm") ? pmW : 0; },
-  });
-  Object.defineProperty(proto, "offsetWidth", { configurable: true, get() { return this.classList.contains("shape") ? 36 : 0; } });
-  window.getComputedStyle = (el) => ({
-    paddingLeft: "10px", paddingRight: "10px", columnGap: el.classList.contains("rooms") ? "8px" : "10px", display: "block",
-  });
-  const grid = r.querySelector(".rooms");
-  const pmCols = () => [...grid.querySelectorAll(".row.pm")].map((p) => p.style.gridTemplateColumns);
-  // A tile needs 10 + 36 + 10 + 10 + the widest of its name, its widest reading (60/70) and its
-  // particles two across (70 + 10 + 70 = 150) → 216 for every room here.
-  card._fit();
-  assert.strictEqual(grid.style.gridTemplateColumns, "repeat(1, minmax(0, 1fr))", "375px phone: one column (2 × 216 + 8 > 339)");
-  eq(pmCols(), ["repeat(2, max-content)", "repeat(2, max-content)", "repeat(2, max-content)", "repeat(2, max-content)"], "PM 2×2 (4 × 70 + 30 > 277)");
-  gridW = 440; // two even columns of 216 + 8 fit exactly
-  pmW = 460;
-  card._fit();
-  assert.strictEqual(grid.style.gridTemplateColumns, "repeat(2, minmax(0, 1fr))");
-  eq(pmCols()[0], "repeat(4, max-content)", "four across when they fit");
-  pmW = 140; // a tile too narrow even for 2×2 → one per line
-  card._fit();
-  eq(pmCols()[0], "", "one per line (the CSS default)");
-  // Desktop: never more than the columns option, fewer when they don't fit.
-  card.setConfig({ ...cfg, columns: 4 });
-  card.hass = hass();
-  gridW = 900; // 4 × 216 + 24 = 888
-  card._fit();
-  assert.strictEqual(r.querySelector(".rooms").style.gridTemplateColumns, "repeat(4, minmax(0, 1fr))");
-  gridW = 800;
-  card._fit();
-  assert.strictEqual(r.querySelector(".rooms").style.gridTemplateColumns, "repeat(3, minmax(0, 1fr))");
-  card.setConfig({ ...cfg, columns: 3 });
-  card.hass = hass();
-  gridW = 900;
-  card._fit();
-  assert.strictEqual(r.querySelector(".rooms").style.gridTemplateColumns, "repeat(3, minmax(0, 1fr))");
-  // A long name drives its tile: two uneven columns when two even ones don't fit but each column's
-  // own widest does (tiles 216, 216, 216, 316 → 2 × 316 + 8 > 545; 216 + 316 + 8 = 540).
-  NAMES["Second Bedroom"] = 250;
-  card.setConfig(cfg);
-  card.hass = hass();
-  gridW = 545;
-  card._fit();
-  assert.strictEqual(r.querySelector(".rooms").style.gridTemplateColumns, "minmax(216px, 1fr) minmax(316px, 1fr)");
-  gridW = 530;
-  card._fit();
-  assert.strictEqual(r.querySelector(".rooms").style.gridTemplateColumns, "repeat(1, minmax(0, 1fr))");
-  // Restore the real (empty) layout: nothing is measured or changed.
-  window.Element.prototype.getBoundingClientRect = saved.rect;
-  if (saved.cw) Object.defineProperty(window.Element.prototype, "clientWidth", saved.cw);
-  if (saved.ow) Object.defineProperty(proto, "offsetWidth", saved.ow);
-  else delete proto.offsetWidth;
-  window.getComputedStyle = saved.gcs;
-  card.setConfig(cfg);
-  card.hass = hass();
-  card._fit();
-  assert.strictEqual(r.querySelector(".rooms").style.gridTemplateColumns, "", "no layout → CSS default (--cols)");
-  assert.strictEqual(r.querySelector(".rooms").getAttribute("style"), "--cols:2");
+  assert.strictEqual(r.querySelector(".rooms").getAttribute("style"), "--cols:2", "two columns, like before");
 
   console.log("ALL AIR-QUALITY TESTS PASSED");
   process.exit(0);

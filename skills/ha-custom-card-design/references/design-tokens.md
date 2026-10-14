@@ -184,10 +184,11 @@ cells) and 8px gaps, never through extra height.
   joined with `&nbsp;· ` so the dot stays with the part before it.
 - **A card's summary goes under its title** (two-line label row, ink-aligned, free to wrap),
   never squeezed onto the right of the title row.
-- **Every value is its own tap target** (more-info of its own sensor); the card or tile as a
-  whole may navigate.
+- **Taps:** when a card or tile links to a dedicated dashboard that has every detail (a room's
+  air quality, Energy), the whole card or tile is one tap target that goes there – no per-value
+  dialogs. Otherwise every value is its own tap target (more-info of its own sensor).
 - **Formats:** durations `45 min`, `3 h`, `1 h 23 min`, `2 d` (a space, short units); readings
-  `21.4°` (no C), `48%`, `612 ppm`, `12 µg/m³`, `1,204 kWh` (`toLocaleString`), times `14:05`
+  `21.4°` (no C), `48%`, `612 ppm`, PM values bare (always µg/m³, the PM label says so), `1,204 kWh` (`toLocaleString`), times `14:05`
   (en-GB); unknown or unavailable `–`; every reading keeps its unit.
 - **Errors:** HA's own message when there is one, else "Couldn't <what you tried>." with the
   friendly name – never an entity id.

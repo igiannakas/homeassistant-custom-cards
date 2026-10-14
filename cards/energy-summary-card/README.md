@@ -18,10 +18,8 @@
   Home Assistant's statistics handle it.
 - Costs use the grid price from **Settings → Energy** unless you set `price`.
   With no price anywhere, the card shows the numbers without costs.
-- **Tap a number** for its own sensor's more-info (Now → the power sensor; Today,
-  Yesterday and the month → the energy sensor). Tap the circle or anywhere else to
-  open the Energy dashboard (or wherever `navigation_path` points). Both work from
-  the keyboard too: the card and each number take Enter / Space.
+- **Tap anywhere** on the card to open the Energy dashboard (or wherever
+  `navigation_path` points), which has every detail. Enter / Space work too.
 - Numbers use your digit grouping ("1,235 W", "1,204 kWh"); values are in the
   primary text colour, costs in the secondary one. The teal circle says the card
   is a tap target.
@@ -45,7 +43,7 @@ navigation_path: /lovelace/energy
 | `power` | Power sensor (W) for "Now". |
 | `energy` | Energy sensor (kWh) with statistics – usually the one in your Energy settings. A daily-resetting meter is fine. |
 | `price` | Optional. A number (price per kWh) or a sensor holding the current price. |
-| `navigation_path` | Where a tap on the card goes. Without it, a tap opens the power sensor. A tap on a number always opens that number's sensor. |
+| `navigation_path` | Where a tap on the card goes. Without it, a tap opens the power sensor. |
 | `icon` | Optional; replaces the lightning icon. |
 
 The currency is your Home Assistant currency (Settings → System → General).

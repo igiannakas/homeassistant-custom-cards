@@ -10,7 +10,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.2.0";
+const AQC_VERSION = "1.3.0";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -44,10 +44,10 @@ const POLLUTANTS = {
   co2: { suffix: "co2", t: [800, null, 1000], label: "CO₂", digits: 0, unit: "ppm", always: true },
   voc: { suffix: "voc_index", t: [150, 250, 400], label: "VOC", digits: 0, always: true },
   // Particles: always shown, each with its size class as the label, on a line of their own.
-  pm1: { suffix: "pm1", t: [12, null, 36], label: "PM1", digits: 1, unit: "µg/m³", always: true, pm: true },
-  pm2_5: { suffix: "pm2_5", t: [12, null, 36], label: "PM2.5", digits: 1, unit: "µg/m³", always: true, pm: true },
-  pm4: { suffix: "pm4", t: [17, null, 51], label: "PM4", digits: 1, unit: "µg/m³", always: true, pm: true },
-  pm10: { suffix: "pm10", t: [17, null, 51], label: "PM10", digits: 1, unit: "µg/m³", always: true, pm: true },
+  pm1: { suffix: "pm1", t: [12, null, 36], label: "PM1", digits: 1, unit: "", always: true, pm: true },
+  pm2_5: { suffix: "pm2_5", t: [12, null, 36], label: "PM2.5", digits: 1, unit: "", always: true, pm: true },
+  pm4: { suffix: "pm4", t: [17, null, 51], label: "PM4", digits: 1, unit: "", always: true, pm: true },
+  pm10: { suffix: "pm10", t: [17, null, 51], label: "PM10", digits: 1, unit: "", always: true, pm: true },
   nox: { suffix: "nox_index", t: [20, 150, 300], label: "NOx", digits: 0 },
 };
 const ORDER = ["co2", "voc", "nox", "pm1", "pm2_5", "pm4", "pm10"];
@@ -105,15 +105,14 @@ const CSS = `
   .s:empty { display: none; }
   /* The summary wraps only between its parts: a room name never splits. */
   .s .p { white-space: nowrap; }
-  /* Room tiles. Every name stays whole: the columns are fitted to the measured names and readings
-     (_fit) – even columns as wide as the widest tile needs while two or more fit (up to the
-     columns option), else two columns each as wide as its own widest, else one. Without a measurement
-     (hidden card) a name wraps rather than being cut. */
+  /* Room tiles: \`columns\` even columns (two by default), on a phone too. A tile is one tap
+     target – it opens the room's air quality dashboard, which has every detail. A name too long
+     for its tile wraps rather than being cut. */
   .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px;
     container: rooms / inline-size; }
   .room { all: unset; box-sizing: border-box; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 11px 10px;
     min-height: 58px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
-    -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
+    -webkit-tap-highlight-color: transparent; transition: background-color 180ms; container-type: inline-size; }
   /* A room that needs a window opened glows red, like a lit room glows on the lights card. */
   .room.alarm { background: ${tint(C.red, 10)}; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
@@ -121,30 +120,28 @@ const CSS = `
   .shape ha-icon { --mdc-icon-size: 24px; transition: color 180ms; }
   .txt { flex: 1; min-width: 0; }
   .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
-  .rooms.measure .nm { white-space: nowrap; width: max-content; }
   .m { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   /* Status, CO₂ and VOC: wrap between readings, never inside one. */
   .row { display: flex; flex-wrap: wrap; column-gap: 7px; }
-  /* Particle sizes as a tidy grid: four across when they fit, else 2×2 (PM1 PM2.5 / PM4 PM10),
-     else one per line – set from the measured readings (_fit); one per line until then. */
-  .row.pm { display: grid; grid-template-columns: max-content; justify-items: start; column-gap: 10px; }
+  /* Particle sizes as a tidy 2×2 (PM1 PM2.5 / PM4 PM10); four across when the tile is wide, one
+     per line when it's very narrow. PM is always µg/m³, so the values go without the unit. */
+  .row.pm { display: grid; grid-template-columns: repeat(2, max-content); justify-items: start; column-gap: 10px; }
+  @container (min-width: 300px) { .row.pm { grid-template-columns: repeat(4, max-content); } }
+  @container (max-width: 175px) { .row, .row.pm { column-gap: 6px; } }
+  @container (max-width: 152px) { .row.pm { grid-template-columns: max-content; } }
   /* Particle size class as a small label in front of each PM value. */
   /* Labels and units are the same size as the values, only lighter. Every reading keeps its unit. */
   .k { margin-right: 3px; color: color-mix(in srgb, var(--secondary-text-color) 70%, transparent); }
   .v.hot .k { color: inherit; }
   /* One type style for the whole block: same size and weight; colour alone marks a problem. */
   .st { white-space: nowrap; }
-  /* Each reading is its own tap target (more-info of its sensor); the rest of the tile navigates. */
-  .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; cursor: pointer; border-radius: 4px; }
+  .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .v small { font-size: inherit; color: color-mix(in srgb, var(--secondary-text-color) 70%, transparent); }
   .v.hot small { color: inherit; }
-  .room:active, .v:active { filter: brightness(.92); }
-  /* Pressing a reading darkens the reading, not the whole tile. */
-  .room:has(.v:active) { filter: none; }
+  .room:active { filter: brightness(.92); }
   .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  /* Phone width: 8px tile sides (the shape–text gap stays 10px). Column count, PM grid and text
-     size are not shrunk to fit – _fit gives a tile the width its names and readings need. */
+  /* Phone width: 8px tile sides (the shape–text gap stays 10px, so names stay at edge + 46). */
   @container rooms (max-width: 400px) { .room { padding: 11px 8px; } }
 `;
 
@@ -303,23 +300,6 @@ class AirQualityCard extends HTMLElement {
     return { columns: "full", rows: "auto" };
   }
 
-  connectedCallback() {
-    this._observe();
-  }
-
-  disconnectedCallback() {
-    this._ro?.disconnect();
-  }
-
-  /* Re-fit the tiles whenever the card's width changes (rotation, sidebar, column count). */
-  _observe() {
-    const grid = this.shadowRoot?.querySelector(".rooms");
-    if (!grid || typeof ResizeObserver === "undefined") return;
-    this._ro = this._ro || new ResizeObserver(() => this._fit());
-    this._ro.disconnect();
-    this._ro.observe(grid);
-  }
-
   _cols() {
     return Math.max(1, Math.min(4, Number(this._config.columns) || 2));
   }
@@ -338,12 +318,7 @@ class AirQualityCard extends HTMLElement {
       </div></ha-card>`;
     root.querySelectorAll(".room").forEach((b) =>
       b.addEventListener("click", (e) => {
-        // A reading opens its own sensor, and only that; anywhere else on the tile opens the room.
-        const v = e.target.closest?.("[data-e]");
-        if (v) {
-          e.stopPropagation();
-          return this._fire("hass-more-info", { entityId: v.dataset.e });
-        }
+        // The whole tile opens the room's dashboard (every detail is there); without one, CO₂.
         const room = c.rooms[Number(b.dataset.i)];
         if (room.navigation_path) {
           history.pushState(null, "", room.navigation_path);
@@ -355,18 +330,11 @@ class AirQualityCard extends HTMLElement {
       }),
     );
     this._built = true;
-    this._refit = true;
-    this._observe();
-    this.ownerDocument.fonts?.ready?.then(() => this._fit());
   }
 
   _render() {
-    // Ink-align the tiles and the label row, then re-fit if a name or reading changed.
-    inkSchedule(this, ".txt, .lt", () => {
-      if (!this._refit) return;
-      this._refit = false;
-      this._fit();
-    });
+    // Ink-align the tiles and the label row.
+    inkSchedule(this, ".txt, .lt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -381,18 +349,15 @@ class AirQualityCard extends HTMLElement {
       if (icon.getAttribute("icon") !== m.tier.icon) icon.setAttribute("icon", m.tier.icon);
       icon.style.color = m.tier.color;
       const nm = el.querySelector(".nm");
-      if (nm.textContent !== m.name) {
-        nm.textContent = m.name;
-        this._refit = true;
-      }
+      if (nm.textContent !== m.name) nm.textContent = m.name;
       el.setAttribute("aria-label", `${m.name}: ${m.tier.word}`);
       // Only touch the DOM when something changed, so a tap is never lost mid-update.
-      // Every reading keeps its unit (ppm, µg/m³) and is a tap target for its own sensor.
+      // CO₂ keeps its unit (ppm); particle sizes are always µg/m³ and go without it.
       const one = (r) => {
         const v = fmt(r.value, r.digits);
         const hot = r.level > 0;
         const head = r.icon ? `<ha-icon icon="${r.icon}"${hot ? ` style="color:${TIERS[r.level].color}"` : ""}></ha-icon>` : `<span class="k">${r.label}</span>`;
-        return `<span class="v${hot ? " hot" : ""}" data-e="${esc(r.id)}" title="${esc(r.label)}"${hot ? ` style="color:${TEXT[r.level]}"` : ""}>${head}${v}${r.unit ? `<small> ${r.unit}</small>` : ""}</span>`;
+        return `<span class="v${hot ? " hot" : ""}" title="${esc(r.label)}"${hot ? ` style="color:${TEXT[r.level]}"` : ""}>${head}${v}${r.unit ? `<small> ${r.unit}</small>` : ""}</span>`;
       };
       const gases = m.readings.filter((r) => !r.pm).map(one).join("");
       const pms = m.readings.filter((r) => r.pm).map(one).join("");
@@ -403,7 +368,6 @@ class AirQualityCard extends HTMLElement {
       if (mEl.dataset.h !== html) {
         mEl.innerHTML = html;
         mEl.dataset.h = html;
-        this._refit = true;
       }
     });
 
@@ -430,60 +394,6 @@ class AirQualityCard extends HTMLElement {
     lab.style.color = lt.color;
   }
 
-  /* Fit the tiles to what they hold, so a room name is never cut (design rule: grids of names are
-     fitted to the names). A tile needs its sides, the 36px circle and its gap, plus the widest of:
-     its name on one line, its widest single reading (readings wrap between each other, never
-     inside one) and its particle sizes two across (the tidy 2×2 – without it a narrow tile would
-     stack every reading on a line of its own). Even columns as wide as the widest tile while two
-     or more fit (at most the columns option); else two columns each as wide as its own widest
-     tile; else one, where only a name wider than the card wraps. Then the particles: four across
-     when they fit, else 2×2, else one per line. Measures natural widths, so the answer doesn't
-     depend on the layout showing; without a layout (hidden card, or no layout engine) nothing is
-     measured or changed. */
-  _fit() {
-    const grid = this.shadowRoot?.querySelector(".rooms");
-    const tiles = grid ? [...grid.querySelectorAll(".room")] : [];
-    const W = grid?.clientWidth;
-    if (!W || !tiles.length) return;
-    const w = (el) => el.getBoundingClientRect().width;
-    const px = (el, prop) => parseFloat(getComputedStyle(el)[prop]) || 0;
-    // Width of a grid of items k across: each column as wide as its widest item, plus the gaps.
-    const across = (ws, k, gap) => {
-      let total = (k - 1) * gap;
-      for (let j = 0; j < k; j++) total += Math.max(0, ...ws.filter((_, i) => i % k === j));
-      return total;
-    };
-    grid.classList.add("measure");
-    const needs = tiles.map((t) => {
-      const side = px(t, "paddingLeft") + px(t, "paddingRight") + t.querySelector(".shape").offsetWidth + px(t, "columnGap");
-      const pm = t.querySelector(".row.pm");
-      const pair = pm && pm.children.length > 1 ? across([...pm.children].map(w), 2, px(pm, "columnGap")) : 0;
-      return Math.ceil(side + Math.max(pair, w(t.querySelector(".nm")), ...[...t.querySelectorAll(".st, .v")].map(w)));
-    });
-    grid.classList.remove("measure");
-    const gap = px(grid, "columnGap");
-    const most = this._cols();
-    const widest = Math.max(...needs);
-    let n = most;
-    while (n > 1 && n * widest + (n - 1) * gap > W + 0.5) n--;
-    let cols = `repeat(${n}, minmax(0, 1fr))`;
-    if (n === 1 && most > 1 && tiles.length > 1) {
-      const col = (k) => Math.max(0, ...needs.filter((_, i) => i % 2 === k));
-      if (col(0) + col(1) + gap <= W + 0.5) cols = `minmax(${col(0)}px, 1fr) minmax(${col(1)}px, 1fr)`;
-    }
-    if (grid.style.gridTemplateColumns !== cols) grid.style.gridTemplateColumns = cols;
-
-    for (const pm of grid.querySelectorAll(".row.pm")) {
-      const ws = [...pm.children].map(w);
-      const avail = pm.clientWidth;
-      const pg = px(pm, "columnGap");
-      // Four readings go 4 or 2×2 (never 3 + 1); other counts try every width down to one.
-      const tries = ws.length === 4 ? [4, 2] : Array.from({ length: Math.max(0, ws.length - 1) }, (_, i) => ws.length - i);
-      const k = tries.find((x) => across(ws, x, pg) <= avail + 0.5) || 1;
-      const v = k > 1 ? `repeat(${k}, max-content)` : "";
-      if (pm.style.gridTemplateColumns !== v) pm.style.gridTemplateColumns = v;
-    }
-  }
 
   _fire(type, detail) {
     this.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
