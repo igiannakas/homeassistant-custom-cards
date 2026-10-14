@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.6.2";
+const RVC_VERSION = "2.6.3";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -1465,7 +1465,8 @@ class RobotVacuumCard extends HTMLElement {
     }
     if (k === "dock") {
       const ends = ["cleaning", "paused"].includes(m.key);
-      const ok = await this._ask("Return to the dock", "mdi:home-import-outline", ends ? C.orange : C.blue,
+      // Blue like every robot action; the warning is in the words (orange means lights / heat).
+      const ok = await this._ask("Return to the dock", "mdi:home-import-outline", C.blue,
         ends ? "This ends the current clean. The robot goes back to the dock." : "The robot goes back to the dock.", "Dock");
       if (ok) this._call("vacuum", "return_to_base", { entity_id: id });
       return;

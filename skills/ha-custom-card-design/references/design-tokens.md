@@ -5,6 +5,28 @@ and Bubble Card without looking foreign. Copy them; don't eyeball them.
 
 ## Colours
 
+**The convention: a colour is a meaning, and each meaning has one colour** – the same on every
+card, built on Home Assistant's own semantic colours (red error, amber warning, green good,
+grey off). Colour a control by what it *means*, never to decorate it:
+
+| Colour | Means | Vacuum cards |
+|---|---|---|
+| Blue | Something running, or the action that starts it (in progress) | Cleaning / Returning, Clean + Resume (filled), rooms picked for the next clean, the Cleaning mode tile, a dock job while it runs, every robot confirmation |
+| Teal | Presence / home / automations that follow you | Auto clean when away (pill and its confirmation, both ways) |
+| Amber | Needs attention soon, but not broken | Paused, mop not attached, a part due soon, battery ≤ 30% |
+| Red | Error / needs you now | Robot or dock error, a tank to empty or refill, a part due now, battery ≤ 15% |
+| Green | Good | Battery above 30% |
+| Orange | Lights, heat, power – never a warning | – (not used on the vacuum cards) |
+| Grey | Off / idle / neutral | Docked, Idle, Dock, the dock jobs at rest, a part that's fine |
+
+- A confirmation takes the colour of the control that opened it (teal pill → teal dialog). A
+  warning goes in the words ("This ends the current clean"), not in an orange button.
+- Literal colours are the one exception: clean water is blue and dirty water brown, because
+  that's what they are.
+- Home Assistant's own default for an active vacuum is teal (`--state-vacuum-active-color`).
+  These cards use blue because blue already means "in progress" here (the printer) and teal
+  means presence. Swap `cleaning`/`returning` to teal only if every card follows.
+
 Use HA's theme variables with fallbacks, so dark mode and custom themes just work:
 
 ```js

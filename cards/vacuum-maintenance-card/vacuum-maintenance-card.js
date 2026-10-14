@@ -13,7 +13,7 @@
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.4.1";
+const VMC_VERSION = "2.4.2";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -153,7 +153,8 @@ const SHEET_CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
   button .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
   button .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
-  button.cta { color: #fff; background: ${C.orange}; }
+  /* Reset is the vacuum's own action, so blue like the robot card's (orange means lights / heat). */
+  button.cta { color: #fff; background: ${C.blue}; }
   button.cta .glyph { background: rgba(255,255,255,.2); }
   button.cta .glyph ha-icon { color: #fff; }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
@@ -463,7 +464,7 @@ class VacuumMaintenanceCard extends HTMLElement {
     else if (it.due) text = `${it.clean ? `Due for cleaning now.` : "Due now."}${every}`;
     else
       text = `${hText(it.left)} left${it.pct !== null ? ` (${it.pct}%)` : ""}${cleans !== null ? `, about ${fmt(cleans)} clean${cleans === 1 ? "" : "s"} at your average of ${fmt(Math.round(avg * 60))} min` : ""}.${every}`;
-    const color = it.due ? C.red : sh.confirm ? C.orange : C.grey;
+    const color = it.due ? C.red : sh.confirm ? C.blue : C.grey;
     const key = [sh.k, sh.confirm, text, !!it.reset].join("|");
     if (key === sh.key) return;
     sh.key = key;
