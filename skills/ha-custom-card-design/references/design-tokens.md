@@ -101,11 +101,13 @@ cells) and 8px gaps, never through extra height.
 | Tier | Height | Radius | Icon | Text | Use for |
 |---|---|---|---|---|---|
 | **Icon circle** (shape) | 36 | 50% | 24px glyph | – | A row's anchor: room, weather, presence, a tappable header icon. |
+| **Call to action** | 44 | 22 | 20px | 14px / 600 / .2px | The card's main job, when the card exists to start it (the robot vacuum's Clean / Auto clean / Pause / Dock). One row per card, at the bottom, equal widths. Padding `0 10px`, gap 8. |
 | **Primary pill** | 36 – the icon circle's height | 18 | 18px | 13px / 600 / .2px | A row's main action, link or state: presence, links to other dashboards, power / plug, watts, card-bottom actions (Power on, Light). Padding `0 14px 0 10px`. |
 | **Secondary pill / chip** | 30 | 15 | 16px | 12px / 500–600 | State chips (Armed), quick toggles in a grid (Door, TV, A/C), message rows (`min-height: 30px`). |
 | Switch | 40×24 in a label row, 44×26 in sheets | 12 / 13 | – | – | On/off of a whole card or group. |
 | Segment | 32 in a 38px track (3px padding) | 9 / 12 | – | 12px | Segmented selectors. |
 | Dialog / sheet row | 56 | 28 | 36px circle | 16px / 600 | Bubble-style pop-up rows. |
+| **Footer action** | 36 (row: 1px rule + 4px padding) | 8 | 16px | 12px / 500, secondary colour, no fill | Secondary actions under the card's main ones (the dock's Empty / Wash mop / Dry mop): full-bleed rule above (`margin: 0 -10px -10px`), equal cells split by short 1px dividers (10px inset top and bottom). |
 
 - A primary pill equals the icon circle, so in a row its top and bottom edges line up with the
   circle exactly. One row uses one pill tier.

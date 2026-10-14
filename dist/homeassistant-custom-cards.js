@@ -3844,7 +3844,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 2.4.0 ===== */
+/* ===== robot-vacuum-card 2.5.0 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3870,7 +3870,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.4.0";
+const RVC_VERSION = "2.5.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -4431,18 +4431,22 @@ const CSS = `
   .chip.now { box-shadow: inset 0 0 0 1.5px ${tint(C.blue, 60)}; }
   .chip[aria-disabled="true"] { cursor: default; }
   .chip[disabled] { opacity: .45; cursor: default; }
-  /* Button rows: equal widths while every label fits; a longer label takes the width it needs
-     (the others share the rest), and only if a row can't hold them all does one wrap. */
+  /* The card's main buttons (Clean, Auto clean, Pause, Dock…) are call-to-action pills: 44px,
+     the biggest control on the card after the mode tile. Equal widths while every label fits; a
+     longer label takes the width it needs, and only if a row can't hold them all does one wrap. */
   .acts { display: flex; flex-wrap: wrap; gap: 8px; }
-  .acts .pill { flex: 1 1 0; min-width: max-content; padding: 0 10px; }
-  /* The dock's jobs are secondary: quiet text buttons (no fill, 30px, 12px, grey) in one row
-     under the main buttons – there when the robot is docked, never competing with Clean. The
-     one that runs is tinted blue. */
-  .jobs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: -4px; }
+  .acts .pill { flex: 1 1 0; min-width: max-content; height: 44px; border-radius: 22px; padding: 0 10px; gap: 8px; font-size: 14px; }
+  .acts .pill ha-icon { --mdc-icon-size: 20px; }
+  /* The dock's jobs are secondary: the card's footer – a full-width rule, then three quiet text
+     buttons (grey 12px, no fill) split by short dividers. There while docked, never competing
+     with Clean. The one that runs is tinted blue. */
+  .jobs { display: flex; flex-wrap: wrap; margin: 0 -10px -10px; padding: 4px 6px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
   .jobs:empty { display: none; }
-  .jobs button { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: max-content; display: inline-flex; align-items: center; justify-content: center;
-    gap: 6px; height: 30px; padding: 0 10px; border-radius: 15px; cursor: pointer; white-space: nowrap;
+  .jobs button { all: unset; box-sizing: border-box; position: relative; flex: 1 1 0; min-width: max-content; display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px; height: 36px; padding: 0 10px; border-radius: 8px; cursor: pointer; white-space: nowrap;
     font-size: 12px; font-weight: 500; letter-spacing: .2px; color: var(--secondary-text-color); -webkit-tap-highlight-color: transparent; }
+  .jobs button + button::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 1px; background: var(--divider-color, rgba(0,0,0,.12)); }
+  .jobs button.run::before, .jobs button.run + button::before { display: none; }
   .jobs ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; }
   .jobs button.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
   .jobs button.run ha-icon { color: ${C.blue}; }

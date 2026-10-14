@@ -19,7 +19,8 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 │ │        Vac & mop · Turbo · Intense mop            │ │
 │ └──────────────────────────────────────────────────┘ │
 │ (   ▶ Clean entire floor    ) (     Auto clean      )  │
-│     🗑 Empty        💧 Wash mop       ✇ Dry mop  docked │
+├──────────────────────────────────────────────────────┤
+│    🗑 Empty     │    💧 Wash mop    │    ✇ Dry mop      │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -54,7 +55,7 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 - **Cleaning mode tile**: what the next clean will use ("Vac & mop · Turbo · Intense mop",
   "· ×2" for two passes) under a blue tune icon, with a chevron – a taller tile, so it never
   reads as one more room. A tap opens the Cleaning mode sheet (below).
-- **Buttons** for the state: Clean entire floor (or Clean N rooms) when idle, Pause and Dock while
+- **Buttons** for the state – the card's main controls, so 44px pills: Clean entire floor (or Clean N rooms) when idle, Pause and Dock while
   cleaning, Resume and Dock when paused, Pause while returning. Dock only shows when the
   robot is away from the dock. The buttons share the row evenly, but a longer label always
   gets the width it needs. Every button asks first except Pause; the clean's
@@ -63,9 +64,10 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
   ends a clean.
 - **Auto clean** (optional, `auto_clean`): a pill that glows teal while your automation
   (or switch) is on; a tap asks, then turns it off or on; a hold opens its more-info.
-- **Dock jobs** (only while the robot is docked): **Empty**, **Wash mop** and **Dry mop** as
-  quiet secondary buttons (grey text, no fill) in one row under the main buttons – the dock's
-  own switches, handy after stopping a clean early with Dock, without competing with Clean.
+- **Dock jobs** (only while the robot is docked): **Empty**, **Wash mop** and **Dry mop** as the
+  card's footer – under a full-width rule, quiet grey text buttons split by short dividers –
+  the dock's own switches, handy after stopping a clean early with Dock, without competing
+  with Clean.
   The one that runs is tinted blue ("Drying"); each asks before it starts, and before it stops.
 
 ## Cleaning mode (the sheet, or `layout: mode`)
