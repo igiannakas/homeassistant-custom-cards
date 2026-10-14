@@ -128,7 +128,11 @@ const devices = {
   // The dock brush: hours, its own reset; the strainer has no reset button here.
   all(".stats button")[4].click();
   assert.strictEqual(stext(), "13 h left, about 22 cleans at your average of 36 min.");
-  eq(btns().map((b) => b.textContent.trim()), ["Reset after replacing", "History", "Close"]);
+  eq(btns().map((b) => b.textContent.trim()), ["Reset after cleaning", "History", "Close"], "the dock brush is cleaned, not replaced");
+  btns()[0].click();
+  assert.strictEqual(stext(), "Only after cleaning it: the dock brush countdown starts again.");
+  btns()[1].click();
+  all(".stats button")[4].click();
   btns()[1].click();
   eq(events.pop(), ["more-info", "sensor.vacuum_cleaner_dock_maintenance_brush_time_left"]);
   all(".stats button")[5].click();
@@ -144,7 +148,10 @@ const devices = {
   assert.strictEqual(q(".s").textContent, "Sensors: due now");
   q(".s").click();
   assert.strictEqual(sheet().shadowRoot.querySelector(".title").textContent, "Sensors");
-  assert.strictEqual(stext(), "Due now. Replace every 30 h of cleaning.");
+  assert.strictEqual(stext(), "Due for cleaning now. Clean them every 30 h of use.");
+  eq(btns().map((b) => b.textContent.trim()), ["Reset after cleaning", "History", "Close"]);
+  btns()[0].click();
+  assert.strictEqual(stext(), "Only after cleaning them: the sensors countdown starts again from 30 h.");
   sheet().shadowRoot.querySelector(".backdrop").click();
   assert(!sheet(), "backdrop closes");
 

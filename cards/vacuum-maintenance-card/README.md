@@ -34,7 +34,9 @@
 - **Tap a number** for a sheet: hours left, the %, about how many cleans that is at your
   average clean (total cleaning time ÷ cleans), and the part's life. **Reset after replacing**
   asks first ("Reset main brush? Only after fitting a new one…") and then presses the
-  integration's reset button. **History** opens the sensor's more-info.
+  integration's reset button. The sensors, the dock brush and the dock strainer are cleaned,
+  not replaced, so theirs reads **Reset after cleaning** ("Only after cleaning them…").
+  **History** opens the sensor's more-info.
 - **Auto-empty**: the dock's auto-empty mode as a full-width tile under the tanks, its icon and
   text on the same lines as theirs. Tap it for its more-info.
 - Text is never cut off: a label too long for its place wraps.

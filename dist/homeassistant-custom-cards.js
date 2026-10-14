@@ -6407,7 +6407,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== vacuum-maintenance-card 2.3.0 ===== */
+/* ===== vacuum-maintenance-card 2.4.0 ===== */
 (() => {
 /*
  * Vacuum maintenance card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -6418,12 +6418,13 @@ registerRoomLightsCard();
  * sensors as the share of life left (hours when the life isn't known, e.g. the dock's brush
  * and strainer), what is due next, a quiet line for the dock (water tanks, auto-empty mode)
  * (the dock's own jobs – Empty, Wash mop, Dry mop – are on the robot vacuum card). Tap a number for the details
- * (hours left, about how many cleans that is at your average) and Reset after replacing,
+ * (hours left, about how many cleans that is at your average) and Reset after replacing (or
+ * after cleaning, for the sensors, the dock brush and the strainer),
  * which asks first. Entities are found from the vacuum's device and its dock device.
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.3.0";
+const VMC_VERSION = "2.4.0";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -6454,14 +6455,16 @@ function hours(s) {
 }
 const hText = (h) => (h === null ? "–" : h > 0 && h < 1 ? "under 1 h" : `${fmt(Math.round(h))} h`);
 
-/* Consumables. Life in hours of cleaning (Roborock's defaults); the dock's are unknown. */
+/* Consumables. Life in hours of cleaning (Roborock's defaults); the dock's are unknown. The
+   brushes and the filter are replaced; the sensors, the dock brush and the strainer are cleaned
+   (clean: true), so their sheet says so ("Reset after cleaning"). */
 const ITEMS = [
   { k: "main_brush", name: "Main brush", icon: "mdi:brush-variant", life: 300, tk: ["main_brush_time_left"], sfx: ["_main_brush_time_left"], reset: ["_reset_main_brush_consumable"] },
   { k: "side_brush", name: "Side brush", icon: "mdi:broom", life: 200, tk: ["side_brush_time_left"], sfx: ["_side_brush_time_left"], reset: ["_reset_side_brush_consumable"] },
   { k: "filter", name: "Filter", icon: "mdi:air-filter", life: 150, tk: ["filter_time_left"], sfx: ["_filter_time_left"], reset: ["_reset_air_filter_consumable", "_reset_filter_consumable"] },
-  { k: "sensor", name: "Sensors", icon: "mdi:eye-outline", life: 30, tk: ["sensor_time_left"], sfx: ["_sensor_time_left"], reset: ["_reset_sensor_consumable"] },
-  { k: "dock_brush", name: "Dock brush", icon: "mdi:brush", life: null, tk: ["cleaning_brush_time_left", "dock_maintenance_brush_time_left"], sfx: ["_maintenance_brush_time_left", "_cleaning_brush_time_left"], reset: ["_reset_cleaning_brush_consumable"] },
-  { k: "strainer", name: "Dock strainer", icon: "mdi:filter-outline", life: null, tk: ["strainer_time_left", "dock_strainer_time_left"], sfx: ["_strainer_time_left"], reset: ["_reset_strainer_consumable"] },
+  { k: "sensor", name: "Sensors", icon: "mdi:eye-outline", life: 30, tk: ["sensor_time_left"], sfx: ["_sensor_time_left"], reset: ["_reset_sensor_consumable"], clean: true, them: true },
+  { k: "dock_brush", name: "Dock brush", icon: "mdi:brush", life: null, tk: ["cleaning_brush_time_left", "dock_maintenance_brush_time_left"], sfx: ["_maintenance_brush_time_left", "_cleaning_brush_time_left"], reset: ["_reset_cleaning_brush_consumable"], clean: true },
+  { k: "strainer", name: "Dock strainer", icon: "mdi:filter-outline", life: null, tk: ["strainer_time_left", "dock_strainer_time_left"], sfx: ["_strainer_time_left"], reset: ["_reset_strainer_consumable"], clean: true },
 ];
 const OTHER = {
   total_time: { domain: "sensor", tk: ["total_cleaning_time"], sfx: ["_total_cleaning_time"] },
@@ -6860,12 +6863,16 @@ class VacuumMaintenanceCard extends HTMLElement {
     if (!it) return this._closeSheet();
     const avg = this._m.avgH;
     const cleans = it.left !== null && avg ? Math.round(it.left / avg) : null;
+    // Replaced parts (brushes, filter) vs cleaned ones (sensors, dock brush, strainer).
+    const it_ = it.them ? "them" : "it";
+    const every = !it.life ? "" : it.clean ? ` Clean ${it_} every ${fmt(it.life)} h of use.` : ` Replace every ${fmt(it.life)} h of cleaning.`;
     let text;
-    if (sh.confirm) text = `Only after fitting a new one: the ${it.name.toLowerCase()} countdown starts again${it.life ? ` from ${fmt(it.life)} h` : ""}.`;
+    if (sh.confirm)
+      text = `Only after ${it.clean ? `cleaning ${it_}` : "fitting a new one"}: the ${it.name.toLowerCase()} countdown starts again${it.life ? ` from ${fmt(it.life)} h` : ""}.`;
     else if (it.left === null) text = "Not reported right now.";
-    else if (it.due) text = `Due now.${it.life ? ` Replace every ${fmt(it.life)} h of cleaning.` : ""}`;
+    else if (it.due) text = `${it.clean ? `Due for cleaning now.` : "Due now."}${every}`;
     else
-      text = `${hText(it.left)} left${it.pct !== null ? ` (${it.pct}%)` : ""}${cleans !== null ? `, about ${fmt(cleans)} clean${cleans === 1 ? "" : "s"} at your average of ${fmt(Math.round(avg * 60))} min` : ""}.${it.life ? ` Replace every ${fmt(it.life)} h of cleaning.` : ""}`;
+      text = `${hText(it.left)} left${it.pct !== null ? ` (${it.pct}%)` : ""}${cleans !== null ? `, about ${fmt(cleans)} clean${cleans === 1 ? "" : "s"} at your average of ${fmt(Math.round(avg * 60))} min` : ""}.${every}`;
     const color = it.due ? C.red : sh.confirm ? C.orange : C.grey;
     const key = [sh.k, sh.confirm, text, !!it.reset].join("|");
     if (key === sh.key) return;
@@ -6873,7 +6880,7 @@ class VacuumMaintenanceCard extends HTMLElement {
     const glyph = (icon) => `<span class="glyph"><ha-icon icon="${icon}"></ha-icon></span>`;
     const buttons = sh.confirm
       ? `<button class="cta" data-a="confirm">${glyph("mdi:restore")}Reset</button><button data-a="close">${glyph("mdi:close")}Cancel</button>`
-      : `${it.reset ? `<button class="cta" data-a="reset">${glyph("mdi:restore")}Reset after replacing</button>` : ""}
+      : `${it.reset ? `<button class="cta" data-a="reset">${glyph("mdi:restore")}Reset after ${it.clean ? "cleaning" : "replacing"}</button>` : ""}
          <button data-a="history">${glyph("mdi:chart-line")}History</button><button data-a="close">${glyph("mdi:close")}Close</button>`;
     sh.root.querySelector(".dialog").setAttribute("aria-label", it.name);
     sh.root.querySelector(".dialog").innerHTML = `<div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(it.icon)}" style="color:${color}"></ha-icon></div>
