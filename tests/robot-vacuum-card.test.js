@@ -139,7 +139,8 @@ const cfg = {
     await tick();
     assert(dlg(), `${title} asks first`);
     if (title) assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, title);
-    const msg = dlg().shadowRoot.querySelector(".secondary").textContent;
+    const msg = dlg().shadowRoot.querySelector(".text").textContent;
+    assert(!/Vacuum cleaner/.test(dlg().shadowRoot.textContent.replace(msg, "")), "no device name in the pop-up");
     dlg().shadowRoot.querySelector(".confirm").click();
     await tick();
     return msg;

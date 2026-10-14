@@ -3844,7 +3844,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 2.6.0 ===== */
+/* ===== robot-vacuum-card 2.6.1 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3870,7 +3870,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.6.0";
+const RVC_VERSION = "2.6.1";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -4236,10 +4236,10 @@ const DIALOG_CSS = `
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
   .title { font-size: 20px; line-height: 26px; font-weight: 600; }
-  .body { margin-top: 20px; }
-  .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
-  .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; color: var(--secondary-text-color); }
-  .buttons { margin-top: 20px; display: grid; gap: 8px; }
+  /* The text sits under the title, starting on its line (8 + 42px glyph + 6px gap). No device
+     name: the dialog opens from the vacuum's own card. */
+  .text { margin: 12px 0 0 56px; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
+  .buttons { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); display: grid; gap: 8px; }
   button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
     border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
@@ -4254,7 +4254,7 @@ const DIALOG_CSS = `
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
 
-function confirmDialog({ title, icon, color, primary, secondary, confirmLabel }) {
+function confirmDialog({ title, icon, color, text, confirmLabel }) {
   return new Promise((resolve) => {
     const host = document.createElement("rvc-confirm-dialog");
     const root = host.attachShadow({ mode: "open" });
@@ -4262,8 +4262,7 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
       <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
         <div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(icon)}" style="color:${color}"></ha-icon></div>
           <div class="title">${esc(title)}</div></div>
-        <div class="row body"><div class="glyph"><ha-icon icon="mdi:robot-vacuum" style="color:${color}"></ha-icon></div>
-          <div><div class="primary">${esc(primary)}</div><div class="secondary">${esc(secondary)}</div></div></div>
+        <div class="text">${esc(text)}</div>
         <div class="buttons">
           <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
           <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
@@ -4348,15 +4347,15 @@ const JOBS = [
 const DOCK_CONFIRM = {
   empty_sw: {
     start: { title: "Empty the bin", label: "Empty", text: "The dock empties the robot's dust bin into its bag now. It's loud for about half a minute." },
-    stop: { title: "Stop emptying", label: "Stop emptying", text: "The dock stops emptying the bin now." },
+    stop: { title: "Stop emptying", label: "Stop emptying", text: "The dock stops now, so the robot's bin may not be fully empty." },
   },
   wash_sw: {
     start: { title: "Wash the mop", label: "Wash mop", text: "The dock washes the mop now, with clean water from its tank. The dirty water goes to the dirty tank." },
-    stop: { title: "Stop washing", label: "Stop washing", text: "The dock stops washing the mop now." },
+    stop: { title: "Stop washing", label: "Stop washing", text: "The dock stops now, so the mop may not be fully clean." },
   },
   dry_sw: {
     start: { title: "Dry the mop", label: "Dry mop", text: "The dock dries the mop now, for the drying time set in the Roborock app." },
-    stop: { title: "Stop drying", label: "Stop drying", text: "The dock stops drying the mop now, so it may stay damp." },
+    stop: { title: "Stop drying", label: "Stop drying", text: "The dock stops now, so the mop may stay damp." },
   },
 };
 
@@ -5267,8 +5266,8 @@ class RobotVacuumCard extends HTMLElement {
     ].filter(Boolean).join(" · ");
   }
 
-  _ask(title, icon, color, secondary, confirmLabel) {
-    return confirmDialog({ title, icon, color, primary: this._m?.name || "Vacuum", secondary, confirmLabel });
+  _ask(title, icon, color, text, confirmLabel) {
+    return confirmDialog({ title, icon, color, text, confirmLabel });
   }
 
   async _switchFloor(name) {
@@ -6414,7 +6413,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== vacuum-maintenance-card 2.4.0 ===== */
+/* ===== vacuum-maintenance-card 2.4.1 ===== */
 (() => {
 /*
  * Vacuum maintenance card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -6431,7 +6430,7 @@ registerRoomLightsCard();
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.4.0";
+const VMC_VERSION = "2.4.1";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -6563,7 +6562,8 @@ const SHEET_CSS = `
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
   .title { font-size: 20px; line-height: 26px; font-weight: 600; }
-  .text { margin: 16px 8px 0; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
+  /* The text sits under the title, starting on its line (8 + 42px glyph + 6px gap). */
+  .text { margin: 12px 0 0 56px; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
   .buttons { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); display: grid; gap: 8px; }
   button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
     border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
@@ -6875,7 +6875,7 @@ class VacuumMaintenanceCard extends HTMLElement {
     const every = !it.life ? "" : it.clean ? ` Clean ${it_} every ${fmt(it.life)} h of use.` : ` Replace every ${fmt(it.life)} h of cleaning.`;
     let text;
     if (sh.confirm)
-      text = `Only after ${it.clean ? `cleaning ${it_}` : "fitting a new one"}: the ${it.name.toLowerCase()} countdown starts again${it.life ? ` from ${fmt(it.life)} h` : ""}.`;
+      text = `Only after ${it.clean ? `cleaning ${it_}` : "fitting a new one"}: the countdown starts again${it.life ? ` from ${fmt(it.life)} h` : ""}.`;
     else if (it.left === null) text = "Not reported right now.";
     else if (it.due) text = `${it.clean ? `Due for cleaning now.` : "Due now."}${every}`;
     else

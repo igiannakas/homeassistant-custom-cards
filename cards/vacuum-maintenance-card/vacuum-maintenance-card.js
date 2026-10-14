@@ -13,7 +13,7 @@
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.4.0";
+const VMC_VERSION = "2.4.1";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -145,7 +145,8 @@ const SHEET_CSS = `
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
   .title { font-size: 20px; line-height: 26px; font-weight: 600; }
-  .text { margin: 16px 8px 0; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
+  /* The text sits under the title, starting on its line (8 + 42px glyph + 6px gap). */
+  .text { margin: 12px 0 0 56px; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
   .buttons { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); display: grid; gap: 8px; }
   button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
     border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
@@ -457,7 +458,7 @@ class VacuumMaintenanceCard extends HTMLElement {
     const every = !it.life ? "" : it.clean ? ` Clean ${it_} every ${fmt(it.life)} h of use.` : ` Replace every ${fmt(it.life)} h of cleaning.`;
     let text;
     if (sh.confirm)
-      text = `Only after ${it.clean ? `cleaning ${it_}` : "fitting a new one"}: the ${it.name.toLowerCase()} countdown starts again${it.life ? ` from ${fmt(it.life)} h` : ""}.`;
+      text = `Only after ${it.clean ? `cleaning ${it_}` : "fitting a new one"}: the countdown starts again${it.life ? ` from ${fmt(it.life)} h` : ""}.`;
     else if (it.left === null) text = "Not reported right now.";
     else if (it.due) text = `${it.clean ? `Due for cleaning now.` : "Due now."}${every}`;
     else

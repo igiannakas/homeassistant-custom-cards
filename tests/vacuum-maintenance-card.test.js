@@ -112,7 +112,7 @@ const devices = {
   eq(btns().map((b) => b.textContent.trim()), ["Reset after replacing", "History", "Close"]);
   btns()[0].click();
   assert.strictEqual(sheet().shadowRoot.querySelector(".title").textContent, "Reset main brush?");
-  assert.strictEqual(stext(), "Only after fitting a new one: the main brush countdown starts again from 300 h.");
+  assert.strictEqual(stext(), "Only after fitting a new one: the countdown starts again from 300 h.");
   eq(btns().map((b) => b.textContent.trim()), ["Reset", "Cancel"]);
   assert.strictEqual(calls.length, 0, "nothing pressed before the confirmation");
   btns()[1].click();
@@ -130,7 +130,7 @@ const devices = {
   assert.strictEqual(stext(), "13 h left, about 22 cleans at your average of 36 min.");
   eq(btns().map((b) => b.textContent.trim()), ["Reset after cleaning", "History", "Close"], "the dock brush is cleaned, not replaced");
   btns()[0].click();
-  assert.strictEqual(stext(), "Only after cleaning it: the dock brush countdown starts again.");
+  assert.strictEqual(stext(), "Only after cleaning it: the countdown starts again.");
   btns()[1].click();
   all(".stats button")[4].click();
   btns()[1].click();
@@ -151,7 +151,7 @@ const devices = {
   assert.strictEqual(stext(), "Due for cleaning now. Clean them every 30 h of use.");
   eq(btns().map((b) => b.textContent.trim()), ["Reset after cleaning", "History", "Close"]);
   btns()[0].click();
-  assert.strictEqual(stext(), "Only after cleaning them: the sensors countdown starts again from 30 h.");
+  assert.strictEqual(stext(), "Only after cleaning them: the countdown starts again from 30 h.");
   sheet().shadowRoot.querySelector(".backdrop").click();
   assert(!sheet(), "backdrop closes");
 
