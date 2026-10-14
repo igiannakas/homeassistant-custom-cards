@@ -39,6 +39,7 @@ Most of them generalise to any dashboard.
 - Benign bulk actions are immediate.
 - Anything that moves hardware or cuts power asks first. Leave out what the user doesn't want on the card at all.
 - Show one control per job: the plug pill only while on, the Power on button only while off. Powering hardware up confirms too.
+- The printer keeps both ways off while on: the plug pill (cuts the power at once, after asking) and Power off (safe shutdown first). They are different jobs; don't merge them.
 - A reading follows the circuit it measures, not the switch on the card (`power_sensor_switch`). While the machine is off and the strip is on, show the watts on their own: no toggle (the one-control rule still holds) and no glow. Never add a control for an upstream plug the user didn't ask to switch.
 - A dashboard monitors a machine; it does not operate it. Offer power and convenience (light) only, and ask which other actions go when removing one.
 - Confirmation belongs in the card (`confirmation` on the action, templated text), not in a pop-up card on every view. Fewer dependencies, one dialog look.
