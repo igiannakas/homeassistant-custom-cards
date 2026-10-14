@@ -2,7 +2,8 @@
  * Energy summary card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * One compact row: power now, and energy used today, yesterday and this month
- * so far, each with what it costs. Tap it for the full Energy dashboard.
+ * so far, each with what it costs. Tap a number for its sensor; tap anywhere else
+ * for the full Energy dashboard.
  * Totals come from Home Assistant's long-term statistics, so they match the
  * Energy dashboard; today and the month also add what the meter has counted
  * since the latest 5-minute statistics, so they tick live instead of lagging.
@@ -10,27 +11,30 @@
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.1.2";
+const ESC_VERSION = "1.2.0";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
+// Teal = you can tap this: the circle is the card's tap target (the user's reference teal).
 const TEAL = "var(--teal-color, #009688)";
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
+// Numbers with the user's digit grouping: 1,235 · 12.3 · 1,204.
+const fmt = (n, d, locale) => n.toLocaleString(locale || "en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
 
-/* 616 W · 12.4 kW */
-function power(w) {
+/* 616 W · 1,235 W · 12.3 kW */
+function power(w, locale) {
   if (w === null) return ["–", "W"];
-  return Math.abs(w) >= 10000 ? [(w / 1000).toFixed(1), "kW"] : [String(Math.round(w)), "W"];
+  return Math.abs(w) >= 10000 ? [fmt(w / 1000, 1, locale), "kW"] : [fmt(Math.round(w) || 0, 0, locale), "W"];
 }
 
-/* 7.99 · 86.6 · 1204 kWh – about three significant figures. */
-function energy(kwh) {
+/* 7.99 · 86.6 · 1,204 kWh – about three significant figures. */
+function energy(kwh, locale) {
   if (kwh === null) return ["–", "kWh"];
   const a = Math.abs(kwh);
-  return [kwh.toFixed(a < 10 ? 2 : a < 100 ? 1 : 0), "kWh"];
+  return [fmt(kwh, a < 10 ? 2 : a < 100 ? 1 : 0, locale), "kWh"];
 }
 
 /* The sensor's state in kWh, whatever energy unit it reports. */
@@ -98,30 +102,39 @@ const CSS = `
   ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  /* Spacing follows Mushroom: content starts 10px from the card edge. */
-  .row { display: flex; align-items: center; gap: 6px; padding: 12px 10px; }
+  /* Spacing follows Mushroom: content starts 10px from the card edge, the first text at edge + 46
+     (36px circle + 10px gap), on every screen. */
+  .row { display: flex; align-items: center; gap: 10px; padding: 12px 10px; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .shape ha-icon { --mdc-icon-size: 24px; } /* same as Mushroom / tile card icons */
-  .stats { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .stat { min-width: 0; padding: 0 6px 0 10px; border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
-  .stat:first-child { border-left: none; }
-  .k { font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: .02em; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* Text matches Mushroom / tile cards: values 14px medium, costs 12px regular, same colour. */
-  .v { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); white-space: nowrap; }
+  /* The numbers are never cut: equal widths while all four fit, a longer one takes what it needs,
+     and only when a row can't hold them does one move to a second row. Each stat has a divider
+     and 10px (--pl) before its text; the block is pulled left by that much, and the 1px clip on
+     its left edge hides the divider of whichever stat starts a row – so the first text of every
+     row lines up at edge + 46. */
+  .stats { --pl: 10px; flex: 1; min-width: 0; display: flex; flex-wrap: wrap; row-gap: 8px;
+    margin-left: calc(-1px - var(--pl)); clip-path: inset(-12px -12px -12px 1px); }
+  .stat { box-sizing: border-box; flex: 1 1 0; min-width: max-content; padding: 0 6px 0 var(--pl);
+    border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
+  /* Captions under the numbers: 11px. */
+  .k { font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: .02em; color: var(--secondary-text-color); }
+  /* Text matches Mushroom / tile cards: values 14px medium in the primary colour (no colour on
+     values), costs 12px regular in the secondary colour. Every number is its own tap target. */
+  .v { all: unset; box-sizing: border-box; display: block; width: fit-content; font-size: 14px; line-height: 20px; font-weight: 500;
+    letter-spacing: .1px; color: var(--primary-text-color); white-space: nowrap; cursor: pointer; border-radius: 4px;
+    -webkit-tap-highlight-color: transparent; }
   .v small { font-size: 11px; font-weight: 400; color: var(--secondary-text-color); margin-left: 2px; }
-  .now .v { color: ${TEAL}; }
-  .c { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .c:empty::before { content: "\\00a0"; }
-  ha-card:active { filter: brightness(.96); }
+  ha-card:active, .v:active { filter: brightness(.92); }
+  /* Pressing a number darkens only the number: the tap goes to it, not to the card. */
+  ha-card:has(.v:active) { filter: none; }
   ha-card:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  /* Phone width: the icon gives its space to the numbers. */
+  .v:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  /* Phone width: a little less air between the numbers, so all four still fit on one row more often. */
   @container (max-width: 400px) {
-    .shape { display: none; }
-    .row { padding: 12px 8px; }
-    .stat { padding: 0 4px 0 8px; }
-    .stat:first-child { padding-left: 2px; }
-    .v small { font-size: 10px; margin-left: 1px; }
+    .stats { --pl: 8px; }
+    .stat { padding-right: 4px; }
   }
 `;
 
@@ -336,15 +349,26 @@ class EnergySummaryCard extends HTMLElement {
 
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
-    const stat = (key) => `<div class="stat ${key}"><div class="k"></div><div class="v"></div><div class="c"></div></div>`;
+    // Each number is a button for its own sensor: Now → the power sensor, the rest → the energy sensor.
+    const sensor = (key) => (key === "now" ? this._config.power : this._config.energy) || "";
+    const stat = (key) =>
+      `<div class="stat ${key}"><div class="k"></div><button class="v" data-e="${esc(sensor(key))}"></button><div class="c"></div></div>`;
     root.innerHTML = `<style>${CSS}</style>
       <ha-card role="button" tabindex="0"><div class="row">
         <div class="shape" style="background:${tint(TEAL, 20)}"><ha-icon style="color:${TEAL}"></ha-icon></div>
         <div class="stats">${["now", "today", "yesterday", "month"].map(stat).join("")}</div>
       </div></ha-card>`;
     const card = root.querySelector("ha-card");
+    // A number opens its own sensor and stops there; the circle and everywhere else navigate.
+    root.querySelectorAll(".v").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._more(b.dataset.e);
+      }),
+    );
     card.addEventListener("click", () => this._tap());
     card.addEventListener("keydown", (e) => {
+      if (e.target !== card) return; // a focused number handles its own Enter / Space (it's a button)
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         this._tap();
@@ -371,10 +395,10 @@ class EnergySummaryCard extends HTMLElement {
     const today = live(this._totals.today);
     const monthSoFar = live(this._totals.month);
     const rows = {
-      now: ["Now", power(w), w === null || price === null ? "" : perHour((w / 1000) * price, currency, locale)],
-      today: ["Today", energy(today), cost(today)],
-      yesterday: ["Yesterday", energy(this._totals.yesterday), cost(this._totals.yesterday)],
-      month: [month.charAt(0).toUpperCase() + month.slice(1), energy(monthSoFar), cost(monthSoFar)],
+      now: ["Now", power(w, locale), w === null || price === null ? "" : perHour((w / 1000) * price, currency, locale)],
+      today: ["Today", energy(today, locale), cost(today)],
+      yesterday: ["Yesterday", energy(this._totals.yesterday, locale), cost(this._totals.yesterday)],
+      month: [month.charAt(0).toUpperCase() + month.slice(1), energy(monthSoFar, locale), cost(monthSoFar)],
     };
     root.querySelector(".shape ha-icon").setAttribute("icon", this._config.icon || "mdi:home-lightning-bolt");
     for (const [key, [label, [value, unit], money_]] of Object.entries(rows)) {
@@ -396,9 +420,11 @@ class EnergySummaryCard extends HTMLElement {
     if (path) {
       history.pushState(null, "", path);
       this._fire("location-changed", { replace: false });
-    } else if (this._config.power || this._config.energy) {
-      this._fire("hass-more-info", { entityId: this._config.power || this._config.energy });
-    }
+    } else this._more(this._config.power || this._config.energy);
+  }
+
+  _more(entityId) {
+    if (entityId) this._fire("hass-more-info", { entityId });
   }
 
   _fire(type, detail) {

@@ -8,12 +8,15 @@
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.2.4";
+const HSC_VERSION = "1.3.0";
 const HSC_TAG = "home-status-card";
 
+// One meaning per colour (design tokens → Colours): green = someone home, orange = the step
+// before red (seen within the hour), red = a call for attention (empty, door open, armed,
+// heating), amber = early warning, blue = cooling, grey = normal.
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
-  teal: "var(--teal-color, #009688)",
+  green: "var(--green-color, #4caf50)",
   orange: "var(--orange-color, #ff9800)",
   amber: "var(--amber-color, #ffc107)",
   red: "var(--red-color, #f44336)",
@@ -22,15 +25,17 @@ const C = {
 const RECENT_S = 3600;
 
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
+// Readable coloured text – mixed toward the text colour, never the raw colour on white.
+const tx = (c, p = 70) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-color))`;
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const num = (v) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v));
 const unavailable = (s) => !s || s.state === "unavailable" || s.state === "unknown";
 
 function when(date) {
-  // Same wording as the old chip: "today at 16:09", "yesterday at 09:12", "on Oct 03 at 18:40".
+  // Same wording as the old chip: "today at 16:09", "yesterday at 09:12", "on 03 Oct at 18:40".
   const now = new Date();
-  const hm = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const hm = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
   const sameDay = (a, b) => a.toDateString() === b.toDateString();
   const y = new Date(now);
   y.setDate(now.getDate() - 1);
@@ -56,7 +61,7 @@ function model(hass, cfg) {
   const lastRoom = (st(p.last_room)?.state || "").trim();
   let presence;
   if (occupied && !unavailable(st(p.occupied)))
-    presence = { color: C.teal, label: "Occupied", detail: occupied, icon: "mdi:home-account" };
+    presence = { color: C.green, label: "Occupied", detail: occupied, icon: "mdi:home-account" };
   else {
     // As before: orange if someone was seen within the hour, red otherwise.
     const recent = lastSeen && (Date.now() - lastSeen.getTime()) / 1000 < RECENT_S;
@@ -79,7 +84,8 @@ function model(hass, cfg) {
     tiles.push({
       key: "door",
       icon: open ? "mdi:door-open" : "mdi:door-closed",
-      label: unavailable(s) ? "Door ?" : open ? "Open" : "Closed",
+      // Each label names its object ("Door open", like "TV on"); unknown is "–".
+      label: unavailable(s) ? "Door –" : open ? "Door open" : "Door closed",
       color: open ? C.red : null,
       action: { action: "more-info", entity: cfg.door },
       title: "Door",
@@ -92,7 +98,7 @@ function model(hass, cfg) {
     tiles.push({
       key: "tv",
       icon: on ? "mdi:television" : "mdi:television-off",
-      label: unavailable(s) ? "TV ?" : on ? "TV on" : "TV off",
+      label: unavailable(s) ? "TV –" : on ? "TV on" : "TV off",
       color: on ? C.amber : null,
       action: tv.navigation_path ? { action: "navigate", path: tv.navigation_path } : { action: "more-info", entity: tv.entity },
       title: "TV",
@@ -111,7 +117,7 @@ function model(hass, cfg) {
       color = C.red;
       icon = "mdi:fire";
     }
-    // Short enough to fit a phone-width button: "25.1° · Cool".
+    // Short, so the three buttons share a row on a phone: "25.1° · Cool".
     const short = /off/i.test(mode) ? "Off" : /cool/i.test(mode) ? "Cool" : /heat/i.test(mode) ? "Heat"
       : mode.replace(/^AC\s*/i, "") || "–";
     tiles.push({
@@ -131,7 +137,7 @@ function model(hass, cfg) {
 }
 
 /* ------------------------------------------------------------------------ */
-/* Confirmation dialog – same look as the Tado X room card's Boost dialog    */
+/* Confirmation dialog – same look as the other cards' dialogs              */
 /* ------------------------------------------------------------------------ */
 
 const DIALOG_CSS = `
@@ -152,10 +158,10 @@ const DIALOG_CSS = `
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
   .title { font-size: 20px; line-height: 26px; font-weight: 600; }
-  .body { margin-top: 20px; }
-  .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
-  .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; }
-  .buttons { margin-top: 20px; display: grid; gap: 8px; }
+  /* The text sits under the title, starting on its line (8 + 42px glyph + 6px gap). No home
+     name: the dialog opens from the home's own card. */
+  .text { margin: 12px 0 0 56px; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
+  .buttons { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); display: grid; gap: 8px; }
   button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
     border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
@@ -170,7 +176,7 @@ const DIALOG_CSS = `
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
 
-function confirmDialog({ title, icon, color, bodyIcon, primary, secondary, confirmLabel }) {
+function confirmDialog({ title, icon, color, text, confirmLabel }) {
   return new Promise((resolve) => {
     const host = document.createElement("hsc-confirm-dialog");
     const root = host.attachShadow({ mode: "open" });
@@ -178,8 +184,7 @@ function confirmDialog({ title, icon, color, bodyIcon, primary, secondary, confi
       <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
         <div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(icon)}" style="color:${color}"></ha-icon></div>
           <div class="title">${esc(title)}</div></div>
-        <div class="row body"><div class="glyph"><ha-icon icon="${esc(bodyIcon)}" style="color:${color}"></ha-icon></div>
-          <div><div class="primary">${esc(primary)}</div><div class="secondary">${esc(secondary)}</div></div></div>
+        <div class="text">${esc(text)}</div>
         <div class="buttons">
           <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
           <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
@@ -223,31 +228,38 @@ const CSS = `
     align-items: center; justify-content: center; transition: background-color 180ms; }
   /* Same size as Mushroom / tile card icons: 36 px circle, 24 px icon. */
   .shape ha-icon { --mdc-icon-size: 24px; transition: color 180ms; }
-  /* Text matches Mushroom / tile cards: name 14px medium, detail 12px regular, same colour. */
-  .name { min-width: 0; font-size: 14px; line-height: 18px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .shape.who:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  /* Text matches Mushroom / tile cards: name 14px medium, detail 12px regular. Nothing is cut off:
+     "Home · Occupied" breaks only before the state word (the dot stays with the name), and the
+     detail line wraps in full. */
+  .name { min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+    overflow-wrap: break-word; }
   .name .state { font-weight: 400; color: var(--secondary-text-color); }
-  .detail { min-width: 0; font-size: 12px; line-height: 15px; color: var(--primary-text-color);
-    letter-spacing: .4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  /* Secondary pill (30px, like the status buttons below): a state chip, not the card's main action. */
-  .alarm { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 5px; height: 30px;
-    padding: 0 10px 0 7px; border-radius: 15px; cursor: pointer; font-size: 12px; font-weight: 600;
+  .name .w { white-space: nowrap; }
+  .detail { min-width: 0; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color);
+    overflow-wrap: break-word; }
+  /* Secondary pill (30px, like the status buttons below): a state chip, not the card's main action.
+     Its word always shows: on a narrow card the text beside it wraps instead. */
+  .alarm { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 5px; min-height: 30px;
+    padding: 0 10px 0 7px; border-radius: 15px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
     transition: background-color 180ms, color 180ms; -webkit-tap-highlight-color: transparent; }
-  .alarm ha-icon { --mdc-icon-size: 16px; color: var(--grey-color, #9e9e9e); }
-  .alarm.on { background: color-mix(in srgb, var(--red-color, #f44336) 20%, transparent); color: var(--red-color, #f44336); }
-  .alarm.on ha-icon { color: var(--red-color, #f44336); }
+  .alarm ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; }
+  /* Armed: the "on" pill of every card – red tint 18%, the word mixed 70% toward the text colour. */
+  .alarm.on { background: ${tint(C.red, 18)}; color: ${tx(C.red, 70)}; }
+  .alarm.on ha-icon { color: ${C.red}; }
   /* Press feedback without moving the button: a scale-down shrinks the target under the finger
      and taps near the edge would be lost. */
-  .alarm:active, .tile:active, .msg:active, .shape.who:active { filter: brightness(.9); }
+  .alarm:active, .tile:active, .msg:active, .shape.who:active { filter: brightness(.92); }
   .alarm:focus-visible, .tile:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  .tiles { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 6px; }
-  .tile { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 6px;
-    height: 30px; padding: 0 8px; border-radius: 15px; cursor: pointer; min-width: 0;
+  /* Status buttons: one row, equal widths while every label fits; a longer label takes the width
+     it needs, and only if the row can't hold them all does one wrap. Labels are never cut. */
+  .tiles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tile { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: max-content; display: flex; align-items: center; justify-content: center;
+    gap: 6px; min-height: 30px; padding: 0 8px; border-radius: 15px; cursor: pointer; white-space: nowrap;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color);
     font-size: 12px; font-weight: 500; transition: background-color 180ms; -webkit-tap-highlight-color: transparent; }
-  .tile ha-icon { --mdc-icon-size: 16px; flex: 0 0 auto; color: var(--grey-color, #9e9e9e); }
-  .tile span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile ha-icon { --mdc-icon-size: 16px; flex: 0 0 auto; color: ${C.grey}; }
   .msg { all: unset; box-sizing: border-box; display: flex; align-items: flex-start; gap: 8px; min-height: 30px; padding: 7px 12px;
     border-radius: 15px; cursor: pointer; font-size: 12px; line-height: 16px; color: var(--primary-text-color);
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
@@ -260,11 +272,6 @@ const CSS = `
   @container (min-width: 600px) {
     ha-card { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
     .head { grid-column: 1 / -1; }
-  }
-  @container (max-width: 300px) {
-    .alarm .txt { display: none; }
-    .alarm { padding: 0 8px; }
-    .tile { gap: 4px; padding: 0 6px; }
   }
 `;
 
@@ -469,6 +476,12 @@ class HomeStatusCard extends HTMLElement {
     const openPresence = () =>
       this._act(p.navigation_path ? { action: "navigate", path: p.navigation_path } : { action: "more-info", entity: p.occupied });
     this._el.who.forEach((el) => el.addEventListener("click", openPresence));
+    // The presence circle is a button: Enter / Space too.
+    this._el.shape.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      openPresence();
+    });
     this._el.alarm.addEventListener("click", () => this._toggleAlarm());
     this._el.msg.addEventListener("click", () => this._act({ action: "more-info", entity: this._config.message }));
     this._built = true;
@@ -488,7 +501,8 @@ class HomeStatusCard extends HTMLElement {
     e.shape.style.backgroundColor = tint(m.presence.color, 20);
     // Only touch the DOM when something changed: replacing an element while a finger is on it
     // swallows the tap, and Home Assistant pushes state updates several times a second.
-    const nameHtml = `${esc(this._config.name || "Home")} <span class="state">· ${esc(m.presence.label)}</span>`;
+    // "Greece · Occupied": on a narrow card only the state word moves down, the dot staying with the name.
+    const nameHtml = `${esc(this._config.name || "Home")}<span class="state">&nbsp;· <span class="w">${esc(m.presence.label)}</span></span>`;
     if (e.name.innerHTML !== nameHtml) e.name.innerHTML = nameHtml;
     if (e.detail.textContent !== m.presence.detail) e.detail.textContent = m.presence.detail;
 
@@ -497,7 +511,8 @@ class HomeStatusCard extends HTMLElement {
       e.alarm.classList.toggle("on", m.alarm.on);
       e.alarm.setAttribute("aria-pressed", String(m.alarm.on));
       e.alarmIcon.setAttribute("icon", m.alarm.on ? "mdi:shield-lock" : "mdi:shield-off-outline");
-      e.alarmTxt.textContent = m.alarm.unavailable ? "Alarm ?" : m.alarm.on ? "Armed" : "Disarmed";
+      const word = m.alarm.unavailable ? "Alarm –" : m.alarm.on ? "Armed" : "Disarmed";
+      if (e.alarmTxt.textContent !== word) e.alarmTxt.textContent = word;
     }
 
     const keys = m.tiles.map((t) => t.key).join();
@@ -505,7 +520,6 @@ class HomeStatusCard extends HTMLElement {
       e.tiles.innerHTML = m.tiles
         .map((t) => `<button class="tile" data-key="${t.key}"><ha-icon></ha-icon><span></span></button>`)
         .join("");
-      e.tiles.style.setProperty("--n", String(m.tiles.length || 1));
       e.tiles.querySelectorAll(".tile").forEach((b) =>
         b.addEventListener("click", () => this._act(this._m.tiles.find((t) => t.key === b.dataset.key).action)),
       );
@@ -513,12 +527,15 @@ class HomeStatusCard extends HTMLElement {
     }
     m.tiles.forEach((t, i) => {
       const b = e.tiles.children[i];
+      // A button that needs attention is an "on" pill: tint 18%, label mixed 70% toward the text
+      // colour, icon in full colour.
       b.querySelector("ha-icon").setAttribute("icon", t.icon);
       b.querySelector("ha-icon").style.color = t.color || "";
-      b.style.backgroundColor = t.color ? tint(t.color, 20) : "";
+      b.style.backgroundColor = t.color ? tint(t.color, 18) : "";
+      b.style.color = t.color ? tx(t.color, 70) : "";
       const span = b.querySelector("span");
       if (span.textContent !== t.label) span.textContent = t.label;
-      b.title = `${t.title}: ${t.label}`;
+      b.title = t.label.startsWith(t.title) ? t.label : `${t.title}: ${t.label}`;
     });
     e.tiles.style.display = m.tiles.length ? "" : "none";
 
@@ -533,17 +550,16 @@ class HomeStatusCard extends HTMLElement {
     const m = this._m;
     if (!m?.alarm) return;
     const arming = !m.alarm.on;
-    const name = this._config.name || "Home";
+    // Red both ways – the Armed chip's colour (a confirmation takes its control's "on" colour).
+    // The dialog opens from the home's own card, so it doesn't name the home again.
     const ok = await confirmDialog({
       title: arming ? "Arm alarm" : "Disarm alarm",
       icon: arming ? "mdi:shield-lock" : "mdi:shield-off-outline",
-      color: arming ? C.red : C.teal,
-      bodyIcon: "mdi:home-outline",
-      primary: name,
-      secondary: arming
-        ? `Your CCTV alarm system will send push notifications when it detects someone in ${name}.`
-        : `Your CCTV alarm system stops sending push notifications for ${name} until you arm it again.`,
-      confirmLabel: arming ? "Arm alarm" : "Disarm alarm",
+      color: C.red,
+      text: arming
+        ? "Your CCTV alarm system will send push notifications when it detects someone."
+        : "Your CCTV alarm system stops sending push notifications until you arm it again.",
+      confirmLabel: arming ? "Arm" : "Disarm",
     });
     if (!ok) return;
     const [domain] = this._config.alarm.split(".");
@@ -552,7 +568,7 @@ class HomeStatusCard extends HTMLElement {
         entity_id: this._config.alarm,
       });
     } catch (err) {
-      this._fire("hass-notification", { message: err?.message || "Could not change the alarm" });
+      this._fire("hass-notification", { message: err?.message || "Couldn't change the alarm." });
     }
   }
 

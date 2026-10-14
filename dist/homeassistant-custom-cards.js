@@ -4,20 +4,21 @@
  * air-quality-card, climate-modes-card, enclosure-filter-card, energy-summary-card, home-status-card, mmu-lanes-card, printer-status-card, printer-temps-card, robot-vacuum-card, room-lights-card, vacuum-maintenance-card, weather-presence-card
  */
 
-/* ===== air-quality-card 1.1.12 ===== */
+/* ===== air-quality-card 1.2.0 ===== */
 (() => {
 /*
  * Air quality card – https://github.com/igiannakas/homeassistant-custom-cards
  *
- * Every room's air in one card: a label row that sums up the house, and a tile
- * per room with its status (Excellent / Elevated / Poor / Ventilate) and its key
- * readings – CO₂, PM2.5 and VOC always, plus whatever else is causing trouble.
+ * Every room's air in one card: a label row that sums up the house under its title, and
+ * a tile per room with its status (Excellent / Elevated / Poor / Ventilate) and its key
+ * readings – CO₂, VOC and every PM size always, plus whatever else is causing trouble.
  * Readings that are out of range take their level's colour; a room that needs a
- * window opened glows red. Tap a room for its own air-quality dashboard.
+ * window opened glows red. Tap a reading for its own sensor, anywhere else on a room
+ * for its own air-quality dashboard.
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.1.12";
+const AQC_VERSION = "1.2.0";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -27,11 +28,13 @@ const C = {
   red: "var(--red-color, #f44336)",
   grey: "var(--grey-color, #9e9e9e)",
 };
+// The words differ by level, not just the colour: Poor (orange, the step before red) and
+// Ventilate (red, a call for attention: open a window), whatever the cause.
 const TIERS = [
   { color: C.green, icon: "mdi:leaf", word: "Excellent" },
   { color: C.amber, icon: "mdi:information-outline", word: "Elevated" },
   { color: C.orange, icon: "mdi:alert-outline", word: "Poor" },
-  { color: C.red, icon: "mdi:alert-circle-outline", word: "Poor air" },
+  { color: C.red, icon: "mdi:window-open-variant", word: "Ventilate" },
 ];
 // Readable text versions of the tier colours (amber text on white is too faint).
 const TEXT = [
@@ -46,20 +49,21 @@ const TEXT = [
  * (null = that level is skipped), label, icon, decimals, unit, and whether it is always shown.
  */
 const POLLUTANTS = {
-  co2: { suffix: "co2", t: [800, null, 1000], label: "CO₂", digits: 0, unit: "ppm", always: true, gas: true },
-  voc: { suffix: "voc_index", t: [150, 250, 400], label: "VOC", digits: 0, always: true, gas: true },
+  co2: { suffix: "co2", t: [800, null, 1000], label: "CO₂", digits: 0, unit: "ppm", always: true },
+  voc: { suffix: "voc_index", t: [150, 250, 400], label: "VOC", digits: 0, always: true },
   // Particles: always shown, each with its size class as the label, on a line of their own.
-  pm1: { suffix: "pm1", t: [12, null, 36], label: "PM1", digits: 1, always: true, pm: true },
-  pm2_5: { suffix: "pm2_5", t: [12, null, 36], label: "PM2.5", digits: 1, always: true, pm: true },
-  pm4: { suffix: "pm4", t: [17, null, 51], label: "PM4", digits: 1, always: true, pm: true },
-  pm10: { suffix: "pm10", t: [17, null, 51], label: "PM10", digits: 1, always: true, pm: true },
-  nox: { suffix: "nox_index", t: [20, 150, 300], label: "NOx", digits: 0, gas: true },
+  pm1: { suffix: "pm1", t: [12, null, 36], label: "PM1", digits: 1, unit: "µg/m³", always: true, pm: true },
+  pm2_5: { suffix: "pm2_5", t: [12, null, 36], label: "PM2.5", digits: 1, unit: "µg/m³", always: true, pm: true },
+  pm4: { suffix: "pm4", t: [17, null, 51], label: "PM4", digits: 1, unit: "µg/m³", always: true, pm: true },
+  pm10: { suffix: "pm10", t: [17, null, 51], label: "PM10", digits: 1, unit: "µg/m³", always: true, pm: true },
+  nox: { suffix: "nox_index", t: [20, 150, 300], label: "NOx", digits: 0 },
 };
 const ORDER = ["co2", "voc", "nox", "pm1", "pm2_5", "pm4", "pm10"];
 
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
+const fmt = (n, d = 0) => (n === null ? "–" : n.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d }));
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 
 function level(value, t) {
@@ -82,10 +86,6 @@ function roomModel(hass, room, thresholds = {}) {
   }
   const worst = readings.reduce((m, r) => Math.max(m, r.level), 0);
   const tier = { ...TIERS[worst] };
-  if (worst === 3 && readings.some((r) => r.level === 3 && r.gas)) {
-    tier.word = "Ventilate";
-    tier.icon = "mdi:window-open-variant";
-  }
   // Always CO₂, VOC and every PM size; NOx only while it is the cause.
   const shown = readings.filter((r) => r.always || (worst > 0 && r.level === worst));
   return { name: room.name || "Room", worst, tier, readings: shown, missing: !readings.length };
@@ -99,55 +99,61 @@ const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
-     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
-     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
-     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
-  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; } /* 10px gap: titles at edge + 46, like Mushroom */
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; }
-  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
-  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
-  .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
-    color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+     Two-line label row, the same on every card: a 24px icon in a 36px slot (where the glyph of a
+     36px Mushroom icon sits; it shows the house's level, so it takes that colour, and it isn't
+     tappable, so no circle), the 14px / 500 title at edge + 46 and the summary under it on the
+     same vertical line (ink-aligned, free to wrap). */
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; }
+  .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+  .slot ha-icon { --mdc-icon-size: 24px; }
+  .lt { flex: 1; min-width: 0; }
+  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
+  .lt.one .t { position: relative; top: 1px; } /* alone, a 20px line reads ~1px high next to the icon */
+  .s { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .s:empty { display: none; }
+  /* The summary wraps only between its parts: a room name never splits. */
+  .s .p { white-space: nowrap; }
+  /* Room tiles. Every name stays whole: the columns are fitted to the measured names and readings
+     (_fit) – even columns as wide as the widest tile needs while two or more fit (up to the
+     columns option), else two columns each as wide as its own widest, else one. Without a measurement
+     (hidden card) a name wraps rather than being cut. */
   .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px;
     container: rooms / inline-size; }
   .room { all: unset; box-sizing: border-box; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 11px 10px;
     min-height: 58px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
-    -webkit-tap-highlight-color: transparent; transition: background-color 180ms; container-type: inline-size; }
+    -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
   /* A room that needs a window opened glows red, like a lit room glows on the lights card. */
   .room.alarm { background: ${tint(C.red, 10)}; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     transition: background-color 180ms; }
   .shape ha-icon { --mdc-icon-size: 24px; transition: color 180ms; }
   .txt { flex: 1; min-width: 0; }
-  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
+  .rooms.measure .nm { white-space: nowrap; width: max-content; }
   .m { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  /* Status, CO₂ and VOC: wrap between readings, never inside one. */
   .row { display: flex; flex-wrap: wrap; column-gap: 7px; }
-  /* Particle sizes as a tidy 2×2 (PM1 PM2.5 / PM4 PM10); four across when the tile is wide. */
-  .row.pm { display: grid; grid-template-columns: repeat(2, max-content); column-gap: 10px; }
-  @container (min-width: 300px) { .row.pm { grid-template-columns: repeat(4, max-content); } }
-  /* Phone-width tiles: CO₂ is always in ppm, so the unit gives way and status, CO₂ and VOC share one line. */
-  @container (max-width: 270px) { .v small { display: none; } }
+  /* Particle sizes as a tidy grid: four across when they fit, else 2×2 (PM1 PM2.5 / PM4 PM10),
+     else one per line – set from the measured readings (_fit); one per line until then. */
+  .row.pm { display: grid; grid-template-columns: max-content; justify-items: start; column-gap: 10px; }
   /* Particle size class as a small label in front of each PM value. */
-  /* Labels and units are the same size as the values, only lighter. */
+  /* Labels and units are the same size as the values, only lighter. Every reading keeps its unit. */
   .k { margin-right: 3px; color: color-mix(in srgb, var(--secondary-text-color) 70%, transparent); }
   .v.hot .k { color: inherit; }
   /* One type style for the whole block: same size and weight; colour alone marks a problem. */
   .st { white-space: nowrap; }
-  .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+  /* Each reading is its own tap target (more-info of its sensor); the rest of the tile navigates. */
+  .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; cursor: pointer; border-radius: 4px; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .v small { font-size: inherit; color: color-mix(in srgb, var(--secondary-text-color) 70%, transparent); }
   .v.hot small { color: inherit; }
-  .room:active { filter: brightness(.94); }
+  .room:active, .v:active { filter: brightness(.92); }
+  /* Pressing a reading darkens the reading, not the whole tile. */
+  .room:has(.v:active) { filter: none; }
   .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  /* Phone width: tiles are ~170px, so tighten the tile's sides and the PM grid so the four PM
-     readings never run past the tile edge. (A container can't style itself, so the tile padding
-     keys off the grid's width and the text rules off the tile's.) */
-  @container rooms (max-width: 400px) { .room { padding: 11px 8px; gap: 8px; } }
-  @container (max-width: 175px) { .row { column-gap: 5px; } .row.pm { column-gap: 5px; } .m { font-size: 11.5px; letter-spacing: .2px; } }
-  /* Very small phones: one PM reading per line rather than running past the edge. */
-  @container (max-width: 152px) { .row.pm { grid-template-columns: max-content; } }
+  /* Phone width: 8px tile sides (the shape–text gap stays 10px). Column count, PM grid and text
+     size are not shrunk to fit – _fit gives a tile the width its names and readings need. */
+  @container rooms (max-width: 400px) { .room { padding: 11px 8px; } }
 `;
 
 /* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
@@ -251,7 +257,10 @@ class AirQualityCard extends HTMLElement {
     const sensor = { entity: { domain: "sensor" } };
     return {
       schema: [
-        { name: "title", selector: { text: {} } },
+        { type: "grid", name: "", schema: [
+          { name: "title", selector: { text: {} } },
+          { name: "columns", selector: { number: { min: 1, max: 4, mode: "box" } } },
+        ] },
         { name: "rooms", selector: { object: {
           multiple: true,
           label_field: "name",
@@ -269,11 +278,15 @@ class AirQualityCard extends HTMLElement {
             nox: { label: "NOx index", selector: sensor },
           },
         } } },
+        { name: "thresholds", selector: { object: {} } },
       ],
-      computeLabel: (s) => ({ title: "Title", rooms: "Rooms" })[s.name] ?? s.name,
+      computeLabel: (s) =>
+        ({ title: "Title", columns: "Tiles per row (at most)", rooms: "Rooms", thresholds: "Thresholds (YAML)" })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
+          columns: "Default 2. Fewer when a room name or reading wouldn't fit.",
           rooms: "With a prefix, the card finds <prefix>co2, pm1, pm2_5, pm4, pm10, voc_index and nox_index by itself.",
+          thresholds: "Per pollutant: [elevated, poor, ventilate]; null skips a level. E.g. co2: [800, null, 1000]",
         })[s.name],
     };
   }
@@ -298,19 +311,47 @@ class AirQualityCard extends HTMLElement {
     return { columns: "full", rows: "auto" };
   }
 
+  connectedCallback() {
+    this._observe();
+  }
+
+  disconnectedCallback() {
+    this._ro?.disconnect();
+  }
+
+  /* Re-fit the tiles whenever the card's width changes (rotation, sidebar, column count). */
+  _observe() {
+    const grid = this.shadowRoot?.querySelector(".rooms");
+    if (!grid || typeof ResizeObserver === "undefined") return;
+    this._ro = this._ro || new ResizeObserver(() => this._fit());
+    this._ro.disconnect();
+    this._ro.observe(grid);
+  }
+
+  _cols() {
+    return Math.max(1, Math.min(4, Number(this._config.columns) || 2));
+  }
+
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const c = this._config;
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      <div class="label"><ha-icon icon="mdi:leaf"></ha-icon><span class="title">${esc(c.title ?? "Air quality")}</span><span class="sum"></span></div>
-      <div class="rooms" style="--cols:${Math.max(1, Math.min(4, Number(c.columns) || 2))}">
+      <div class="label"><div class="slot"><ha-icon icon="mdi:leaf"></ha-icon></div>
+        <div class="lt"><div class="t">${esc(c.title ?? "Air quality")}</div><div class="s"></div></div></div>
+      <div class="rooms" style="--cols:${this._cols()}">
         ${c.rooms
           .map((r, i) => `<button class="room" data-i="${i}"><span class="shape"><ha-icon></ha-icon></span>
             <span class="txt"><div class="nm"></div><div class="m"></div></span></button>`)
           .join("")}
       </div></ha-card>`;
     root.querySelectorAll(".room").forEach((b) =>
-      b.addEventListener("click", () => {
+      b.addEventListener("click", (e) => {
+        // A reading opens its own sensor, and only that; anywhere else on the tile opens the room.
+        const v = e.target.closest?.("[data-e]");
+        if (v) {
+          e.stopPropagation();
+          return this._fire("hass-more-info", { entityId: v.dataset.e });
+        }
         const room = c.rooms[Number(b.dataset.i)];
         if (room.navigation_path) {
           history.pushState(null, "", room.navigation_path);
@@ -322,10 +363,18 @@ class AirQualityCard extends HTMLElement {
       }),
     );
     this._built = true;
+    this._refit = true;
+    this._observe();
+    this.ownerDocument.fonts?.ready?.then(() => this._fit());
   }
 
   _render() {
-    inkSchedule(this, ".txt");
+    // Ink-align the tiles and the label row, then re-fit if a name or reading changed.
+    inkSchedule(this, ".txt, .lt", () => {
+      if (!this._refit) return;
+      this._refit = false;
+      this._fit();
+    });
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -340,14 +389,18 @@ class AirQualityCard extends HTMLElement {
       if (icon.getAttribute("icon") !== m.tier.icon) icon.setAttribute("icon", m.tier.icon);
       icon.style.color = m.tier.color;
       const nm = el.querySelector(".nm");
-      if (nm.textContent !== m.name) nm.textContent = m.name;
+      if (nm.textContent !== m.name) {
+        nm.textContent = m.name;
+        this._refit = true;
+      }
       el.setAttribute("aria-label", `${m.name}: ${m.tier.word}`);
       // Only touch the DOM when something changed, so a tap is never lost mid-update.
+      // Every reading keeps its unit (ppm, µg/m³) and is a tap target for its own sensor.
       const one = (r) => {
-            const v = r.value === null ? "–" : r.value.toFixed(r.digits);
-            const hot = r.level > 0;
-            const head = r.icon ? `<ha-icon icon="${r.icon}"${hot ? ` style="color:${TIERS[r.level].color}"` : ""}></ha-icon>` : `<span class="k">${r.label}</span>`;
-            return `<span class="v${hot ? " hot" : ""}" title="${esc(r.label)}"${hot ? ` style="color:${TEXT[r.level]}"` : ""}>${head}${v}${r.unit ? `<small> ${r.unit}</small>` : ""}</span>`;
+        const v = fmt(r.value, r.digits);
+        const hot = r.level > 0;
+        const head = r.icon ? `<ha-icon icon="${r.icon}"${hot ? ` style="color:${TIERS[r.level].color}"` : ""}></ha-icon>` : `<span class="k">${r.label}</span>`;
+        return `<span class="v${hot ? " hot" : ""}" data-e="${esc(r.id)}" title="${esc(r.label)}"${hot ? ` style="color:${TEXT[r.level]}"` : ""}>${head}${v}${r.unit ? `<small> ${r.unit}</small>` : ""}</span>`;
       };
       const gases = m.readings.filter((r) => !r.pm).map(one).join("");
       const pms = m.readings.filter((r) => r.pm).map(one).join("");
@@ -358,30 +411,86 @@ class AirQualityCard extends HTMLElement {
       if (mEl.dataset.h !== html) {
         mEl.innerHTML = html;
         mEl.dataset.h = html;
+        this._refit = true;
       }
     });
 
-    // The house in a few words.
+    // The house in a few words, under the title: the rooms at the worst level by name
+    // ("Ventilate Living Room", "Poor in Study, Bedroom"), or a count while only elevated.
+    // Each room name is an unbreakable part; the line wraps only between them.
     const worst = models.reduce((a, m) => Math.max(a, m.worst), 0);
-    let sum = "All excellent";
-    if (worst === 3) {
-      // Each problem by name: rooms to air out, and rooms with too many particles.
-      const names = (word) => models.filter((m) => m.worst === 3 && m.tier.word === word).map((m) => m.name).join(", ");
-      sum = [names("Ventilate") && `Ventilate ${names("Ventilate")}`, names("Poor air") && `Poor air in ${names("Poor air")}`]
-        .filter(Boolean)
-        .join(" · ");
-    } else if (worst === 2) {
-      sum = `Poor in ${models.filter((m) => m.worst === 2).map((m) => m.name).join(", ")}`;
+    let parts = ["All excellent"];
+    if (worst >= 2) {
+      const lead = worst === 3 ? "Ventilate" : "Poor in";
+      parts = models.filter((m) => m.worst === worst).map((m, i) => (i ? m.name : `${lead} ${m.name}`));
     } else if (worst === 1) {
       const n = models.filter((m) => m.worst === 1).length;
-      sum = `${n} ${n === 1 ? "room" : "rooms"} elevated`;
+      parts = [`${n} ${n === 1 ? "room" : "rooms"} elevated`];
     }
-    const sumEl = root.querySelector(".sum");
-    if (sumEl.textContent !== sum) sumEl.textContent = sum;
-    const lab = root.querySelector(".label ha-icon");
-    const lt = { ...TIERS[worst] };
-    lab.setAttribute("icon", worst ? lt.icon : "mdi:leaf");
+    const sum = parts.map((p) => `<span class="p">${esc(p)}</span>`).join(", ");
+    const sumEl = root.querySelector(".s");
+    if (sumEl.innerHTML !== sum) sumEl.innerHTML = sum;
+    root.querySelector(".lt").classList.toggle("one", !sum);
+    // The label icon shows the house's level, so it takes that colour.
+    const lab = root.querySelector(".slot ha-icon");
+    const lt = TIERS[worst];
+    if (lab.getAttribute("icon") !== lt.icon) lab.setAttribute("icon", lt.icon);
     lab.style.color = lt.color;
+  }
+
+  /* Fit the tiles to what they hold, so a room name is never cut (design rule: grids of names are
+     fitted to the names). A tile needs its sides, the 36px circle and its gap, plus the widest of:
+     its name on one line, its widest single reading (readings wrap between each other, never
+     inside one) and its particle sizes two across (the tidy 2×2 – without it a narrow tile would
+     stack every reading on a line of its own). Even columns as wide as the widest tile while two
+     or more fit (at most the columns option); else two columns each as wide as its own widest
+     tile; else one, where only a name wider than the card wraps. Then the particles: four across
+     when they fit, else 2×2, else one per line. Measures natural widths, so the answer doesn't
+     depend on the layout showing; without a layout (hidden card, or no layout engine) nothing is
+     measured or changed. */
+  _fit() {
+    const grid = this.shadowRoot?.querySelector(".rooms");
+    const tiles = grid ? [...grid.querySelectorAll(".room")] : [];
+    const W = grid?.clientWidth;
+    if (!W || !tiles.length) return;
+    const w = (el) => el.getBoundingClientRect().width;
+    const px = (el, prop) => parseFloat(getComputedStyle(el)[prop]) || 0;
+    // Width of a grid of items k across: each column as wide as its widest item, plus the gaps.
+    const across = (ws, k, gap) => {
+      let total = (k - 1) * gap;
+      for (let j = 0; j < k; j++) total += Math.max(0, ...ws.filter((_, i) => i % k === j));
+      return total;
+    };
+    grid.classList.add("measure");
+    const needs = tiles.map((t) => {
+      const side = px(t, "paddingLeft") + px(t, "paddingRight") + t.querySelector(".shape").offsetWidth + px(t, "columnGap");
+      const pm = t.querySelector(".row.pm");
+      const pair = pm && pm.children.length > 1 ? across([...pm.children].map(w), 2, px(pm, "columnGap")) : 0;
+      return Math.ceil(side + Math.max(pair, w(t.querySelector(".nm")), ...[...t.querySelectorAll(".st, .v")].map(w)));
+    });
+    grid.classList.remove("measure");
+    const gap = px(grid, "columnGap");
+    const most = this._cols();
+    const widest = Math.max(...needs);
+    let n = most;
+    while (n > 1 && n * widest + (n - 1) * gap > W + 0.5) n--;
+    let cols = `repeat(${n}, minmax(0, 1fr))`;
+    if (n === 1 && most > 1 && tiles.length > 1) {
+      const col = (k) => Math.max(0, ...needs.filter((_, i) => i % 2 === k));
+      if (col(0) + col(1) + gap <= W + 0.5) cols = `minmax(${col(0)}px, 1fr) minmax(${col(1)}px, 1fr)`;
+    }
+    if (grid.style.gridTemplateColumns !== cols) grid.style.gridTemplateColumns = cols;
+
+    for (const pm of grid.querySelectorAll(".row.pm")) {
+      const ws = [...pm.children].map(w);
+      const avail = pm.clientWidth;
+      const pg = px(pm, "columnGap");
+      // Four readings go 4 or 2×2 (never 3 + 1); other counts try every width down to one.
+      const tries = ws.length === 4 ? [4, 2] : Array.from({ length: Math.max(0, ws.length - 1) }, (_, i) => ws.length - i);
+      const k = tries.find((x) => across(ws, x, pg) <= avail + 0.5) || 1;
+      const v = k > 1 ? `repeat(${k}, max-content)` : "";
+      if (pm.style.gridTemplateColumns !== v) pm.style.gridTemplateColumns = v;
+    }
   }
 
   _fire(type, detail) {
@@ -406,23 +515,25 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== climate-modes-card 1.3.4 ===== */
+/* ===== climate-modes-card 1.4.0 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * Whole-house shortcuts in one card: a label row (icon, title, what the rooms are
- * on, or a switch) and a row of mode tiles. A tile glows in its colour while it is
- * the active mode. Made for heating presets across several thermostats, and just
- * as happy with any entity + state (e.g. an aircon speed helper). Any tap action can ask
- * first: add `confirmation` and the card shows its own confirm dialog (Bubble Card look,
- * texts may be templates), so no pop-up card is needed. With `status: activity` the label
- * row shows what the heating is doing instead of the mode: which rooms are calling for
- * heat, Idle, or a lock (e.g. summer mode) – and the icon follows.
+ * on under the title, or a switch) and a row of mode tiles. A tile glows in its colour
+ * while it is the active mode, and the label icon takes that colour (grey when nothing is
+ * on). Made for heating presets across several thermostats, and just as happy with any
+ * entity + state (e.g. an aircon speed helper). Any tap action can ask first: add
+ * `confirmation` and the card shows its own confirm dialog (Bubble Card look, texts may be
+ * templates), so no pop-up card is needed. With `status: activity` the label row shows what
+ * the heating is doing instead of the mode: which rooms are calling for heat, Idle, or a
+ * lock (e.g. summer mode) – and the icon follows. Tile names are never cut: when they don't
+ * fit side by side, the tiles wrap into balanced rows.
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.3.4";
+const CMC_VERSION = "1.4.0";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -431,6 +542,15 @@ const FALLBACK = { cyan: "#00bcd4", blue: "#2196f3", purple: "#9c27b0", amber: "
   teal: "#009688", green: "#4caf50", grey: "#9e9e9e", "light-blue": "#03a9f4", indigo: "#3f51b5", "deep-purple": "#673ab7" };
 const color = (c) => (!c ? `var(--grey-color, #9e9e9e)` : NAMED.includes(c) ? `var(--${c}-color, ${FALLBACK[c] || "#9e9e9e"})` : c);
 const GREY = color("grey");
+// Teal = you can tap / pick this (design tokens → Colours): the switch is teal when on unless it
+// has a colour of its own, and a tile or switch without a state colour of its own – none, or
+// grey (Off, Away) – asks in teal: a filled grey button would read as disabled. (Such a tile
+// still glows grey when it is the mode.)
+const TEAL = color("teal");
+const askColor = (m) => {
+  const c = m?.color ? color(m.color) : TEAL;
+  return c === GREY ? TEAL : c;
+};
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -454,10 +574,10 @@ const DIALOG_CSS = `
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
   .title { font-size: 20px; line-height: 26px; font-weight: 600; }
-  .body { margin-top: 20px; }
-  .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
-  .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; }
-  .buttons { margin-top: 20px; display: grid; gap: 8px; }
+  /* The text sits under the title, starting on its line (8 + 42px glyph + 6px gap). One glyph,
+     no subject line: the dialog opens from the card's own tile or switch. */
+  .text { margin: 12px 0 0 56px; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
+  .buttons { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); display: grid; gap: 8px; }
   button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
     border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
@@ -492,8 +612,10 @@ function renderTemplate(hass, tpl) {
   });
 }
 
-/* Confirm dialog in the Bubble Card look. Resolves true (confirm) or false (cancel). */
-function confirmDialog({ title, icon, col, subjectIcon, subject, text, confirmLabel }) {
+/* Confirm dialog in the Bubble Card look, the same layout as every card's: a title row with one
+   glyph, the text under the title, then Confirm / Cancel below a rule. In the colour of the
+   control that opened it. Resolves true (confirm) or false (cancel). */
+function confirmDialog({ title, icon, color: col, text, confirmLabel }) {
   return new Promise((resolve) => {
     const host = document.createElement("cmc-confirm-dialog");
     const root = host.attachShadow({ mode: "open" });
@@ -501,8 +623,7 @@ function confirmDialog({ title, icon, col, subjectIcon, subject, text, confirmLa
       <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
         <div class="row"><div class="glyph" style="background:${tint(col, 20)}"><ha-icon icon="${esc(icon)}" style="color:${col}"></ha-icon></div>
           <div class="title">${esc(title)}</div></div>
-        ${subject || text ? `<div class="row body"><div class="glyph"><ha-icon icon="${esc(subjectIcon)}" style="color:${col}"></ha-icon></div>
-          <div>${subject ? `<div class="primary">${esc(subject)}</div>` : ""}${text ? `<div class="secondary">${esc(text)}</div>` : ""}</div></div>` : ""}
+        ${text ? `<div class="text">${esc(text)}</div>` : ""}
         <div class="buttons">
           <button class="confirm" style="background:${col}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
           <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
@@ -527,23 +648,34 @@ function confirmDialog({ title, icon, col, subjectIcon, subject, text, confirmLa
   });
 }
 
-/* What the heating is doing: locked (e.g. summer mode), rooms calling for heat, or idle. */
+/* What the heating is doing: locked (e.g. summer mode), rooms calling for heat, or idle. The
+   text comes in parts (a list inside a part is joined with commas): the line wraps only
+   between them. */
 function activity(hass, cfg) {
   const lock = cfg.lock;
   if (lock?.entity && hass.states[lock.entity]?.state === "on") {
-    return { kind: "locked", text: lock.text || "Locked", icon: lock.icon || cfg.icon, color: color(lock.color || "amber") };
+    // Grey by default: a lock (summer mode) is an off state, not a warning.
+    const text = String(lock.text || "Locked");
+    return { kind: "locked", parts: text.split(/\s+·\s+/), icon: lock.icon || cfg.icon, color: color(lock.color || "grey") };
   }
   const calling = list(cfg.thermostats).filter((id) => hass.states[id]?.attributes?.hvac_action === "heating");
   if (calling.length) {
     const names = calling.map((id) => cfg.names?.[id] || String(hass.states[id]?.attributes?.friendly_name || id).replace(/\s+thermostat$/i, ""));
     return {
-      kind: "heating", text: `Heating · ${names.join(", ")}`,
-      short: `Heating · ${calling.length} room${calling.length > 1 ? "s" : ""}`,
+      kind: "heating", parts: ["Heating", names],
+      short: ["Heating", `${calling.length} room${calling.length > 1 ? "s" : ""}`],
       icon: cfg.icon, color: color(cfg.icon_color || "orange"),
     };
   }
-  return { kind: "idle", text: "Idle", icon: cfg.icon, color: GREY };
+  return { kind: "idle", parts: ["Idle"], icon: cfg.icon, color: GREY };
 }
+
+/* "All rooms · Night" as HTML: each part unbreakable, joined so the dot stays with the part
+   before it (design tokens → Status lines). */
+const partsHtml = (parts) =>
+  parts
+    .map((p) => (Array.isArray(p) ? p.map((n) => `<span class="p">${esc(n)}</span>`).join(", ") : `<span class="p">${esc(p)}</span>`))
+    .join("&nbsp;· ");
 
 /* Which mode is on? A preset all thermostats share, or a mode's own entity + state. */
 /* A flag tile glows on its own, next to the active mode: active: {attribute, state} is on
@@ -591,50 +723,107 @@ const CSS = `
     -webkit-tap-highlight-color: transparent; }
   .label > ha-icon.tap:active { filter: brightness(.92); }
   .label > ha-icon.tap:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
-  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
-  .status { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* Switch next to the status; padded so the whole label + switch is an easy tap target. */
+  /* Card label row: same on every card – a 24px icon in a 36px slot, a 14px / 500 title (like
+     Mushroom names) and, under the title, the summary (12px, free to wrap between its parts).
+     The icon and the switch are centred on the two lines. */
+  .lt { flex: 1; min-width: 0; }
+  .title { display: block; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+    overflow-wrap: break-word; }
+  /* top: 1px – optical centring: alone, a 20px line box sits ~1px high against an icon of the same height. */
+  .lt.one .title { position: relative; top: 1px; }
+  .status { display: block; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .status:empty { display: none; }
+  .status .p { white-space: nowrap; }
+  .status.measure { white-space: nowrap; }
+  /* Switch after the label; padded so the whole label + switch is an easy tap target. */
   .switch { all: unset; flex: none; margin: -6px -4px -6px 4px; padding: 6px 4px 6px 10px; display: inline-flex; align-items: center; gap: 8px;
     cursor: pointer; border-radius: 16px; font-size: 12px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
-    -webkit-tap-highlight-color: transparent; }
-  .status:empty { display: none; }
-  /* status: activity – what the heating is doing goes on its own line under the title (like a
-     Mushroom secondary line); icon and switch are centred on both lines. */
-  .label.two { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "icon title sw" "icon status sw";
-    column-gap: 10px; row-gap: 0; align-items: center; }
-  .label.two > ha-icon:first-child { grid-area: icon; }
-  .label.two .title { grid-area: title; top: 0; align-self: end; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .label.two .status { grid-area: status; margin-left: 0; align-self: start; font-weight: 400; line-height: 16px; }
-  .label.two .switch { grid-area: sw; align-self: center; } /* centred on the two lines, like the icon */
+    white-space: nowrap; -webkit-tap-highlight-color: transparent; }
   /* Label-row switch: 40×24, the same on every card. */
   .sw { flex: none; width: 40px; height: 24px; border-radius: 12px; position: relative; background: var(--disabled-color, #bdbdbd); transition: background-color 160ms; }
   .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .switch.on .sw { background: var(--sw-color); }
   .switch.on .sw::after { transform: translateX(16px); }
-  .modes { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 8px; }
-  .mode { all: unset; box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 12px 2px 11px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
+  /* Mode tiles: one row, equal widths while every name fits; a longer name takes the width it
+     needs. When they don't all fit, the card measures the names and lays the tiles out in even,
+     balanced rows (.fit: e.g. 3 + 3 rather than 5 + 1). Names are never cut and never shrink. */
+  .modes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .modes.fit { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
+  .mode { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: max-content; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 11px 10px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
+  .modes.fit .mode { min-width: 0; }
   .shape { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     background: ${tint(GREY, 20)}; transition: background-color 180ms; }
   .shape ha-icon { --mdc-icon-size: 24px; color: ${GREY}; transition: color 180ms; }
-  /* 12px like every other card's second line; the icon carries the tile. */
-  .name { max-width: 100%; font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .2px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mode.on { background: color-mix(in srgb, var(--c) 12%, transparent); }
+  /* 12px like every other card's second line; the icon carries the tile. A name wraps only if it
+     is wider than the whole card on its own. */
+  .name { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .2px; color: var(--primary-text-color);
+    white-space: nowrap; text-align: center; }
+  .modes.wrap .name { white-space: normal; overflow-wrap: break-word; }
+  /* Active tile glow: its colour at 10%, the icon circle at 20%. */
+  .mode.on { background: color-mix(in srgb, var(--c) 10%, transparent); }
   .mode.on .shape { background: color-mix(in srgb, var(--c) 20%, transparent); }
   .mode.on .shape ha-icon { color: var(--c); }
   /* Press feedback without moving anything, so taps near the edge still land. */
   .mode:active, .switch:active { filter: brightness(.92); }
   .mode:focus-visible, .switch:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  ha-card { container-type: inline-size; }
-  /* Six or more tiles on a phone: a touch smaller so names like "Schedule" fit. */
-  @container (max-width: 420px) { .modes.many .name { font-size: 11px; letter-spacing: 0; } }
 `;
+
+/* Ink alignment (design rule): the summary under the title starts on the title's vertical line,
+   measured on ink rather than boxes (a leading "1" or "A" has its own side bearing). */
+const INK = { ctx: undefined };
+const inkCtx = () => {
+  if (INK.ctx === undefined)
+    INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  return INK.ctx;
+};
+const inkVisible = (el) => !el.hidden && getComputedStyle(el).display !== "none";
+function inkLead(el) {
+  for (const n of el.childNodes) {
+    if (n.nodeType === 3) {
+      if (n.textContent.trim()) return { text: n };
+    } else if (n.nodeType === 1 && inkVisible(n)) {
+      if (n.localName === "ha-icon") return { icon: n };
+      const r = inkLead(n);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+function inkText(node) {
+  const ctx = inkCtx();
+  if (!ctx) return null;
+  const cs = getComputedStyle(node.parentElement);
+  ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+const inkSet = (el, px) => {
+  const v = Math.abs(px) > 0.2 ? `${px.toFixed(2)}px` : "";
+  if (el.style.marginLeft !== v) el.style.marginLeft = v;
+};
+function inkAlign(blocks) {
+  for (const b of blocks) {
+    const lines = [...b.children].filter(inkVisible);
+    const t = lines.length > 1 ? inkLead(lines[0]) : null;
+    if (!t || !t.text) continue;
+    const ref = inkText(t.text);
+    if (ref === null) return;
+    for (const line of lines.slice(1)) {
+      const lead = inkLead(line);
+      if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
+    }
+  }
+}
+function inkSchedule(host, selector) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    if (host.shadowRoot) inkAlign(host.shadowRoot.querySelectorAll(selector));
+  });
+}
 
 class ClimateModesCard extends HTMLElement {
   static getStubConfig() {
@@ -667,7 +856,7 @@ class ClimateModesCard extends HTMLElement {
         ({
           title: "Title",
           icon: "Icon",
-          icon_color: "Icon colour",
+          icon_color: "Icon colour (default: the active mode's colour, grey when none)",
           thermostats: "Thermostats (a mode is active when all share its preset)",
           switch: "Switch in the label row (optional)",
           switch_name: "Switch label (default Automatic)",
@@ -679,9 +868,9 @@ class ClimateModesCard extends HTMLElement {
       computeHelper: (s) =>
         ({
           modes: "One entry per tile: name, icon, color, preset (or active: {entity, state} / {attribute, state}) and tap_action.",
-          switch: "Shown after the status, e.g. summer mode or an automatic-aircon automation.",
-          switch_tap_action: "Add confirmation: {title, subject, text} in YAML to ask first.",
-          lock: "With activity: {entity, text, icon, color} – e.g. summer mode: Summer · heating locked.",
+          switch: "Shown after the title, e.g. summer mode or an automatic-aircon automation. Teal when on unless switch_color is set.",
+          switch_tap_action: "Add confirmation: {title, text} in YAML to ask first.",
+          lock: "With activity: {entity, text, icon, color} – e.g. summer mode: Summer · heating locked (grey unless color is set).",
         })[s.name],
     };
   }
@@ -711,26 +900,47 @@ class ClimateModesCard extends HTMLElement {
     const c = this._config;
     this._ro?.disconnect();
     this._ro = null;
+    this._statusKey = undefined;
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      ${c.title || c.icon ? `<div class="label${c.status === "activity" ? " two" : ""}"><ha-icon icon="${esc(c.icon || "mdi:thermostat")}" style="color:${color(c.icon_color || "orange")}"${this._headerAction() ? ` class="tap" role="button" tabindex="0" aria-label="${esc(c.title || "Open")}"` : ""}></ha-icon>
-        <span class="title">${esc(c.title || "")}</span>
-        <span class="status"></span>
-        ${c.switch ? `<button class="switch" role="switch" style="--sw-color:${color(c.switch_color || "blue")}"><span class="swl"></span><span class="sw"></span></button>` : ""}</div>` : ""}
-      <div class="modes${c.modes.length >= 6 ? " many" : ""}" style="--n:${Math.max(1, c.modes.length)}">
+      ${c.title || c.icon ? `<div class="label"><ha-icon icon="${esc(c.icon || "mdi:thermostat")}"${this._headerAction() ? ` class="tap" role="button" tabindex="0" aria-label="${esc(c.title || "Open")}"` : ""}></ha-icon>
+        <div class="lt"><span class="title">${esc(c.title || "")}</span><span class="status"></span></div>
+        ${c.switch ? `<button class="switch" role="switch" style="--sw-color:${c.switch_color ? color(c.switch_color) : TEAL}"><span class="swl"></span><span class="sw"></span></button>` : ""}</div>` : ""}
+      <div class="modes">
         ${c.modes
           .map((m, i) => `<button class="mode" data-i="${i}" style="--c:${color(m.color)}" aria-pressed="false">
             <span class="shape"><ha-icon icon="${esc(m.icon || "mdi:thermostat")}"></ha-icon></span><span class="name">${esc(m.name || "")}</span></button>`)
           .join("")}
       </div></ha-card>`;
-    root.querySelectorAll(".mode").forEach((b) => b.addEventListener("click", () => this._tap(c.modes[Number(b.dataset.i)])));
+    root.querySelectorAll(".mode").forEach((b) =>
+      b.addEventListener("click", () => {
+        const m = c.modes[Number(b.dataset.i)];
+        this._tap(m, `switch to ${m.name || "that mode"}`);
+      }),
+    );
     root.querySelector(".switch")?.addEventListener("click", () => this._toggleSwitch());
     const tapIcon = root.querySelector(".label > ha-icon.tap");
     if (tapIcon) {
-      const go = () => this._tap({ name: c.title, icon: c.icon, color: c.icon_color, tap_action: this._headerAction() });
+      // The header's dialog takes the header icon's colour as it is now (teal while it is grey:
+      // then it is just a tap target with no state colour of its own).
+      const go = () =>
+        this._tap({ name: c.title, icon: tapIcon.getAttribute("icon"), col: this._headColor && this._headColor !== GREY ? this._headColor : TEAL,
+          tap_action: this._headerAction() });
       tapIcon.addEventListener("click", go);
       tapIcon.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), go()));
       root.querySelectorAll(".label .title, .label .status").forEach((n) => { n.classList.add("tap"); n.addEventListener("click", go); });
     }
+    // Names and the status line are measured: again when the card resizes and once the font has loaded.
+    if (typeof ResizeObserver !== "undefined") {
+      this._ro = new ResizeObserver(() => {
+        this._fitModes();
+        this._fitStatus();
+      });
+      root.querySelectorAll(".modes, .label").forEach((n) => this._ro.observe(n));
+    }
+    document.fonts?.ready?.then(() => {
+      this._fitModes();
+      this._fitStatus();
+    });
     this._built = true;
   }
 
@@ -742,6 +952,7 @@ class ClimateModesCard extends HTMLElement {
   _render() {
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
+    inkSchedule(this, ".lt");
     const hass = this._hass;
     const root = this.shadowRoot;
     const c = this._config;
@@ -754,22 +965,26 @@ class ClimateModesCard extends HTMLElement {
       b.setAttribute("aria-pressed", String(on));
     });
     const status = root.querySelector(".status");
+    const ic = root.querySelector(".label > ha-icon");
     if (status && c.status === "activity") {
       // The header says what the heating is doing; the tiles below already show the mode.
       const a = activity(hass, c);
-      const ic = root.querySelector(".label > ha-icon");
       const icon = a.icon || "mdi:thermostat";
       if (ic.getAttribute("icon") !== icon) ic.setAttribute("icon", icon);
-      if (ic.style.color !== a.color) ic.style.color = a.color;
+      this._headColor = a.color;
       root.querySelector(".label").dataset.activity = a.kind;
       this._status = a;
-      this._fitStatus();
     } else if (status) {
+      // The active mode, under the title. The icon takes the active mode's colour – grey when
+      // nothing is on – unless icon_color fixes it.
       const n = list(c.thermostats).length;
-      const text = !n ? (active >= 0 ? c.modes[active].name : "")
-        : active >= 0 ? `${n > 1 ? "All rooms" : "On"} · ${c.modes[active].name}` : "Mixed";
-      if (status.textContent !== text) status.textContent = text;
+      const parts = !n ? (active >= 0 ? [c.modes[active].name] : [])
+        : active >= 0 ? [n > 1 ? "All rooms" : "On", c.modes[active].name] : ["Mixed"];
+      this._headColor = c.icon_color ? color(c.icon_color) : active >= 0 ? color(c.modes[active].color) : GREY;
+      this._status = { parts: parts.filter(Boolean) };
     }
+    if (ic && ic.style.color !== this._headColor) ic.style.color = this._headColor;
+    this._fitStatus();
     const sw = root.querySelector(".switch");
     if (sw) {
       const s = hass.states[c.switch];
@@ -781,20 +996,51 @@ class ClimateModesCard extends HTMLElement {
     }
   }
 
-  /* Room names when they fit, otherwise "Heating · 3 rooms" (re-checked when the card resizes). */
+  /* The summary under the title. Room names when they fit on one line, otherwise "Heating · 3
+     rooms" (re-checked when the card resizes); either way it wraps only between its parts. */
   _fitStatus() {
     const status = this.shadowRoot?.querySelector(".status");
     const a = this._status;
     if (!status || !a) return;
-    if (status.textContent !== a.text) status.textContent = a.text;
-    if (a.short && status.clientWidth && status.scrollWidth > status.clientWidth) status.textContent = a.short;
-    if (!this._ro && window.ResizeObserver) {
-      this._ro = new ResizeObserver(() => this._fitStatus());
-      this._ro.observe(this.shadowRoot.querySelector(".label"));
+    const full = partsHtml(a.parts);
+    let html = full;
+    if (a.short && status.clientWidth) {
+      const key = `${full}|${status.clientWidth}`;
+      if (key === this._statusKey) html = this._statusHtml;
+      else {
+        if (status.innerHTML !== full) status.innerHTML = full;
+        status.classList.add("measure");
+        if (status.scrollWidth > status.clientWidth) html = partsHtml(a.short);
+        status.classList.remove("measure");
+        this._statusKey = key;
+        this._statusHtml = html;
+      }
     }
+    if (status.innerHTML !== html) status.innerHTML = html;
+    status.parentElement.classList.toggle("one", !html);
   }
 
-  async _tap(mode) {
+  /* Mode tiles: every name whole, never under 12px. One row while every tile fits (name + 20px
+     padding, at least the 36px icon); else even rows as balanced as they can be; and only if a
+     single name is wider than the card does it wrap. Without layout (tests), the CSS default
+     stays: one flex row that wraps a tile rather than squeezing its name. */
+  _fitModes() {
+    const box = this.shadowRoot?.querySelector(".modes");
+    const W = box?.clientWidth;
+    const names = box ? [...box.querySelectorAll(".mode .name")] : [];
+    if (!W || !names.length) return;
+    box.classList.remove("wrap");
+    const need = Math.max(56, ...names.map((n) => Math.ceil(n.scrollWidth) + 20));
+    const n = names.length;
+    const fit = Math.max(1, Math.floor((W + 8) / (need + 8)));
+    const cols = n <= fit ? 0 : Math.ceil(n / Math.ceil(n / fit));
+    box.classList.toggle("fit", cols > 0);
+    if (cols && box.style.getPropertyValue("--cols") !== String(cols)) box.style.setProperty("--cols", String(cols));
+    box.classList.toggle("wrap", need > W);
+  }
+
+  /* what: what a failure message says you tried ("Couldn't switch to Night."). */
+  async _tap(mode, what = "do that") {
     const a = mode?.tap_action;
     if (!a || a.action === "none") return;
     this._fire("haptic", "light");
@@ -812,12 +1058,15 @@ class ClimateModesCard extends HTMLElement {
         await this._hass.callService(domain, service, { ...(a.data || a.service_data || {}) }, a.target);
       }
     } catch (err) {
-      this._fire("hass-notification", { message: err?.message || "That did not work" });
+      this._fire("hass-notification", { message: err?.message || `Couldn't ${what}.` });
     }
   }
 
-  /* Ask first. confirmation: true, or {title, icon, subject, subject_icon, text, confirm_label};
-     every text may be a template. Defaults come from the tile (name, icon, colour). */
+  /* Ask first. confirmation: true, or {title, icon, text, confirm_label}; every text may be a
+     template. Defaults come from the tile (name, icon). The colour is the control's own: the
+     tile's colour (teal for a tile without one, or a grey one), the switch's, or the header
+     icon's. The older subject is no longer a line of its own: it stands in for the text when
+     there is none. */
   async _confirm(mode, conf) {
     if (this._asking) return false;
     this._asking = true;
@@ -830,10 +1079,8 @@ class ClimateModesCard extends HTMLElement {
       return await confirmDialog({
         title: name,
         icon: icon.trim() || mode.icon || "mdi:help-circle-outline",
-        col: color(mode.color || "blue"),
-        subjectIcon: o.subject_icon || this._config.icon || "mdi:information-outline",
-        subject: subject.trim(),
-        text: text.trim(),
+        color: mode.col || askColor(mode),
+        text: text.trim() || subject.trim(),
         confirmLabel: label.trim() || name,
       });
     } finally {
@@ -843,19 +1090,22 @@ class ClimateModesCard extends HTMLElement {
 
   async _toggleSwitch() {
     const c = this._config;
+    const id = c.switch;
+    const on = this._hass.states[id]?.state === "on";
+    // For messages: the switch's friendly name, never its entity id.
+    const name = this._hass.states[id]?.attributes?.friendly_name || c.switch_name || "the switch";
+    const what = `turn ${name} ${on ? "off" : "on"}`;
     if (c.switch_tap_action) {
       return this._tap({
-        name: c.switch_name ?? "Automatic", color: c.switch_color || "blue", icon: c.icon,
-        active: { entity: c.switch }, tap_action: c.switch_tap_action,
-      });
+        name: c.switch_name ?? "Automatic", color: c.switch_color, icon: c.icon,
+        active: { entity: id }, tap_action: c.switch_tap_action,
+      }, what);
     }
-    const id = this._config.switch;
-    const on = this._hass.states[id]?.state === "on";
     this._fire("haptic", "light");
     try {
       await this._hass.callService("homeassistant", on ? "turn_off" : "turn_on", { entity_id: id });
     } catch (err) {
-      this._fire("hass-notification", { message: err?.message || `Could not switch ${id}` });
+      this._fire("hass-notification", { message: err?.message || `Couldn't ${what}.` });
     }
   }
 
@@ -881,24 +1131,25 @@ async function registerClimateModesCard() {
 registerClimateModesCard();
 })();
 
-/* ===== enclosure-filter-card 1.1.7 ===== */
+/* ===== enclosure-filter-card 1.2.0 ===== */
 (() => {
 /*
  * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * A printer enclosure's filter / vent (e.g. a StealthMax): the vent position as a
- * segmented selector, intake and exhaust side by side (temperature, humidity, VOC,
- * VOC with manual calibration), and any extra readings (e.g. the delta) as a small
- * line. Tap any value for its own more-info.
+ * segmented selector (a tap moves the selection at once; it falls back if Home Assistant
+ * doesn't confirm), intake and exhaust side by side (temperature, humidity, VOC, VOC with
+ * manual calibration), the summary under the title, and any extra readings (e.g. the delta),
+ * each with its unit, as a small line. Tap any value for its own more-info.
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.1.7";
+const EFC_VERSION = "1.2.0";
 const EFC_TAG = "enclosure-filter-card";
+const PENDING_MS = 45000; // how long a vent move shows before Home Assistant confirms it
 
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
-  teal: "var(--teal-color, #009688)",
   green: "var(--green-color, #4caf50)",
   amber: "var(--amber-color, #ffc107)",
   orange: "var(--orange-color, #ff9800)",
@@ -917,6 +1168,15 @@ const esc = (s) =>
 const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
 const fmt = (n, d = 0) => (n === null ? "–" : n.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d }));
 
+/* A reading with its unit, as the cards write them: "48%", "21.4°" (no C), "612 ppm". */
+function withUnit(text, unit) {
+  const u = String(unit || "").trim();
+  if (!u || text === "–") return text;
+  if (u === "%") return `${text}%`;
+  if (/^°[CF]?$/.test(u)) return `${text}°`;
+  return `${text} ${u}`;
+}
+
 /* "0" → Closed, "100" → Open, numbers as they are. */
 function optionLabel(o) {
   if (String(o) === "0") return "Closed";
@@ -932,39 +1192,45 @@ const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
-     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
-     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
-     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
-  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; } /* 10px gap: titles at edge + 46, like Mushroom */
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; color: ${C.teal}; }
-  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
-  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
-  .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
-    white-space: nowrap; }
+     Two-line label row, the same on every card: a 24px icon in a 36px slot (where the glyph of a
+     Mushroom icon sits), the 14px / 500 title at edge + 46 and the 12px summary under it on the
+     same vertical line (ink-aligned, free to wrap). The icon is decorative: grey, no circle. */
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; }
+  .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+  .slot ha-icon { --mdc-icon-size: 24px; color: ${C.grey}; }
+  .lt { flex: 1; min-width: 0; }
+  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
+  .lt.one .t { position: relative; top: 1px; } /* alone, a 20px line reads ~1px high next to the icon */
+  .s { display: block; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .s:empty { display: none; }
+  /* Summary parts stay whole; the line wraps only between them. */
+  .p { white-space: nowrap; }
   .vent { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
-  .vl { font-size: 12px; letter-spacing: .4px; color: var(--secondary-text-color); }
-  .seg { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 2px; padding: 3px;
-    border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
-  .opt { all: unset; box-sizing: border-box; min-width: 0; height: 32px; border-radius: 9px; cursor: pointer; text-align: center;
-    font-size: 12px; line-height: 32px; font-weight: 500; letter-spacing: .2px; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
+  .vl { flex: none; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  /* Segmented selector (32px segments in a 38px track), as on the robot vacuum card. A label too
+     long for its segment wraps (the segment grows), never cut; a single word is never split. */
+  .seg { flex: 1; min-width: 0; display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
+  .opt { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: min-content; min-height: 32px; padding: 0 6px; border-radius: 9px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; line-height: 16px; font-weight: 500;
+    color: var(--secondary-text-color); overflow-wrap: break-word; -webkit-tap-highlight-color: transparent; }
   .opt.on { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
   .io { display: flex; align-items: stretch; gap: 8px; }
-  .side { box-sizing: border-box; flex: 1; min-width: 0; padding: 10px; border-radius: 10px; cursor: pointer;
+  .side { box-sizing: border-box; flex: 1; min-width: 0; padding: 11px 10px; border-radius: 10px; cursor: pointer;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); display: grid; gap: 1px; -webkit-tap-highlight-color: transparent; }
   .vals { display: flex; flex-wrap: wrap; gap: 1px 10px; }
-  .h { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  .h { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
   .v, .x { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; line-height: 16px;
     letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; cursor: pointer; border-radius: 4px;
     -webkit-tap-highlight-color: transparent; }
+  /* An extra reading's name may wrap on a narrow card; its value and unit stay together. */
+  .x { display: block; white-space: normal; overflow-wrap: break-word; }
   .v:active, .x:active { filter: brightness(.85); }
   .v:focus-visible, .x:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .arrow { align-self: center; --mdc-icon-size: 20px; color: color-mix(in srgb, var(--secondary-text-color) 45%, transparent); }
   .extra { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 10px 0 0; }
   .extra:empty { display: none; }
-  .opt:active, .side:active { filter: brightness(.94); }
+  .opt:active, .side:active { filter: brightness(.92); }
   .opt:focus-visible, .side:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
@@ -1092,6 +1358,7 @@ class EnclosureFilterCard extends HTMLElement {
     if (!config) throw new Error("Missing configuration");
     this._config = { intake: {}, exhaust: {}, ...config };
     this._built = false;
+    this._pending = {};
     if (this._hass) this._render();
   }
 
@@ -1108,6 +1375,25 @@ class EnclosureFilterCard extends HTMLElement {
     return { columns: "full", rows: "auto" };
   }
 
+  disconnectedCallback() {
+    clearTimeout(this._pendTimer);
+  }
+
+  /* A vent move shown before Home Assistant confirms it (like the vacuum's floor switch): the
+     pressed segment moves at once; the real state takes over once it matches, or after 45 s. */
+  _pend(k, v) {
+    this._pending[k] = { v, t: Date.now() };
+  }
+  _shown(k, actual) {
+    const p = this._pending[k];
+    if (!p) return actual;
+    if (p.v === actual || Date.now() - p.t > PENDING_MS) {
+      delete this._pending[k];
+      return actual;
+    }
+    return p.v;
+  }
+
   _options() {
     const s = this._hass.states[this._config.vent];
     return (s?.attributes?.options || []).filter((o) => isFinite(Number(o)));
@@ -1118,9 +1404,10 @@ class EnclosureFilterCard extends HTMLElement {
     const opts = this._config.vent ? this._options() : [];
     const side = (k, title) => `<div class="side ${k}" role="button" tabindex="0"><div class="h">${esc(title)}</div><div class="vals"></div></div>`;
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      <div class="label"><ha-icon icon="mdi:air-filter"></ha-icon><span class="title">${esc(this._config.title ?? "Filter")}</span><span class="sum"></span></div>
-      ${opts.length ? `<div class="vent"><span class="vl">Vent</span><div class="seg" style="--n:${opts.length}">
-        ${opts.map((o) => `<button class="opt" data-o="${esc(o)}">${esc(optionLabel(o))}</button>`).join("")}</div></div>` : ""}
+      <div class="label"><div class="slot"><ha-icon icon="mdi:air-filter"></ha-icon></div>
+        <div class="lt"><div class="t">${esc(this._config.title ?? "Filter")}</div><span class="s"></span></div></div>
+      ${opts.length ? `<div class="vent"><span class="vl">Vent</span><div class="seg" role="group" aria-label="Vent">
+        ${opts.map((o) => `<button class="opt" data-o="${esc(o)}" aria-pressed="false">${esc(optionLabel(o))}</button>`).join("")}</div></div>` : ""}
       <div class="io">${side("in", this._config.intake_name || "Intake")}<ha-icon class="arrow" icon="mdi:arrow-right-thick"></ha-icon>${side("out", this._config.exhaust_name || "Exhaust")}</div>
       <div class="extra"></div></ha-card>`;
     root.querySelectorAll(".opt").forEach((b) => b.addEventListener("click", () => this._select(b.dataset.o)));
@@ -1166,7 +1453,7 @@ class EnclosureFilterCard extends HTMLElement {
   }
 
   _render() {
-    inkSchedule(this, ".side");
+    inkSchedule(this, ".side, .lt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -1174,18 +1461,24 @@ class EnclosureFilterCard extends HTMLElement {
     const set = (n, v) => {
       if (n && n.innerHTML !== v) n.innerHTML = v;
     };
-    const vent = this._hass.states[this._config.vent]?.state;
-    root.querySelectorAll(".opt").forEach((b) => b.classList.toggle("on", b.dataset.o === vent));
+    const vent = this._shown("vent", this._hass.states[this._config.vent]?.state);
+    if (!this._pending.vent) clearTimeout(this._pendTimer);
+    root.querySelectorAll(".opt").forEach((b) => {
+      const on = b.dataset.o === vent;
+      b.classList.toggle("on", on);
+      if (b.getAttribute("aria-pressed") !== String(on)) b.setAttribute("aria-pressed", String(on));
+    });
     const a = this._side(this._config.intake);
     const b = this._side(this._config.exhaust);
     set(root.querySelector(".side.in .vals"), a.html);
     set(root.querySelector(".side.out .vals"), b.html);
+    // The summary, under the title: each part whole, the line breaking only between parts.
     const sum = [
       vent && !isFinite(Number(vent)) ? `Vent: ${vent}` : "",
       a.voc != null && b.voc != null ? `VOC ${fmt(a.voc)} → ${fmt(b.voc)}` : "",
-    ].filter(Boolean).join(" · ");
-    const s = root.querySelector(".sum");
-    if (s.textContent !== sum) s.textContent = sum;
+    ].filter(Boolean).map((p) => `<span class="p">${esc(p)}</span>`).join("&nbsp;· ");
+    set(root.querySelector(".s"), sum);
+    root.querySelector(".lt").classList.toggle("one", !sum);
     const extra = (this._config.details || [])
       .map((d) => (typeof d === "string" ? { entity: d } : d))
       .filter((d) => this._hass.states[d.entity])
@@ -1193,19 +1486,30 @@ class EnclosureFilterCard extends HTMLElement {
         const st = this._hass.states[d.entity];
         const n = num(st.state);
         const name = d.name || st.attributes.friendly_name || d.entity;
-        return `<button class="x" data-e="${esc(d.entity)}">${esc(name)} ${n === null ? esc(st.state) : fmt(n, Math.abs(n) < 100 && n % 1 ? 1 : 0)}</button>`;
+        const value = n === null
+          ? (["unknown", "unavailable"].includes(st.state) ? "–" : st.state)
+          : withUnit(fmt(n, Math.abs(n) < 100 && n % 1 ? 1 : 0), st.attributes.unit_of_measurement);
+        return `<button class="x" data-e="${esc(d.entity)}">${esc(name)} <span class="p">${esc(value)}</span></button>`;
       })
       .join("");
     set(root.querySelector(".extra"), extra);
   }
 
+  /* The pressed segment moves at once; it falls back at once if Home Assistant refuses, else
+     when the 45 s are up without the vent's state agreeing. */
   async _select(option) {
     const id = this._config.vent;
     const [domain] = id.split(".");
+    this._pend("vent", option);
+    this._render();
+    clearTimeout(this._pendTimer);
+    this._pendTimer = setTimeout(() => this._render(), PENDING_MS + 50);
     try {
       await this._hass.callService(domain === "input_select" ? "input_select" : "select", "select_option", { entity_id: id, option });
     } catch (err) {
-      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "Could not move the vent" }, bubbles: true, composed: true }));
+      delete this._pending.vent;
+      this._render();
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "Couldn't move the vent." }, bubbles: true, composed: true }));
     }
   }
 
@@ -1231,13 +1535,14 @@ async function registerEnclosureFilterCard() {
 registerEnclosureFilterCard();
 })();
 
-/* ===== energy-summary-card 1.1.2 ===== */
+/* ===== energy-summary-card 1.2.0 ===== */
 (() => {
 /*
  * Energy summary card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * One compact row: power now, and energy used today, yesterday and this month
- * so far, each with what it costs. Tap it for the full Energy dashboard.
+ * so far, each with what it costs. Tap a number for its sensor; tap anywhere else
+ * for the full Energy dashboard.
  * Totals come from Home Assistant's long-term statistics, so they match the
  * Energy dashboard; today and the month also add what the meter has counted
  * since the latest 5-minute statistics, so they tick live instead of lagging.
@@ -1245,27 +1550,30 @@ registerEnclosureFilterCard();
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.1.2";
+const ESC_VERSION = "1.2.0";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
+// Teal = you can tap this: the circle is the card's tap target (the user's reference teal).
 const TEAL = "var(--teal-color, #009688)";
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
+// Numbers with the user's digit grouping: 1,235 · 12.3 · 1,204.
+const fmt = (n, d, locale) => n.toLocaleString(locale || "en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
 
-/* 616 W · 12.4 kW */
-function power(w) {
+/* 616 W · 1,235 W · 12.3 kW */
+function power(w, locale) {
   if (w === null) return ["–", "W"];
-  return Math.abs(w) >= 10000 ? [(w / 1000).toFixed(1), "kW"] : [String(Math.round(w)), "W"];
+  return Math.abs(w) >= 10000 ? [fmt(w / 1000, 1, locale), "kW"] : [fmt(Math.round(w) || 0, 0, locale), "W"];
 }
 
-/* 7.99 · 86.6 · 1204 kWh – about three significant figures. */
-function energy(kwh) {
+/* 7.99 · 86.6 · 1,204 kWh – about three significant figures. */
+function energy(kwh, locale) {
   if (kwh === null) return ["–", "kWh"];
   const a = Math.abs(kwh);
-  return [kwh.toFixed(a < 10 ? 2 : a < 100 ? 1 : 0), "kWh"];
+  return [fmt(kwh, a < 10 ? 2 : a < 100 ? 1 : 0, locale), "kWh"];
 }
 
 /* The sensor's state in kWh, whatever energy unit it reports. */
@@ -1333,30 +1641,39 @@ const CSS = `
   ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  /* Spacing follows Mushroom: content starts 10px from the card edge. */
-  .row { display: flex; align-items: center; gap: 6px; padding: 12px 10px; }
+  /* Spacing follows Mushroom: content starts 10px from the card edge, the first text at edge + 46
+     (36px circle + 10px gap), on every screen. */
+  .row { display: flex; align-items: center; gap: 10px; padding: 12px 10px; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .shape ha-icon { --mdc-icon-size: 24px; } /* same as Mushroom / tile card icons */
-  .stats { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .stat { min-width: 0; padding: 0 6px 0 10px; border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
-  .stat:first-child { border-left: none; }
-  .k { font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: .02em; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* Text matches Mushroom / tile cards: values 14px medium, costs 12px regular, same colour. */
-  .v { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); white-space: nowrap; }
+  /* The numbers are never cut: equal widths while all four fit, a longer one takes what it needs,
+     and only when a row can't hold them does one move to a second row. Each stat has a divider
+     and 10px (--pl) before its text; the block is pulled left by that much, and the 1px clip on
+     its left edge hides the divider of whichever stat starts a row – so the first text of every
+     row lines up at edge + 46. */
+  .stats { --pl: 10px; flex: 1; min-width: 0; display: flex; flex-wrap: wrap; row-gap: 8px;
+    margin-left: calc(-1px - var(--pl)); clip-path: inset(-12px -12px -12px 1px); }
+  .stat { box-sizing: border-box; flex: 1 1 0; min-width: max-content; padding: 0 6px 0 var(--pl);
+    border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
+  /* Captions under the numbers: 11px. */
+  .k { font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: .02em; color: var(--secondary-text-color); }
+  /* Text matches Mushroom / tile cards: values 14px medium in the primary colour (no colour on
+     values), costs 12px regular in the secondary colour. Every number is its own tap target. */
+  .v { all: unset; box-sizing: border-box; display: block; width: fit-content; font-size: 14px; line-height: 20px; font-weight: 500;
+    letter-spacing: .1px; color: var(--primary-text-color); white-space: nowrap; cursor: pointer; border-radius: 4px;
+    -webkit-tap-highlight-color: transparent; }
   .v small { font-size: 11px; font-weight: 400; color: var(--secondary-text-color); margin-left: 2px; }
-  .now .v { color: ${TEAL}; }
-  .c { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .c:empty::before { content: "\\00a0"; }
-  ha-card:active { filter: brightness(.96); }
+  ha-card:active, .v:active { filter: brightness(.92); }
+  /* Pressing a number darkens only the number: the tap goes to it, not to the card. */
+  ha-card:has(.v:active) { filter: none; }
   ha-card:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  /* Phone width: the icon gives its space to the numbers. */
+  .v:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  /* Phone width: a little less air between the numbers, so all four still fit on one row more often. */
   @container (max-width: 400px) {
-    .shape { display: none; }
-    .row { padding: 12px 8px; }
-    .stat { padding: 0 4px 0 8px; }
-    .stat:first-child { padding-left: 2px; }
-    .v small { font-size: 10px; margin-left: 1px; }
+    .stats { --pl: 8px; }
+    .stat { padding-right: 4px; }
   }
 `;
 
@@ -1571,15 +1888,26 @@ class EnergySummaryCard extends HTMLElement {
 
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
-    const stat = (key) => `<div class="stat ${key}"><div class="k"></div><div class="v"></div><div class="c"></div></div>`;
+    // Each number is a button for its own sensor: Now → the power sensor, the rest → the energy sensor.
+    const sensor = (key) => (key === "now" ? this._config.power : this._config.energy) || "";
+    const stat = (key) =>
+      `<div class="stat ${key}"><div class="k"></div><button class="v" data-e="${esc(sensor(key))}"></button><div class="c"></div></div>`;
     root.innerHTML = `<style>${CSS}</style>
       <ha-card role="button" tabindex="0"><div class="row">
         <div class="shape" style="background:${tint(TEAL, 20)}"><ha-icon style="color:${TEAL}"></ha-icon></div>
         <div class="stats">${["now", "today", "yesterday", "month"].map(stat).join("")}</div>
       </div></ha-card>`;
     const card = root.querySelector("ha-card");
+    // A number opens its own sensor and stops there; the circle and everywhere else navigate.
+    root.querySelectorAll(".v").forEach((b) =>
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._more(b.dataset.e);
+      }),
+    );
     card.addEventListener("click", () => this._tap());
     card.addEventListener("keydown", (e) => {
+      if (e.target !== card) return; // a focused number handles its own Enter / Space (it's a button)
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         this._tap();
@@ -1606,10 +1934,10 @@ class EnergySummaryCard extends HTMLElement {
     const today = live(this._totals.today);
     const monthSoFar = live(this._totals.month);
     const rows = {
-      now: ["Now", power(w), w === null || price === null ? "" : perHour((w / 1000) * price, currency, locale)],
-      today: ["Today", energy(today), cost(today)],
-      yesterday: ["Yesterday", energy(this._totals.yesterday), cost(this._totals.yesterday)],
-      month: [month.charAt(0).toUpperCase() + month.slice(1), energy(monthSoFar), cost(monthSoFar)],
+      now: ["Now", power(w, locale), w === null || price === null ? "" : perHour((w / 1000) * price, currency, locale)],
+      today: ["Today", energy(today, locale), cost(today)],
+      yesterday: ["Yesterday", energy(this._totals.yesterday, locale), cost(this._totals.yesterday)],
+      month: [month.charAt(0).toUpperCase() + month.slice(1), energy(monthSoFar, locale), cost(monthSoFar)],
     };
     root.querySelector(".shape ha-icon").setAttribute("icon", this._config.icon || "mdi:home-lightning-bolt");
     for (const [key, [label, [value, unit], money_]] of Object.entries(rows)) {
@@ -1631,9 +1959,11 @@ class EnergySummaryCard extends HTMLElement {
     if (path) {
       history.pushState(null, "", path);
       this._fire("location-changed", { replace: false });
-    } else if (this._config.power || this._config.energy) {
-      this._fire("hass-more-info", { entityId: this._config.power || this._config.energy });
-    }
+    } else this._more(this._config.power || this._config.energy);
+  }
+
+  _more(entityId) {
+    if (entityId) this._fire("hass-more-info", { entityId });
   }
 
   _fire(type, detail) {
@@ -1658,7 +1988,7 @@ async function registerEnergySummaryCard() {
 registerEnergySummaryCard();
 })();
 
-/* ===== home-status-card 1.2.4 ===== */
+/* ===== home-status-card 1.3.0 ===== */
 (() => {
 /*
  * Home status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1670,12 +2000,15 @@ registerEnergySummaryCard();
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.2.4";
+const HSC_VERSION = "1.3.0";
 const HSC_TAG = "home-status-card";
 
+// One meaning per colour (design tokens → Colours): green = someone home, orange = the step
+// before red (seen within the hour), red = a call for attention (empty, door open, armed,
+// heating), amber = early warning, blue = cooling, grey = normal.
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
-  teal: "var(--teal-color, #009688)",
+  green: "var(--green-color, #4caf50)",
   orange: "var(--orange-color, #ff9800)",
   amber: "var(--amber-color, #ffc107)",
   red: "var(--red-color, #f44336)",
@@ -1684,15 +2017,17 @@ const C = {
 const RECENT_S = 3600;
 
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
+// Readable coloured text – mixed toward the text colour, never the raw colour on white.
+const tx = (c, p = 70) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-color))`;
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const num = (v) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v));
 const unavailable = (s) => !s || s.state === "unavailable" || s.state === "unknown";
 
 function when(date) {
-  // Same wording as the old chip: "today at 16:09", "yesterday at 09:12", "on Oct 03 at 18:40".
+  // Same wording as the old chip: "today at 16:09", "yesterday at 09:12", "on 03 Oct at 18:40".
   const now = new Date();
-  const hm = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const hm = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
   const sameDay = (a, b) => a.toDateString() === b.toDateString();
   const y = new Date(now);
   y.setDate(now.getDate() - 1);
@@ -1718,7 +2053,7 @@ function model(hass, cfg) {
   const lastRoom = (st(p.last_room)?.state || "").trim();
   let presence;
   if (occupied && !unavailable(st(p.occupied)))
-    presence = { color: C.teal, label: "Occupied", detail: occupied, icon: "mdi:home-account" };
+    presence = { color: C.green, label: "Occupied", detail: occupied, icon: "mdi:home-account" };
   else {
     // As before: orange if someone was seen within the hour, red otherwise.
     const recent = lastSeen && (Date.now() - lastSeen.getTime()) / 1000 < RECENT_S;
@@ -1741,7 +2076,8 @@ function model(hass, cfg) {
     tiles.push({
       key: "door",
       icon: open ? "mdi:door-open" : "mdi:door-closed",
-      label: unavailable(s) ? "Door ?" : open ? "Open" : "Closed",
+      // Each label names its object ("Door open", like "TV on"); unknown is "–".
+      label: unavailable(s) ? "Door –" : open ? "Door open" : "Door closed",
       color: open ? C.red : null,
       action: { action: "more-info", entity: cfg.door },
       title: "Door",
@@ -1754,7 +2090,7 @@ function model(hass, cfg) {
     tiles.push({
       key: "tv",
       icon: on ? "mdi:television" : "mdi:television-off",
-      label: unavailable(s) ? "TV ?" : on ? "TV on" : "TV off",
+      label: unavailable(s) ? "TV –" : on ? "TV on" : "TV off",
       color: on ? C.amber : null,
       action: tv.navigation_path ? { action: "navigate", path: tv.navigation_path } : { action: "more-info", entity: tv.entity },
       title: "TV",
@@ -1773,7 +2109,7 @@ function model(hass, cfg) {
       color = C.red;
       icon = "mdi:fire";
     }
-    // Short enough to fit a phone-width button: "25.1° · Cool".
+    // Short, so the three buttons share a row on a phone: "25.1° · Cool".
     const short = /off/i.test(mode) ? "Off" : /cool/i.test(mode) ? "Cool" : /heat/i.test(mode) ? "Heat"
       : mode.replace(/^AC\s*/i, "") || "–";
     tiles.push({
@@ -1793,7 +2129,7 @@ function model(hass, cfg) {
 }
 
 /* ------------------------------------------------------------------------ */
-/* Confirmation dialog – same look as the Tado X room card's Boost dialog    */
+/* Confirmation dialog – same look as the other cards' dialogs              */
 /* ------------------------------------------------------------------------ */
 
 const DIALOG_CSS = `
@@ -1814,10 +2150,10 @@ const DIALOG_CSS = `
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
   .title { font-size: 20px; line-height: 26px; font-weight: 600; }
-  .body { margin-top: 20px; }
-  .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
-  .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; }
-  .buttons { margin-top: 20px; display: grid; gap: 8px; }
+  /* The text sits under the title, starting on its line (8 + 42px glyph + 6px gap). No home
+     name: the dialog opens from the home's own card. */
+  .text { margin: 12px 0 0 56px; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
+  .buttons { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); display: grid; gap: 8px; }
   button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
     border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
@@ -1832,7 +2168,7 @@ const DIALOG_CSS = `
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
 
-function confirmDialog({ title, icon, color, bodyIcon, primary, secondary, confirmLabel }) {
+function confirmDialog({ title, icon, color, text, confirmLabel }) {
   return new Promise((resolve) => {
     const host = document.createElement("hsc-confirm-dialog");
     const root = host.attachShadow({ mode: "open" });
@@ -1840,8 +2176,7 @@ function confirmDialog({ title, icon, color, bodyIcon, primary, secondary, confi
       <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
         <div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(icon)}" style="color:${color}"></ha-icon></div>
           <div class="title">${esc(title)}</div></div>
-        <div class="row body"><div class="glyph"><ha-icon icon="${esc(bodyIcon)}" style="color:${color}"></ha-icon></div>
-          <div><div class="primary">${esc(primary)}</div><div class="secondary">${esc(secondary)}</div></div></div>
+        <div class="text">${esc(text)}</div>
         <div class="buttons">
           <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
           <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
@@ -1885,31 +2220,38 @@ const CSS = `
     align-items: center; justify-content: center; transition: background-color 180ms; }
   /* Same size as Mushroom / tile card icons: 36 px circle, 24 px icon. */
   .shape ha-icon { --mdc-icon-size: 24px; transition: color 180ms; }
-  /* Text matches Mushroom / tile cards: name 14px medium, detail 12px regular, same colour. */
-  .name { min-width: 0; font-size: 14px; line-height: 18px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .shape.who:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  /* Text matches Mushroom / tile cards: name 14px medium, detail 12px regular. Nothing is cut off:
+     "Home · Occupied" breaks only before the state word (the dot stays with the name), and the
+     detail line wraps in full. */
+  .name { min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+    overflow-wrap: break-word; }
   .name .state { font-weight: 400; color: var(--secondary-text-color); }
-  .detail { min-width: 0; font-size: 12px; line-height: 15px; color: var(--primary-text-color);
-    letter-spacing: .4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  /* Secondary pill (30px, like the status buttons below): a state chip, not the card's main action. */
-  .alarm { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 5px; height: 30px;
-    padding: 0 10px 0 7px; border-radius: 15px; cursor: pointer; font-size: 12px; font-weight: 600;
+  .name .w { white-space: nowrap; }
+  .detail { min-width: 0; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color);
+    overflow-wrap: break-word; }
+  /* Secondary pill (30px, like the status buttons below): a state chip, not the card's main action.
+     Its word always shows: on a narrow card the text beside it wraps instead. */
+  .alarm { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 5px; min-height: 30px;
+    padding: 0 10px 0 7px; border-radius: 15px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
     transition: background-color 180ms, color 180ms; -webkit-tap-highlight-color: transparent; }
-  .alarm ha-icon { --mdc-icon-size: 16px; color: var(--grey-color, #9e9e9e); }
-  .alarm.on { background: color-mix(in srgb, var(--red-color, #f44336) 20%, transparent); color: var(--red-color, #f44336); }
-  .alarm.on ha-icon { color: var(--red-color, #f44336); }
+  .alarm ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; }
+  /* Armed: the "on" pill of every card – red tint 18%, the word mixed 70% toward the text colour. */
+  .alarm.on { background: ${tint(C.red, 18)}; color: ${tx(C.red, 70)}; }
+  .alarm.on ha-icon { color: ${C.red}; }
   /* Press feedback without moving the button: a scale-down shrinks the target under the finger
      and taps near the edge would be lost. */
-  .alarm:active, .tile:active, .msg:active, .shape.who:active { filter: brightness(.9); }
+  .alarm:active, .tile:active, .msg:active, .shape.who:active { filter: brightness(.92); }
   .alarm:focus-visible, .tile:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  .tiles { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 6px; }
-  .tile { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 6px;
-    height: 30px; padding: 0 8px; border-radius: 15px; cursor: pointer; min-width: 0;
+  /* Status buttons: one row, equal widths while every label fits; a longer label takes the width
+     it needs, and only if the row can't hold them all does one wrap. Labels are never cut. */
+  .tiles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tile { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: max-content; display: flex; align-items: center; justify-content: center;
+    gap: 6px; min-height: 30px; padding: 0 8px; border-radius: 15px; cursor: pointer; white-space: nowrap;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color);
     font-size: 12px; font-weight: 500; transition: background-color 180ms; -webkit-tap-highlight-color: transparent; }
-  .tile ha-icon { --mdc-icon-size: 16px; flex: 0 0 auto; color: var(--grey-color, #9e9e9e); }
-  .tile span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile ha-icon { --mdc-icon-size: 16px; flex: 0 0 auto; color: ${C.grey}; }
   .msg { all: unset; box-sizing: border-box; display: flex; align-items: flex-start; gap: 8px; min-height: 30px; padding: 7px 12px;
     border-radius: 15px; cursor: pointer; font-size: 12px; line-height: 16px; color: var(--primary-text-color);
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
@@ -1922,11 +2264,6 @@ const CSS = `
   @container (min-width: 600px) {
     ha-card { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
     .head { grid-column: 1 / -1; }
-  }
-  @container (max-width: 300px) {
-    .alarm .txt { display: none; }
-    .alarm { padding: 0 8px; }
-    .tile { gap: 4px; padding: 0 6px; }
   }
 `;
 
@@ -2131,6 +2468,12 @@ class HomeStatusCard extends HTMLElement {
     const openPresence = () =>
       this._act(p.navigation_path ? { action: "navigate", path: p.navigation_path } : { action: "more-info", entity: p.occupied });
     this._el.who.forEach((el) => el.addEventListener("click", openPresence));
+    // The presence circle is a button: Enter / Space too.
+    this._el.shape.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      openPresence();
+    });
     this._el.alarm.addEventListener("click", () => this._toggleAlarm());
     this._el.msg.addEventListener("click", () => this._act({ action: "more-info", entity: this._config.message }));
     this._built = true;
@@ -2150,7 +2493,8 @@ class HomeStatusCard extends HTMLElement {
     e.shape.style.backgroundColor = tint(m.presence.color, 20);
     // Only touch the DOM when something changed: replacing an element while a finger is on it
     // swallows the tap, and Home Assistant pushes state updates several times a second.
-    const nameHtml = `${esc(this._config.name || "Home")} <span class="state">· ${esc(m.presence.label)}</span>`;
+    // "Greece · Occupied": on a narrow card only the state word moves down, the dot staying with the name.
+    const nameHtml = `${esc(this._config.name || "Home")}<span class="state">&nbsp;· <span class="w">${esc(m.presence.label)}</span></span>`;
     if (e.name.innerHTML !== nameHtml) e.name.innerHTML = nameHtml;
     if (e.detail.textContent !== m.presence.detail) e.detail.textContent = m.presence.detail;
 
@@ -2159,7 +2503,8 @@ class HomeStatusCard extends HTMLElement {
       e.alarm.classList.toggle("on", m.alarm.on);
       e.alarm.setAttribute("aria-pressed", String(m.alarm.on));
       e.alarmIcon.setAttribute("icon", m.alarm.on ? "mdi:shield-lock" : "mdi:shield-off-outline");
-      e.alarmTxt.textContent = m.alarm.unavailable ? "Alarm ?" : m.alarm.on ? "Armed" : "Disarmed";
+      const word = m.alarm.unavailable ? "Alarm –" : m.alarm.on ? "Armed" : "Disarmed";
+      if (e.alarmTxt.textContent !== word) e.alarmTxt.textContent = word;
     }
 
     const keys = m.tiles.map((t) => t.key).join();
@@ -2167,7 +2512,6 @@ class HomeStatusCard extends HTMLElement {
       e.tiles.innerHTML = m.tiles
         .map((t) => `<button class="tile" data-key="${t.key}"><ha-icon></ha-icon><span></span></button>`)
         .join("");
-      e.tiles.style.setProperty("--n", String(m.tiles.length || 1));
       e.tiles.querySelectorAll(".tile").forEach((b) =>
         b.addEventListener("click", () => this._act(this._m.tiles.find((t) => t.key === b.dataset.key).action)),
       );
@@ -2175,12 +2519,15 @@ class HomeStatusCard extends HTMLElement {
     }
     m.tiles.forEach((t, i) => {
       const b = e.tiles.children[i];
+      // A button that needs attention is an "on" pill: tint 18%, label mixed 70% toward the text
+      // colour, icon in full colour.
       b.querySelector("ha-icon").setAttribute("icon", t.icon);
       b.querySelector("ha-icon").style.color = t.color || "";
-      b.style.backgroundColor = t.color ? tint(t.color, 20) : "";
+      b.style.backgroundColor = t.color ? tint(t.color, 18) : "";
+      b.style.color = t.color ? tx(t.color, 70) : "";
       const span = b.querySelector("span");
       if (span.textContent !== t.label) span.textContent = t.label;
-      b.title = `${t.title}: ${t.label}`;
+      b.title = t.label.startsWith(t.title) ? t.label : `${t.title}: ${t.label}`;
     });
     e.tiles.style.display = m.tiles.length ? "" : "none";
 
@@ -2195,17 +2542,16 @@ class HomeStatusCard extends HTMLElement {
     const m = this._m;
     if (!m?.alarm) return;
     const arming = !m.alarm.on;
-    const name = this._config.name || "Home";
+    // Red both ways – the Armed chip's colour (a confirmation takes its control's "on" colour).
+    // The dialog opens from the home's own card, so it doesn't name the home again.
     const ok = await confirmDialog({
       title: arming ? "Arm alarm" : "Disarm alarm",
       icon: arming ? "mdi:shield-lock" : "mdi:shield-off-outline",
-      color: arming ? C.red : C.teal,
-      bodyIcon: "mdi:home-outline",
-      primary: name,
-      secondary: arming
-        ? `Your CCTV alarm system will send push notifications when it detects someone in ${name}.`
-        : `Your CCTV alarm system stops sending push notifications for ${name} until you arm it again.`,
-      confirmLabel: arming ? "Arm alarm" : "Disarm alarm",
+      color: C.red,
+      text: arming
+        ? "Your CCTV alarm system will send push notifications when it detects someone."
+        : "Your CCTV alarm system stops sending push notifications until you arm it again.",
+      confirmLabel: arming ? "Arm" : "Disarm",
     });
     if (!ok) return;
     const [domain] = this._config.alarm.split(".");
@@ -2214,7 +2560,7 @@ class HomeStatusCard extends HTMLElement {
         entity_id: this._config.alarm,
       });
     } catch (err) {
-      this._fire("hass-notification", { message: err?.message || "Could not change the alarm" });
+      this._fire("hass-notification", { message: err?.message || "Couldn't change the alarm." });
     }
   }
 
@@ -2250,25 +2596,25 @@ async function registerHomeStatusCard() {
 registerHomeStatusCard();
 })();
 
-/* ===== mmu-lanes-card 1.1.7 ===== */
+/* ===== mmu-lanes-card 1.2.0 ===== */
 (() => {
 /*
  * MMU lanes card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * Every lane of a Happy Hare MMU (e.g. an EMU) at a glance: whether filament is
- * loaded, the lane's humidity (coloured: dry / OK / humid) and temperature, and a
- * fan icon while the lane is drying. The label row counts the loaded lanes. Tap a
- * reading for its own more-info. Sensors are found from the Moonraker prefix;
- * lanes are counted automatically.
+ * loaded (green: good, ready), the lane's humidity (coloured: dry / medium / wet) and
+ * temperature, and a fan icon while the lane is drying. The summary under the title counts
+ * the loaded lanes. Lane names are never cut: the grid takes as many columns as the measured
+ * names allow (fewer on a phone). Tap a reading for its own more-info. Sensors are found
+ * from the Moonraker prefix; lanes are counted automatically.
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.1.7";
+const MLC_VERSION = "1.2.0";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
-  teal: "var(--teal-color, #009688)",
   green: "var(--green-color, #4caf50)",
   amber: "var(--amber-color, #ffc107)",
   orange: "var(--orange-color, #ff9800)",
@@ -2334,30 +2680,41 @@ const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; container-type: inline-size; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
-     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
-     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
-     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
-  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; } /* 10px gap: titles at edge + 46, like Mushroom */
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; color: ${C.teal}; }
-  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
-  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
-  .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
-    color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+     Two-line label row, the same on every card: a 24px icon in a 36px slot (where the glyph of a
+     Mushroom icon sits), the 14px / 500 title at edge + 46 and the 12px summary under it on the
+     same vertical line (ink-aligned, free to wrap). The icon is decorative: grey, no circle. */
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; }
+  .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+  .slot ha-icon { --mdc-icon-size: 24px; color: ${C.grey}; }
+  .lt { flex: 1; min-width: 0; }
+  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
+  .lt.one .t { position: relative; top: 1px; } /* alone, a 20px line reads ~1px high next to the icon */
+  .s { display: block; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .s:empty { display: none; }
+  /* Lanes: the columns are fitted to the measured names (_fitLanes) – as many as the columns option while
+     every name fits on one line, fewer on a phone. Before that (and without a browser to measure
+     in), four columns, two on a narrow card. */
   .lanes { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
   @container (max-width: 300px) { .lanes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .lane { box-sizing: border-box; min-width: 0; padding: 10px 8px; border-radius: 10px; cursor: pointer;
+  .lane { box-sizing: border-box; min-width: 0; padding: 11px 10px; border-radius: 10px; cursor: pointer;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
-  .lt { display: flex; align-items: center; gap: 4px; }
-  .ln { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lh { display: flex; align-items: center; gap: 4px; }
+  /* The name keeps its natural width (so it can be measured) and pushes the icons to the end. */
+  .ln { flex: 0 1 auto; min-width: 0; margin-right: auto; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px;
+    color: var(--primary-text-color); white-space: nowrap; }
+  /* Only a name wider than the whole card wraps. */
+  .lanes.wrap .ln { white-space: normal; overflow-wrap: break-word; }
   .lane.empty .ln { color: var(--secondary-text-color); }
-  .lt ha-icon { --mdc-icon-size: 18px; color: ${C.teal}; }
-  .lane.empty .lt ha-icon.sp { color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
-  .lt ha-icon.dry { --mdc-icon-size: 16px; color: ${C.orange}; }
+  .lh ha-icon { flex: none; --mdc-icon-size: 18px; }
+  /* Loaded = good, ready: green. Empty: quiet. Unknown: grey. */
+  .lh ha-icon.sp { color: ${C.green}; }
+  .lane.empty .lh ha-icon.sp { color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
+  .lane.unknown .lh ha-icon.sp { color: ${C.grey}; }
+  /* Drying: heat, so orange. */
+  .lh ha-icon.dry { --mdc-icon-size: 16px; color: ${C.orange}; }
   .lv { display: grid; gap: 1px; margin-top: 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .v { all: unset; box-sizing: border-box; justify-self: start; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
-    cursor: pointer; border-radius: 6px; -webkit-tap-highlight-color: transparent; }
+    cursor: pointer; border-radius: 4px; -webkit-tap-highlight-color: transparent; }
   .v:active { filter: brightness(.85); }
   .v:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
@@ -2365,8 +2722,8 @@ const CSS = `
     color: var(--secondary-text-color); }
   .legend span { display: inline-flex; align-items: center; gap: 4px; }
   .legend em { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  .legend ha-icon { --mdc-icon-size: 14px; color: ${C.teal}; }
-  .lane:active { filter: brightness(.94); }
+  .legend ha-icon { --mdc-icon-size: 14px; color: ${C.green}; }
+  .lane:active { filter: brightness(.92); }
   .lane:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
@@ -2504,14 +2861,28 @@ class MmuLanesCard extends HTMLElement {
     return { columns: "full", rows: "auto" };
   }
 
+  connectedCallback() {
+    if (this._built && this._ro && this._lanesEl) this._ro.observe(this._lanesEl);
+  }
+
+  disconnectedCallback() {
+    this._ro?.disconnect();
+  }
+
+  /* The most lanes per row: the columns option (1–8), default 4. */
+  _maxCols() {
+    return Math.max(1, Math.min(8, Number(this._config.columns) || 4));
+  }
+
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const ls = lanes(this._hass, this._config);
     const [dry, humid] = this._config.humidity_thresholds || [20, 40];
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      <div class="label"><ha-icon icon="mdi:tray-full"></ha-icon><span class="title">${esc(this._config.title ?? "MMU lanes")}</span><span class="sum"></span></div>
-      <div class="lanes" style="--cols:${Math.max(1, Math.min(8, Number(this._config.columns) || 4))}">
-        ${ls.map((l) => `<div class="lane" role="button" tabindex="0" data-n="${l.n}"><div class="lt"><span class="ln">${esc(l.name)}</span>
+      <div class="label"><div class="slot"><ha-icon icon="mdi:tray-full"></ha-icon></div>
+        <div class="lt"><div class="t">${esc(this._config.title ?? "MMU lanes")}</div><span class="s"></span></div></div>
+      <div class="lanes" style="--cols:${this._maxCols()}">
+        ${ls.map((l) => `<div class="lane" role="button" tabindex="0" data-n="${l.n}"><div class="lh"><span class="ln">${esc(l.name)}</span>
           <ha-icon class="dry" icon="mdi:fan" style="display:none"></ha-icon><ha-icon class="sp"></ha-icon></div><div class="lv"></div></div>`).join("")}
       </div>
       ${this._config.legend ? `<div class="legend"><span><ha-icon icon="mdi:circle-slice-8"></ha-icon>loaded</span>
@@ -2534,11 +2905,55 @@ class MmuLanesCard extends HTMLElement {
         open(e);
       }
     });
+    // Fit the columns to the names now, whenever the card resizes, and once the fonts have loaded.
+    this._lanesEl = root.querySelector(".lanes");
+    this._ro?.disconnect();
+    if (typeof ResizeObserver !== "undefined") {
+      this._ro = new ResizeObserver(() => this._fitLanes());
+      this._ro.observe(this._lanesEl);
+    }
+    document.fonts?.ready?.then(() => this._fitLanes());
     this._built = true;
   }
 
+  /* The lane grid's columns, so that every name stays whole on one line. A lane needs its name
+     + 4px gap + 16px drying fan (reserved, so a fan starting never re-flows the grid) + 4px gap +
+     18px status icon + 20px padding, or its widest reading + 20px. Even columns as wide as the
+     widest lane: the columns option if they fit, else the most that fit (preferring a count that
+     fills every row); if not even two fit, two columns each as wide as its own widest lane;
+     else one, where only a name wider than the card wraps. Without layout (tests, a hidden tab)
+     there is nothing to measure and the CSS default stands. */
+  _fitLanes() {
+    const box = this._lanesEl;
+    if (!box || !box.isConnected) return;
+    const W = box.clientWidth;
+    const els = [...box.querySelectorAll(".lane")];
+    if (!W || !els.length) return;
+    box.classList.remove("wrap");
+    const ws = els.map((el) => {
+      const name = Math.ceil(el.querySelector(".ln").scrollWidth) + 62;
+      const vals = Math.max(0, ...[...el.querySelectorAll(".lv .v")].map((v) => Math.ceil(v.scrollWidth))) + 20;
+      return Math.max(name, vals);
+    });
+    const max = Math.max(...ws);
+    const n = els.length;
+    const most = this._maxCols();
+    const fits = (c) => c * max + (c - 1) * 8 <= W;
+    let c = fits(most) ? most : 0;
+    for (let k = most - 1; !c && k >= 2; k--) if (fits(k) && n % k === 0) c = k;
+    for (let k = most - 1; !c && k >= 2; k--) if (fits(k)) c = k;
+    let cols;
+    if (c >= 2) cols = `repeat(${c}, minmax(0, 1fr))`;
+    else {
+      const col = (k) => Math.max(0, ...ws.filter((_, i) => i % 2 === k));
+      cols = n > 1 && most >= 2 && col(0) + col(1) + 8 <= W ? "repeat(2, minmax(max-content, 1fr))" : "minmax(0, 1fr)";
+      box.classList.toggle("wrap", cols === "minmax(0, 1fr)" && max > W);
+    }
+    if (box.style.gridTemplateColumns !== cols) box.style.gridTemplateColumns = cols;
+  }
+
   _render() {
-    inkSchedule(this, ".lane");
+    inkSchedule(this, ".lane, .lt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -2548,6 +2963,7 @@ class MmuLanesCard extends HTMLElement {
       const el = root.querySelectorAll(".lane")[i];
       if (!el) return;
       el.classList.toggle("empty", l.loaded === false);
+      el.classList.toggle("unknown", l.loaded === null);
       const sp = el.querySelector(".sp");
       const icon = l.loaded === null ? "mdi:help-circle-outline" : l.loaded ? "mdi:circle-slice-8" : "mdi:circle-outline";
       if (sp.getAttribute("icon") !== icon) sp.setAttribute("icon", icon);
@@ -2563,8 +2979,9 @@ class MmuLanesCard extends HTMLElement {
     });
     const loaded = ls.filter((l) => l.loaded).length;
     const sum = `${loaded} of ${ls.length} loaded`;
-    const s = root.querySelector(".sum");
+    const s = root.querySelector(".s");
     if (s.textContent !== sum) s.textContent = sum;
+    root.querySelector(".lt").classList.toggle("one", !sum);
   }
 }
 
@@ -2585,7 +3002,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.6.0 ===== */
+/* ===== printer-status-card 1.7.0 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2598,14 +3015,17 @@ registerMmuLanesCard();
  * (plug off) or a safe Power off (idle), and an optional chamber light toggle (glows while
  * on; hold it for the light's more-info). Printer operations – homing, pause, resume,
  * cancel – are left to the printer itself on purpose. Power on, Power off and turning the
- * plug off always ask first. Tap any value for its own more-info (the watts on the power
- * pill too). Sensors are found from the Moonraker prefix (e.g. "voron").
+ * plug off always ask first (orange like the power pill; red only when cutting the plug would
+ * end a print). Tap any value for its own more-info (the watts on the power pill too), or the
+ * state circle for the printer's. Sensors are found from the Moonraker prefix (e.g. "voron").
+ * Text is never cut off: names, file names and status lines wrap (status lines only between
+ * their parts).
  * `layout: compact` is a one-row summary for an overview page (state, what matters now,
  * a progress bar while printing, live watts); a tap anywhere opens `navigation_path`.
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.6.0";
+const PSC_VERSION = "1.7.0";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -2622,11 +3042,24 @@ const esc = (s) =>
 const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
 const fmt = (n, d = 0) => (n === null ? "–" : n.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d }));
 
-/* 1.383 h → "1h 23m" */
-function hm(hours) {
+/* 1.383 h → "1 h 23 min", 0.75 h → "45 min", 3 h → "3 h" */
+function dur(hours) {
   if (hours === null) return "–";
   const m = Math.max(0, Math.round(hours * 60));
-  return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`;
+  if (m < 60) return `${m} min`;
+  return m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m / 60} h`;
+}
+/* A clock time, en-GB: "15:42". */
+const clock = (d) => d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+/* A status line: each part stays whole (nowrap) and the line wraps only between parts, the dot
+   staying with the part before it. A part is text, or {t, e} (opens entity e), or {t, free}
+   (a file name, which may break anywhere). */
+function line(list) {
+  return list
+    .map((p) => (typeof p === "string" ? { t: p } : p))
+    .filter((p) => p && p.t)
+    .map((p) => `<span class="${p.free ? "f" : "p"}"${p.e ? ` data-e="${esc(p.e)}"` : ""}>${esc(p.t)}</span>`)
+    .join("&nbsp;· ");
 }
 /* "4825h 49m 38s" → 4826 */
 function hoursFrom(text) {
@@ -2679,12 +3112,13 @@ function model(hass, cfg) {
   return {
     key,
     state: STATES[key],
-    message: !plugOn ? "Power is off" : key === "busy" ? busyMsg : msg,
+    // Off: the state word already says so ("Voron · Off"), so no line under it.
+    message: !plugOn ? "" : key === "busy" ? busyMsg : msg,
     plug: plug ? { on: plugOn, watts, live: meterOn && watts !== null } : null,
     file: s("filename") && !["unknown", "unavailable"].includes(s("filename")) ? s("filename") : "",
     progress: num(s("progress")),
     left: num(s("print_time_left")),
-    eta: etaDate && !isNaN(etaDate) ? etaDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "",
+    eta: etaDate && !isNaN(etaDate) ? clock(etaDate) : "",
     layer: num(s("current_layer")),
     layers: num(s("total_layer")),
     filament: num(s("filament_used")),
@@ -2699,7 +3133,7 @@ function model(hass, cfg) {
     ended: (() => {
       const t = st(`sensor.${p}_current_print_state`)?.last_changed;
       const d = t ? new Date(t) : null;
-      return d && !isNaN(d) ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+      return d && !isNaN(d) ? clock(d) : "";
     })(),
     chamber: num(st(cfg.chamber_sensor || `sensor.${p}_heater_chamber_temperature`)?.state),
     lanes: (() => {
@@ -2711,27 +3145,29 @@ function model(hass, cfg) {
   };
 }
 
-/* Compact layout: the state word, the line under it, and whether to show a progress bar. */
+/* Compact layout: the state word, the line under it (status-line parts, see line()), and
+   whether to show a progress bar. */
 function compactText(m, cfg) {
-  const file = m.file.replace(/\.gcode$/i, "");
+  const file = { t: m.file.replace(/\.gcode$/i, ""), free: true };
   const pct = m.progress === null ? "" : ` ${Math.round(m.progress)}%`;
+  const msg = { t: m.message, free: true };
   if (m.key === "printing" || m.key === "paused") {
     // The file gets its own line (it may wrap); the times stay together on the next one.
     return {
       word: `${m.state.word}${pct}`,
-      line: file,
-      line2: [m.left === null ? "" : `${hm(m.left)} left`, m.eta ? `done ${m.eta}` : ""].filter(Boolean).join(" · "),
+      line: [file],
+      line2: [m.left === null ? "" : `${dur(m.left)} left`, m.eta ? `ends ${m.eta}` : ""],
       bar: true,
     };
   }
-  if (m.key === "complete") return { word: m.state.word, line: [file, m.ended ? `finished ${m.ended}` : ""].filter(Boolean).join(" · ") };
-  if (m.key === "cancelled") return { word: m.state.word, line: file };
-  if (m.key === "off") return { word: m.state.word, line: cfg.energy_today && m.today !== null ? `Today ${fmt(m.today, 2)} kWh` : m.message };
+  if (m.key === "complete") return { word: m.state.word, line: [file, m.ended ? `finished ${m.ended}` : ""] };
+  if (m.key === "cancelled") return { word: m.state.word, line: [file] };
+  if (m.key === "off") return { word: m.state.word, line: [cfg.energy_today && m.today !== null ? `Today ${fmt(m.today, 2)} kWh` : ""] };
   if (m.key === "ready") {
     const bits = [m.chamber === null ? "" : `Chamber ${fmt(m.chamber)}°`, m.lanes ? `${m.lanes.loaded} of ${m.lanes.total} loaded` : ""].filter(Boolean);
-    return { word: m.state.word, line: bits.join(" · ") || m.message };
+    return { word: m.state.word, line: bits.length ? bits : [msg] };
   }
-  return { word: m.state.word, line: m.message };
+  return { word: m.state.word, line: [msg] };
 }
 
 /* Chamber light: a light / switch / input_boolean, or a 0–100 number (a Klipper output pin). */
@@ -2748,7 +3184,8 @@ function lightModel(s, id) {
 }
 
 /* Which power buttons fit the state: [key, label, icon]. Printer operations (home, pause,
-   resume, cancel) are deliberately not here – they are done on the printer. */
+   resume, cancel) are deliberately not here – they are done on the printer. Both power
+   buttons are orange, like the power pill (orange means power). */
 function actions(key) {
   if (key === "off") return [["poweron", "Power on", "mdi:power"]];
   if (["printing", "paused", "busy"].includes(key)) return [];
@@ -2777,10 +3214,10 @@ const DIALOG_CSS = `
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
   .title { font-size: 20px; line-height: 26px; font-weight: 600; }
-  .body { margin-top: 20px; }
-  .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
-  .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; }
-  .buttons { margin-top: 20px; display: grid; gap: 8px; }
+  /* The text sits under the title, starting on its line (8 + 42px glyph + 6px gap). No printer
+     name: the dialog opens from the printer's own card. */
+  .text { margin: 12px 0 0 56px; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
+  .buttons { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); display: grid; gap: 8px; }
   button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
     border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
@@ -2795,7 +3232,7 @@ const DIALOG_CSS = `
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
 
-function confirmDialog({ title, icon, color, primary, secondary, confirmLabel }) {
+function confirmDialog({ title, icon, color, text, confirmLabel }) {
   return new Promise((resolve) => {
     const host = document.createElement("psc-confirm-dialog");
     const root = host.attachShadow({ mode: "open" });
@@ -2803,8 +3240,7 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
       <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
         <div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(icon)}" style="color:${color}"></ha-icon></div>
           <div class="title">${esc(title)}</div></div>
-        <div class="row body"><div class="glyph"><ha-icon icon="mdi:printer-3d" style="color:${color}"></ha-icon></div>
-          <div><div class="primary">${esc(primary)}</div><div class="secondary">${esc(secondary)}</div></div></div>
+        <div class="text">${esc(text)}</div>
         <div class="buttons">
           <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
           <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
@@ -2842,10 +3278,10 @@ const CSS = `
   ha-card.compact { padding: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   ha-card.compact:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
   .crow { display: flex; align-items: center; gap: 10px; }
-  .crow .sc { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
-  .cbar { height: 4px; border-radius: 2px; margin-top: 6px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
+  /* A job progress bar is 8px, here as on the full card. */
+  .cbar { height: 8px; border-radius: 4px; margin-top: 6px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
   .cbar[hidden], .sc:empty { display: none; }
-  .cbar i { display: block; height: 100%; border-radius: 2px; background: var(--c, ${C.blue}); transition: width 300ms; }
+  .cbar i { display: block; height: 100%; border-radius: 4px; background: var(--c, ${C.blue}); transition: width 300ms; }
   .watts { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 10px; border-radius: 18px;
     font-size: 13px; font-weight: 600; letter-spacing: .2px; white-space: nowrap;
     background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
@@ -2859,13 +3295,20 @@ const CSS = `
   .head { display: flex; align-items: center; gap: 10px; padding: 0 0 10px; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .shape ha-icon { --mdc-icon-size: 24px; }
+  /* The state circle opens the printer's more-info, like the vacuum's (a tinted circle = tap target). */
+  .head .shape { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .txt { flex: 1; min-width: 0; }
-  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Text is never cut off: a line too long for its box wraps instead. "Name · State" breaks only
+     before the state word, the dot staying with the name. */
+  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
   .nm .st { font-weight: 400; color: var(--secondary-text-color); }
-  .sc { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pill { flex: none; display: inline-flex; align-items: stretch; height: 36px; border-radius: 18px; overflow: hidden;
+  .nm .w { white-space: nowrap; }
+  /* Status lines wrap only between their parts ("1 h 23 min left" stays whole); a file name or a
+     message may break anywhere. */
+  .sc { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); overflow-wrap: anywhere; }
+  .p { white-space: nowrap; }
+  .f { overflow-wrap: anywhere; }
+  .pill { flex: none; display: inline-flex; align-items: stretch; height: 36px; border-radius: 18px;
     font-size: 13px; font-weight: 600; letter-spacing: .2px; white-space: nowrap;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color); }
   .pill button { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
@@ -2888,8 +3331,10 @@ const CSS = `
   .thumb img { width: 100%; height: 100%; object-fit: contain; }
   .thumb ha-icon { --mdc-icon-size: 30px; color: ${C.grey}; }
   .jt { flex: 1; min-width: 0; }
-  .pct { font-size: 20px; line-height: 26px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; }
-  .pct .when { font-size: 12px; font-weight: 400; letter-spacing: .4px; color: var(--secondary-text-color); margin-left: 8px; }
+  /* "62%" and the times beside it; on a narrow card the times move under it rather than being cut. */
+  .pct { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; font-size: 20px; line-height: 26px; font-weight: 600;
+    color: var(--primary-text-color); }
+  .pct .when { min-width: 0; font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: .4px; color: var(--secondary-text-color); }
   .pbar { height: 8px; border-radius: 4px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); margin: 4px 0 6px; overflow: hidden; }
   .pbar i { display: block; height: 100%; border-radius: 4px; transition: width 400ms; }
   .camera { margin: 0 0 10px; border-radius: 10px; overflow: hidden; }
@@ -2899,21 +3344,24 @@ const CSS = `
     border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); -webkit-tap-highlight-color: transparent; }
   .stats > button:first-child { border-left: none; }
   .stats b { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--primary-text-color); white-space: nowrap; }
-  .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); }
-  .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; }
+  .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); overflow-wrap: break-word; padding: 0 4px; }
+  /* Button row: equal widths while every label fits, a longer label takes what it needs, and only
+     if the row can't hold them all does one wrap. */
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; }
   .acts:empty { display: none; }
   /* Primary pills: 36px, the height of the icon circle (one size for every main action). */
-  .act { all: unset; box-sizing: border-box; height: 36px; border-radius: 18px; cursor: pointer; display: flex; align-items: center;
-    justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--primary-text-color);
+  .act { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: max-content; height: 36px; border-radius: 18px; padding: 0 14px 0 10px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
+    font-size: 13px; font-weight: 600; letter-spacing: .2px; color: var(--primary-text-color);
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
   .act ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
-  .act.poweroff ha-icon { color: ${C.orange}; }
-  .act.poweron ha-icon { color: ${C.green}; }
+  /* Power on and Power off: orange, like the power pill (orange means power). */
+  .act.poweroff ha-icon, .act.poweron ha-icon { color: ${C.orange}; }
   /* Chamber light: glows while on, like a lit room on the lights card. */
   .act.light.on { background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
   .act.light.on ha-icon { color: ${C.orange}; }
   .act .lvl { font-weight: 400; opacity: .8; }
-  .pill button:active, .act:active { filter: brightness(.92); }
+  .pill button:active, .act:active, .head .shape:active, .stats > button:active { filter: brightness(.92); }
   .pill button:focus-visible, .act:focus-visible, [data-e]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
@@ -3120,9 +3568,9 @@ class PrinterStatusCard extends HTMLElement {
     if (ic.getAttribute("icon") !== m.state.icon) ic.setAttribute("icon", m.state.icon);
     ic.style.color = m.state.color;
     const t = compactText(m, this._config);
-    set(".nm", `${esc(this._config.name || "Printer")} <span class="st">· ${esc(t.word)}</span>`, true);
-    set(".sc:not(.sc2)", t.line);
-    set(".sc2", t.line2 || "");
+    set(".nm", `${esc(this._config.name || "Printer")}<span class="st">&nbsp;· <span class="w">${esc(t.word)}</span></span>`, true);
+    set(".sc:not(.sc2)", line(t.line), true);
+    set(".sc2", line(t.line2 || []), true);
     const bar = root.querySelector(".cbar");
     bar.hidden = !t.bar;
     if (t.bar) {
@@ -3140,9 +3588,10 @@ class PrinterStatusCard extends HTMLElement {
   _build() {
     if (this._config.layout === "compact") return this._buildCompact();
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
+    const stateId = `sensor.${esc(this._config.prefix)}_current_print_state`;
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      <div class="head"><div class="shape"><ha-icon></ha-icon></div>
-        <div class="txt" data-e="sensor.${esc(this._config.prefix)}_current_print_state" role="button" tabindex="0"><div class="nm"></div><div class="sc msg"></div></div>
+      <div class="head"><div class="shape" data-e="${stateId}" role="button" tabindex="0" aria-label="Printer details"><ha-icon></ha-icon></div>
+        <div class="txt" data-e="${stateId}" role="button" tabindex="0"><div class="nm"></div><div class="sc msg"></div></div>
         ${this._config.power_switch ? `<div class="pill"><button class="tog"><ha-icon icon="mdi:power-plug"></ha-icon><span></span></button><button class="w"${this._config.power_sensor ? ` data-e="${esc(this._config.power_sensor)}"` : ""}><ha-icon icon="mdi:power-plug" hidden></ha-icon><span></span></button></div>` : ""}</div>
       <div class="job"><div class="thumb" data-e="${esc(this._config.thumbnail || `camera.${this._config.prefix}_thumbnail`)}"><ha-icon icon="mdi:cube-outline"></ha-icon></div>
         <div class="jt"><div class="pct"></div><div class="pbar"><i></i></div><div class="sc l1"></div><div class="sc l2"></div></div></div>
@@ -3158,7 +3607,7 @@ class PrinterStatusCard extends HTMLElement {
     };
     card.addEventListener("click", open);
     card.addEventListener("keydown", (e) => {
-      if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(".txt")) {
+      if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(".txt, .shape")) {
         e.preventDefault();
         open(e);
       }
@@ -3266,7 +3715,8 @@ class PrinterStatusCard extends HTMLElement {
     const ic = shape.querySelector("ha-icon");
     if (ic.getAttribute("icon") !== m.state.icon) ic.setAttribute("icon", m.state.icon);
     ic.style.color = m.state.color;
-    set(".nm", `${esc(this._config.name || "Printer")} <span class="st">· ${esc(m.state.word)}</span>`, true);
+    // Name · state; on a narrow card the state word wraps whole, the dot staying with the name.
+    set(".nm", `${esc(this._config.name || "Printer")}<span class="st">&nbsp;· <span class="w">${esc(m.state.word)}</span></span>`, true);
     const active = ["printing", "paused", "complete", "cancelled"].includes(m.key) && m.file;
     set(".msg", active ? m.file : m.message);
 
@@ -3294,15 +3744,19 @@ class PrinterStatusCard extends HTMLElement {
     if (active) {
       const pct = m.progress === null ? 0 : Math.max(0, Math.min(100, m.progress));
       const p = this._config.prefix;
-      const e = (key, text) => `<span data-e="sensor.${esc(p)}_${key}">${esc(text)}</span>`;
+      const e = (key, t) => ({ t, e: `sensor.${p}_${key}` });
+      // "1 h 23 min left · ends 15:42" while it runs ("ends", so a time is never read as done);
+      // the state word once it has finished.
       const when =
-        m.key === "complete" ? "Done" : m.key === "cancelled" ? "Cancelled" : `${e("print_time_left", `${hm(m.left)} left`)}${m.eta ? ` · ${e("print_eta", `done ${m.eta}`)}` : ""}`;
-      set(".pct", `${e("progress", `${fmt(pct)}%`)}<span class="when">${when}</span>`, true);
+        m.key === "complete" || m.key === "cancelled"
+          ? [m.state.word]
+          : [e("print_time_left", `${dur(m.left)} left`), m.eta ? e("print_eta", `ends ${m.eta}`) : ""];
+      set(".pct", `${line([e("progress", `${fmt(pct)}%`)])}<span class="when">${line(when)}</span>`, true);
       const bar = root.querySelector(".pbar i");
       bar.style.width = `${pct}%`;
       bar.style.background = m.state.color;
-      set(".l1", [m.layers ? e("current_layer", `Layer ${fmt(m.layer)} / ${fmt(m.layers)}`) : "", m.filament !== null ? e("filament_used", `${fmt(m.filament, 1)} m filament`) : ""].filter(Boolean).join(" · "), true);
-      set(".l2", m.key === "printing" && m.speed !== null ? e("print_speed", `${fmt(m.speed)} mm/s`) : "", true);
+      set(".l1", line([m.layers ? e("current_layer", `Layer ${fmt(m.layer)} / ${fmt(m.layers)}`) : "", m.filament !== null ? e("filament_used", `${fmt(m.filament, 1)} m filament`) : ""]), true);
+      set(".l2", m.key === "printing" && m.speed !== null ? line([e("print_speed", `${fmt(m.speed)} mm/s`)]) : "", true);
       const thumb = root.querySelector(".thumb");
       if (m.thumb && thumb.dataset.src !== m.thumb) {
         thumb.dataset.src = m.thumb;
@@ -3317,11 +3771,11 @@ class PrinterStatusCard extends HTMLElement {
     if (!active) {
       const cells = [];
       const p = this._config.prefix;
-      if (this._config.energy_today) cells.push([`${fmt(m.today, 2)} kWh`, "today", this._config.energy_today]);
+      if (this._config.energy_today) cells.push([m.today === null ? "–" : `${fmt(m.today, 2)} kWh`, "Today", this._config.energy_today]);
       cells.push(
-        [fmt(m.jobs), "prints", `sensor.${p}_totals_jobs`],
-        [m.hours === null ? "–" : `${fmt(m.hours)} h`, "printed", `sensor.${p}_totals_print_time`],
-        [m.km === null ? "–" : `${fmt(m.km, 1)} km`, "filament", `sensor.${p}_totals_filament_used`],
+        [fmt(m.jobs), "Prints", `sensor.${p}_totals_jobs`],
+        [m.hours === null ? "–" : `${fmt(m.hours)} h`, "Printed", `sensor.${p}_totals_print_time`],
+        [m.km === null ? "–" : `${fmt(m.km, 1)} km`, "Filament", `sensor.${p}_totals_filament_used`],
       );
       stats.style.gridTemplateColumns = `repeat(${cells.length}, minmax(0, 1fr))`;
       set(".stats", cells.map(([b, s, id]) => `<button data-e="${esc(id)}"><b>${esc(b)}</b><span>${esc(s)}</span></button>`).join(""), true);
@@ -3337,7 +3791,6 @@ class PrinterStatusCard extends HTMLElement {
     const keys = acts.map((a) => a[0]).join();
     if (keys !== this._actKeys) {
       const box = root.querySelector(".acts");
-      box.style.setProperty("--n", String(acts.length || 1));
       box.innerHTML = acts
         .map(([k, label, icon]) =>
           k === "light"
@@ -3399,63 +3852,70 @@ class PrinterStatusCard extends HTMLElement {
     const l = this._m?.light;
     if (!id || !l) return;
     const [domain] = id.split(".");
+    const what = `turn ${l.on ? "off" : "on"} ${this._hass.states[id]?.attributes?.friendly_name || "the light"}`;
     if (l.numeric) {
       // A Klipper output pin: off is 0; on goes back to the last level seen, or light_on (default: full).
       const on = this._lastLight || num(this._config.light_on) || l.max;
-      return this._call(domain, "set_value", { entity_id: id, value: l.on ? 0 : on });
+      return this._call(domain, "set_value", { entity_id: id, value: l.on ? 0 : on }, what);
     }
     const svc = domain === "light" || domain === "switch" || domain === "input_boolean" ? domain : "homeassistant";
-    return this._call(svc, l.on ? "turn_off" : "turn_on", { entity_id: id });
+    return this._call(svc, l.on ? "turn_off" : "turn_on", { entity_id: id }, what);
   }
 
+  /* Power on / Power off: orange both ways, like the power pill and the buttons. The dialog
+     opens from the printer's own card, so it doesn't name the printer again. */
   async _action(k) {
-    const name = this._config.name || "Printer";
-    const press = (id) => this._call("button", "press", { entity_id: id });
+    const name = this._config.name || "the printer";
     if (k === "poweron") {
       const ok = await confirmDialog({
-        title: "Power on", icon: "mdi:power", color: C.green, primary: name,
-        secondary: `The plug turns on and ${name} starts up.`, confirmLabel: "Power on",
+        title: "Power on", icon: "mdi:power", color: C.orange,
+        text: "The plug turns on and the printer starts up.", confirmLabel: "Power on",
       });
       if (!ok) return;
       const id = this._config.power_switch;
       const [domain] = id.split(".");
-      return this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_on", { entity_id: id });
+      return this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_on", { entity_id: id }, `power on ${name}`);
     }
     if (k === "poweroff") {
       const ok = await confirmDialog({
-        title: "Power off", icon: "mdi:power", color: C.orange, primary: name,
-        secondary: `${name} shuts down safely, then its plug turns off.`, confirmLabel: "Power off",
+        title: "Power off", icon: "mdi:power", color: C.orange,
+        text: "The printer shuts down safely, then its plug turns off.", confirmLabel: "Power off",
       });
       if (ok) {
-        const [domain] = this._config.power_off_script.split(".");
-        domain === "button" ? press(this._config.power_off_script) : this._call("script", "turn_on", { entity_id: this._config.power_off_script });
+        const id = this._config.power_off_script;
+        const [domain] = id.split(".");
+        domain === "button"
+          ? this._call("button", "press", { entity_id: id }, `power off ${name}`)
+          : this._call("script", "turn_on", { entity_id: id }, `power off ${name}`);
       }
     }
   }
 
-  /* Plug pill (shown only while on): off asks first and warns while printing. */
+  /* Plug pill (shown only while on): off asks first – orange like the pill, red only while a
+     print is running, because cutting the power would end it. */
   async _togglePlug() {
     const id = this._config.power_switch;
     const on = this._m?.plug?.on;
     const [domain] = id.split(".");
     if (!on) return this._action("poweron");
-    const name = this._config.name || "Printer";
     const busy = ["printing", "paused"].includes(this._m.key);
     const ok = await confirmDialog({
-      title: "Cut power", icon: "mdi:power-plug-off", color: busy ? C.red : C.orange, primary: name,
-      secondary: busy
-        ? `${name} is printing. Cutting power now ends the print.`
-        : `The plug switches off at once, without a shutdown.${this._config.power_off_script ? " Use Power off for a safe shutdown." : ""}`,
-      confirmLabel: "Turn plug off",
+      title: "Turn the plug off", icon: "mdi:power-plug-off", color: busy ? C.red : C.orange,
+      text: busy
+        ? "This ends the current print. The power goes at once, without a shutdown."
+        : `The power goes at once, without a shutdown.${this._config.power_off_script ? " Power off shuts the printer down safely first." : ""}`,
+      confirmLabel: "Turn off",
     });
-    if (ok) this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_off", { entity_id: id });
+    const plug = this._hass.states[id]?.attributes?.friendly_name || "the plug";
+    if (ok) this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_off", { entity_id: id }, `turn off ${plug}`);
   }
 
-  async _call(domain, service, data) {
+  /* HA's own message when it has one, else "Couldn't <what you tried>." – never an entity id. */
+  async _call(domain, service, data, what = "do that") {
     try {
       await this._hass.callService(domain, service, data);
     } catch (err) {
-      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "That did not work" }, bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || `Couldn't ${what}.` }, bubbles: true, composed: true }));
     }
   }
 }
@@ -3477,25 +3937,26 @@ async function registerPrinterStatusCard() {
 registerPrinterStatusCard();
 })();
 
-/* ===== printer-temps-card 1.1.8 ===== */
+/* ===== printer-temps-card 1.2.0 ===== */
 (() => {
 /*
  * Printer temperatures card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * Heaters (temperature, target, heater power – the tile glows while heating), other
- * temperature readings, and the fans, for a Klipper / Moonraker printer. Sensors
- * are found from the Moonraker prefix; every list can be overridden. Tap any value
- * (temperature, target, power, fan) for its own more-info.
+ * temperature readings, and the fans (blue while running), for a Klipper / Moonraker
+ * printer. The summary ("Heating", "At temperature", "All heaters off") sits under the
+ * title. Sensors are found from the Moonraker prefix; every list can be overridden. Tap
+ * any value (temperature, target, power, fan) for its own more-info. Names wrap, never cut.
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.8";
+const PTC_VERSION = "1.2.0";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
   orange: "var(--orange-color, #ff9800)",
-  teal: "var(--teal-color, #009688)",
+  blue: "var(--blue-color, #2196f3)",
 };
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 const esc = (s) =>
@@ -3559,19 +4020,22 @@ const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
-     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
-     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
-     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
-  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; } /* 10px gap: titles at edge + 46, like Mushroom */
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; color: ${C.orange}; }
-  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
-  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
-  .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
-    white-space: nowrap; }
+     Two-line label row, the same on every card: a 24px icon in a 36px slot (where the glyph of a
+     Mushroom icon sits), the 14px / 500 title at edge + 46 and the 12px summary under it on the
+     same vertical line (ink-aligned, free to wrap). The icon is decorative, so no circle; it is
+     grey, and orange while a heater is on (it shows that state). */
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; }
+  .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+  .slot ha-icon { --mdc-icon-size: 24px; color: ${C.grey}; }
+  .label.on .slot ha-icon { color: ${C.orange}; }
+  .lt { flex: 1; min-width: 0; }
+  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
+  .lt.one .t { position: relative; top: 1px; } /* alone, a 20px line reads ~1px high next to the icon */
+  .s { display: block; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .s:empty { display: none; }
   .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
   .tile { box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px;
-    padding: 10px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
+    padding: 11px 10px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
   /* A heater that is on glows, like a lit room on the lights card. */
   .tile.on { background: ${tint(C.orange, 10)}; }
@@ -3582,8 +4046,8 @@ const CSS = `
   .tile.on .shape { background: ${tint(C.orange, 20)}; }
   .tile.on .shape ha-icon { color: ${C.orange}; }
   .txt { flex: 1; min-width: 0; }
-  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* A name too long for its tile wraps (tiles in a row stay level: grid-auto-rows 1fr). */
+  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
   /* Wraps rather than overflowing on a narrow tile. */
   .val { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 4px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; }
@@ -3594,17 +4058,18 @@ const CSS = `
   /* Heater power sits at the end of its bar. */
   .br { display: flex; align-items: center; gap: 6px; }
   .br .bar { flex: 1; min-width: 0; }
-  .pw { min-width: 30px; text-align: right; font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color);
+  .pw { min-width: 30px; text-align: right; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; }
   .pw:empty { display: none; }
   .bar { height: 4px; border-radius: 2px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
   .bar i { display: block; height: 100%; background: ${C.orange}; border-radius: 2px; transition: width 400ms; }
   .fans { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 10px 0 0; font-size: 12px; line-height: 16px; letter-spacing: .4px;
     color: var(--secondary-text-color); }
-  .fan { all: unset; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
+  .fan { all: unset; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; white-space: nowrap; border-radius: 4px; }
   .fan ha-icon { --mdc-icon-size: 16px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
-  .fan.on ha-icon { color: ${C.teal}; }
-  .tile:active, .fan:active { filter: brightness(.94); }
+  /* A running fan is blue (something running). */
+  .fan.on ha-icon { color: ${C.blue}; }
+  .tile:active, .fan:active { filter: brightness(.92); }
   .tile:focus-visible, .fan:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
@@ -3754,7 +4219,8 @@ class PrinterTempsCard extends HTMLElement {
     const items = [...heaters(this._hass, this._config).filter((h) => !h.missing), ...readings(this._hass, this._config)];
     const fl = fans(this._hass, this._config);
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      <div class="label"><ha-icon icon="mdi:thermometer"></ha-icon><span class="title">${esc(this._config.title ?? "Temperatures")}</span><span class="sum"></span></div>
+      <div class="label"><div class="slot"><ha-icon icon="mdi:thermometer"></ha-icon></div>
+        <div class="lt"><div class="t">${esc(this._config.title ?? "Temperatures")}</div><span class="s"></span></div></div>
       <div class="tiles">${items
         .map((it, i) => `<div class="tile ${it.kind}" role="button" tabindex="0" data-i="${i}"><div class="hh"><span class="shape"><ha-icon icon="${esc(it.icon)}"></ha-icon></span>
           <span class="txt"><div class="nm">${esc(it.name)}</div><div class="val"></div></span></div>${it.kind === "heater" ? `<div class="br"><div class="bar"><i></i></div><button class="pw" data-e="${esc(it.power)}"></button></div>` : ""}</div>`)
@@ -3783,7 +4249,7 @@ class PrinterTempsCard extends HTMLElement {
   }
 
   _render() {
-    inkSchedule(this, ".txt");
+    inkSchedule(this, ".txt, .lt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -3818,8 +4284,11 @@ class PrinterTempsCard extends HTMLElement {
     const hs = items.filter((it) => it.kind === "heater");
     const on = hs.filter((h) => h.on);
     const sum = !on.length ? "All heaters off" : on.every((h) => h.t !== null && Math.abs(h.t - h.tg) <= 2) ? "At temperature" : "Heating";
-    const sumEl = root.querySelector(".sum");
+    const sumEl = root.querySelector(".s");
     if (sumEl.textContent !== sum) sumEl.textContent = sum;
+    root.querySelector(".lt").classList.toggle("one", !sum);
+    // The label icon shows state only while a heater is on (orange); otherwise it is decoration (grey).
+    root.querySelector(".label").classList.toggle("on", on.length > 0);
   }
 
   _more(entityId) {
@@ -3844,7 +4313,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 2.6.3 ===== */
+/* ===== robot-vacuum-card 2.7.0 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3870,7 +4339,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.6.3";
+const RVC_VERSION = "2.7.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -3898,7 +4367,8 @@ const human = (s) => {
 function mins(sec) {
   if (sec === null) return "–";
   const m = Math.max(0, Math.round(sec / 60));
-  return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min` : `${m} min`;
+  // "45 min", "3 h", "1 h 5 min" – the same format on every card (design tokens → Text and formats).
+  return m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`;
 }
 // A past moment as "today 10:00", "yesterday 10:00", "Sat 10:00" or "10 Oct".
 function when(iso, now = new Date()) {
@@ -4302,7 +4772,7 @@ const SEG_CSS = `
   .seg[hidden] { display: none; }
   .set { display: grid; gap: 6px; }
   .k { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); }
-  .k b { font-weight: 500; margin-left: 6px; color: ${tx(C.blue, 75)}; }
+  .k b { font-weight: 500; margin-left: 6px; color: ${tx(C.teal, 75)}; }
 `;
 
 /* The Cleaning mode sheet (Bubble look), holding the same panel as layout: mode. */
@@ -4425,8 +4895,8 @@ const CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color); -webkit-tap-highlight-color: transparent; }
   .rooms.wrap .chip { white-space: normal; padding-top: 7px; padding-bottom: 7px; }
   .chip ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; flex: none; }
-  .chip.sel { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
-  .chip.sel ha-icon { color: ${C.blue}; }
+  .chip.sel { background: ${tint(C.teal, 18)}; color: ${tx(C.teal)}; }
+  .chip.sel ha-icon { color: ${C.teal}; }
   .chip.now { box-shadow: inset 0 0 0 1.5px ${tint(C.blue, 60)}; }
   .chip[aria-disabled="true"] { cursor: default; }
   .chip[disabled] { opacity: .45; cursor: default; }
@@ -4469,8 +4939,8 @@ const CSS = `
      chevron – so it reads as "settings" and never as one more room. */
   .modetile { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 11px 10px; border-radius: 10px;
     cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
-  .modetile .shape { background: ${tint(C.blue, 20)}; }
-  .modetile .shape ha-icon { color: ${C.blue}; }
+  .modetile .shape { background: ${tint(C.teal, 20)}; }
+  .modetile .shape ha-icon { color: ${C.teal}; }
   .modetile .chev { --mdc-icon-size: 20px; color: ${C.grey}; flex: none; }
   .modetile[disabled] { opacity: .45; cursor: default; }
   .modetile:active { filter: brightness(.92); }
@@ -5006,7 +5476,7 @@ class RobotVacuumCard extends HTMLElement {
     const icon = JOBS.find((j) => j[0] === k)?.[1] || "mdi:robot-vacuum";
     // The dialog takes the colour of the button you tapped (a job glows blue while it runs).
     if (c && !(await this._ask(c.title, on ? "mdi:stop-circle-outline" : icon, C.blue, c.text, c.label))) return;
-    return this._call("switch", on ? "turn_off" : "turn_on", { entity_id: id });
+    return this._call("switch", on ? "turn_off" : "turn_on", { entity_id: id }, `${on ? "stop" : "start"} the dock`);
   }
 
   /* ---- Cleaning mode panel (layout: mode) ---- */
@@ -5108,7 +5578,7 @@ class RobotVacuumCard extends HTMLElement {
     const root = host.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${MODE_SHEET_CSS}</style><div class="backdrop"></div>
       <div class="dialog" role="dialog" aria-modal="true" aria-label="Cleaning mode">
-        <div class="row"><div class="glyph" style="background:${tint(C.blue, 20)}"><ha-icon icon="mdi:tune-variant" style="color:${C.blue}"></ha-icon></div>
+        <div class="row"><div class="glyph" style="background:${tint(C.teal, 20)}"><ha-icon icon="mdi:tune-variant" style="color:${C.teal}"></ha-icon></div>
           <div class="title">Cleaning mode</div></div>
         <div class="seg tabs"></div><div class="sets"></div>
         <div class="actions"><button class="done"><span class="glyph"><ha-icon icon="mdi:check"></ha-icon></span>Done</button></div></div>`;
@@ -5147,9 +5617,9 @@ class RobotVacuumCard extends HTMLElement {
     // Show the choice at once; the robot's answer confirms it (or it falls back after a while).
     this._pend(k, v);
     this._render();
-    if (k === "fan") return this._call("vacuum", "set_fan_speed", { entity_id: id, fan_speed: v });
+    if (k === "fan") return this._call("vacuum", "set_fan_speed", { entity_id: id, fan_speed: v }, "change the suction power");
     const ent = { mode: f.mode, water: f.mop_water, route: f.mop_route }[k];
-    if (ent) return this._call("select", "select_option", { entity_id: ent, option: v });
+    if (ent) return this._call("select", "select_option", { entity_id: ent, option: v }, "change the cleaning mode");
   }
 
   /* Rooms and segment ids per map, from roborock.get_maps (or the maps: option). */
@@ -5272,12 +5742,12 @@ class RobotVacuumCard extends HTMLElement {
   }
 
   async _switchFloor(name) {
-    const ok = await this._ask(`Switch to ${name}`, "mdi:layers-outline", C.blue, `Place the robot on the ${name}, then confirm.`, "Confirm");
+    const ok = await this._ask(`Switch to ${name}`, "mdi:layers-outline", C.teal, `Place the robot on the ${name}, then confirm.`, "Confirm");
     if (!ok) return;
     this._sel.clear();
     this._pend("floor", name);
     this._render();
-    return this._call("select", "select_option", { entity_id: this._found.map_select, option: name });
+    return this._call("select", "select_option", { entity_id: this._found.map_select, option: name }, `switch to the ${name}`);
   }
 
   /* Every button asks first except Pause (the user's choice). */
@@ -5303,12 +5773,12 @@ class RobotVacuumCard extends HTMLElement {
       this._sel.clear();
       this._render();
       const target = segs.length ? segs : all;
-      if (target.length) return this._call("vacuum", "send_command", { entity_id: id, command: "app_segment_clean", params: [{ segments: target, repeat: twice ? 2 : 1 }] });
-      return this._call("vacuum", "start", { entity_id: id });
+      if (target.length) return this._call("vacuum", "send_command", { entity_id: id, command: "app_segment_clean", params: [{ segments: target, repeat: twice ? 2 : 1 }] }, "start the clean");
+      return this._call("vacuum", "start", { entity_id: id }, "start the clean");
     }
-    if (k === "pause") return this._call("vacuum", "pause", { entity_id: id });
+    if (k === "pause") return this._call("vacuum", "pause", { entity_id: id }, "pause the robot");
     if (k === "resume") {
-      if (await this._ask("Resume", "mdi:play", C.blue, "The robot carries on with the paused clean.", "Resume")) this._call("vacuum", "start", { entity_id: id });
+      if (await this._ask("Resume", "mdi:play", C.blue, "The robot carries on with the paused clean.", "Resume")) this._call("vacuum", "start", { entity_id: id }, "resume the clean");
       return;
     }
     if (k === "dock") {
@@ -5316,7 +5786,7 @@ class RobotVacuumCard extends HTMLElement {
       // Blue like every robot action; the warning is in the words (orange means lights / heat).
       const ok = await this._ask("Return to the dock", "mdi:home-import-outline", C.blue,
         ends ? "This ends the current clean. The robot goes back to the dock." : "The robot goes back to the dock.", "Dock");
-      if (ok) this._call("vacuum", "return_to_base", { entity_id: id });
+      if (ok) this._call("vacuum", "return_to_base", { entity_id: id }, "send the robot to the dock");
       return;
     }
     if (k === "auto") {
@@ -5329,15 +5799,15 @@ class RobotVacuumCard extends HTMLElement {
       if (!ok) return;
       const [domain] = a.split(".");
       const svc = ["automation", "input_boolean", "switch"].includes(domain) ? domain : "homeassistant";
-      return this._call(svc, on ? "turn_off" : "turn_on", { entity_id: a });
+      return this._call(svc, on ? "turn_off" : "turn_on", { entity_id: a }, `turn ${on ? "off" : "on"} ${label}`);
     }
   }
 
-  async _call(domain, service, data) {
+  async _call(domain, service, data, what = "do that") {
     try {
       await this._hass.callService(domain, service, data);
     } catch (err) {
-      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "That did not work" }, bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || `Couldn't ${what}.` }, bubbles: true, composed: true }));
     }
   }
 }
@@ -5359,7 +5829,7 @@ async function registerRobotVacuumCard() {
 registerRobotVacuumCard();
 })();
 
-/* ===== room-lights-card 1.3.7 ===== */
+/* ===== room-lights-card 1.4.0 ===== */
 (() => {
 /*
  * Room lights card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -5368,26 +5838,33 @@ registerRobotVacuumCard();
  * tile per room underneath with its temperature, humidity and light level.
  * Tap a tile to switch the room, tap its icon to open the room's dashboard,
  * long-press for the room's individual lamps. Nothing asks first – lights are
- * cheap to switch back.
+ * cheap to switch back. Names are never cut: the grid takes as many columns as
+ * the longest room name (with its presence) allows.
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.7";
+const RLC_VERSION = "1.4.0";
 const RLC_TAG = "room-lights-card";
 
+// One meaning per colour (design tokens → Colours): orange = lights, green = someone here,
+// amber = early warning, red = a call for attention, grey = off.
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
   orange: "var(--orange-color, #ff9800)",
   red: "var(--red-color, #f44336)",
   blue: "var(--blue-color, #2196f3)",
   amber: "var(--amber-color, #ffc107)",
-  teal: "var(--teal-color, #009688)",
+  green: "var(--green-color, #4caf50)",
 };
 const HOLD_MS = 500;
 const HISTORY_DAYS = 3;
 const MOVE_PX = 10;
+// A tile around its text: 10px padding + 36px icon + 10px gap … 10px padding.
+const TILE_PAD = 66;
 
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
+// Readable coloured text – mixed toward the text colour, never the raw colour on white.
+const tx = (c, p = 70) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-color))`;
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const list = (v) => (v === undefined || v === null || v === "" ? [] : Array.isArray(v) ? v.filter(Boolean) : [v]);
@@ -5398,7 +5875,9 @@ function reading(hass, ids, digits, unit, space) {
   const vals = list(ids).map((id) => {
     const s = hass.states[id];
     const n = s ? Number(s.state) : NaN;
-    return s && s.state !== "" && isFinite(n) ? n.toFixed(digits) : "–";
+    return s && s.state !== "" && isFinite(n)
+      ? n.toLocaleString("en-GB", { minimumFractionDigits: digits, maximumFractionDigits: digits })
+      : "–";
   });
   if (!vals.length) return null;
   return `${vals.join("/")}${space ? " " : ""}${unit}`;
@@ -5415,17 +5894,18 @@ function lampName(friendly, room) {
   return n.charAt(0).toUpperCase() + n.slice(1);
 }
 
-/* "12m", "3h", "2d" */
+/* "12 min", "3 h", "2 d" (design tokens → Formats) */
 function ago(ms) {
   const m = Math.max(0, Math.round(ms / 60000));
-  if (m < 60) return `${m}m`;
-  if (m < 1440) return `${Math.floor(m / 60)}h`;
-  return `${Math.floor(m / 1440)}d`;
+  if (m < 60) return `${m} min`;
+  if (m < 1440) return `${Math.floor(m / 60)} h`;
+  return `${Math.floor(m / 1440)} d`;
 }
 
 /*
- * Who is in the room: occupied → teal motion sensor; empty → how long since someone was there.
- * Lights on in a room that has been empty for a while → amber, so lights left on stand out.
+ * Who is in the room: occupied → green motion sensor (someone home); empty → how long since
+ * someone was there. Lights on in a room that has been empty for a while → amber (an early
+ * warning), so lights left on stand out.
  */
 function presenceModel(hass, room, lastSeen, warnMin, lightsOn) {
   const id = room.occupancy;
@@ -5437,7 +5917,7 @@ function presenceModel(hass, room, lastSeen, warnMin, lightsOn) {
   if (since === null) return { kind: "empty", text: "" };
   const ms = Date.now() - since;
   const warn = lightsOn && ms >= warnMin * 60000;
-  return { kind: warn ? "warn" : "empty", text: ms > HISTORY_DAYS * 86400000 ? `${HISTORY_DAYS}d+` : ago(ms) };
+  return { kind: warn ? "warn" : "empty", text: ms > HISTORY_DAYS * 86400000 ? `${HISTORY_DAYS} d+` : ago(ms) };
 }
 
 function roomModel(hass, room) {
@@ -5525,12 +6005,13 @@ const SHEET_CSS = `
   .head { display: flex; align-items: center; gap: 6px; padding-left: 8px; }
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
-  .title { font-size: 20px; line-height: 26px; font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Text is never cut: a long room or lamp name wraps (the row grows past 56px) instead. */
+  .title { font-size: 20px; line-height: 26px; font-weight: 600; min-width: 0; overflow-wrap: break-word; }
   .list, .buttons { margin-top: 20px; display: grid; gap: 8px; }
   /* The actions are set apart from the lamp list by a divider and extra space. */
   .buttons { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
-  button { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; height: 56px;
-    padding: 0 12px 0 10px; border-radius: 28px; cursor: pointer; font-size: 16px; line-height: 24px; font-weight: 600;
+  button { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; min-height: 56px;
+    padding: 6px 12px 6px 10px; border-radius: 28px; cursor: pointer; font-size: 16px; line-height: 24px; font-weight: 600;
     letter-spacing: .1px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color);
     -webkit-tap-highlight-color: transparent; }
   button .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
@@ -5539,7 +6020,7 @@ const SHEET_CSS = `
   button.open { background: ${C.orange}; color: #fff; }
   button.open .glyph { background: rgba(255,255,255,.2); }
   button.open .glyph ha-icon { color: #fff; }
-  button.open .nm, .lamp .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  button.open .nm, .lamp .nm { flex: 1; min-width: 0; overflow-wrap: break-word; }
   .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
   .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
@@ -5549,7 +6030,10 @@ const SHEET_CSS = `
   .lamp.missing { opacity: .5; }
   button:active { filter: brightness(.92); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
-  .empty { padding: 0 8px; font-size: 15px; line-height: 21px; color: var(--primary-text-color); }
+  /* No lamps: a line under the title, on the title's line (8 + 42px glyph + 6px gap), like the
+     text of every other dialog. */
+  .list.none { margin-top: 12px; }
+  .empty { margin-left: 56px; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
   @keyframes fade { from { opacity: 0; } }
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
@@ -5621,7 +6105,8 @@ class RoomLampsSheet {
     const open = root.querySelector(".open");
     if (open) {
       open.querySelector("ha-icon").setAttribute("icon", m.icon);
-      const label = `Open ${m.name}`;
+      // The title already names the room; the button doesn't repeat it.
+      const label = "Open room";
       if (open.querySelector(".nm").textContent !== label) open.querySelector(".nm").textContent = label;
     }
     root.querySelector(".dialog").setAttribute("aria-label", m.name);
@@ -5631,6 +6116,7 @@ class RoomLampsSheet {
     const keys = items.map((l) => l.id).join();
     if (box.dataset.keys !== keys) {
       box.dataset.keys = keys;
+      box.classList.toggle("none", !items.length);
       box.innerHTML = items.length
         ? items
             .map((l) => `<button class="lamp" role="switch" data-id="${esc(l.id)}"><span class="glyph"><ha-icon></ha-icon></span>
@@ -5684,67 +6170,76 @@ const CSS = `
     justify-content: center; transition: background-color 180ms; }
   /* Same size as Mushroom / tile card icons: 36 px circle, 24 px icon. */
   .shape ha-icon { --mdc-icon-size: 24px; transition: color 180ms; }
-  /* Text matches Mushroom / tile cards: names 14px medium, readings 12px regular, same colour. */
+  /* Text matches Mushroom / tile cards: names 14px medium, readings 12px regular, same colour.
+     Nothing is cut off: a label too long for its box wraps instead. */
   .all .nm { position: relative; top: 1px; flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    overflow-wrap: break-word; }
   .all .sw { flex: 0 0 auto; width: 40px; height: 24px; border-radius: 12px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
   .all .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .all.on .sw { background: ${C.orange}; }
   .all.on .sw::after { transform: translateX(16px); }
+  /* Rooms: an even grid, \`columns\` across at most. The card measures every room's name and
+     takes fewer columns when they would not fit (_fitRooms): even columns while the longest fits;
+     else two columns each as wide as its own longest; else one. Names are never cut. */
   .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
-  .room { position: relative; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
-    container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
+  .room { position: relative; min-width: 0; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
+    cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
     -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
   .tile { display: flex; align-items: center; gap: 10px; height: 100%; box-sizing: border-box; padding: 11px 10px; min-height: 58px; }
   .room .shape { cursor: pointer; }
+  /* With a room view, the icon is its own button (it opens the room): keyboard and focus too. */
+  .room .shape[role="button"]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .badge { position: absolute; top: -3px; right: -3px; width: 16px; height: 16px; border-radius: 50%; display: none;
     align-items: center; justify-content: center; background: ${C.red}; }
   .badge ha-icon { --mdc-icon-size: 11px; color: #fff; }
   .badge.on { display: flex; }
   .txt { flex: 1; min-width: 0; }
-  .room .nm { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* Presence sits on the name's own line, so it always lines up with the room title. */
-  .top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  /* Presence sits on the name's own line, so it lines up with the room title. When a tile is too
+     narrow for both, it drops under the name (it wraps, never cuts) – the columns follow the names
+     only, so a ticking "12 min" never reflows the grid. */
+  .top { display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; min-width: 0; }
+  .room .nm { flex: 0 1 auto; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+    overflow-wrap: break-word; }
   .pres { flex: 0 0 auto; display: none; align-items: center; gap: 2px; height: 20px; font-size: 12px; line-height: 20px;
-    font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); }
+    font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; }
   .pres.show { display: inline-flex; }
   .pres ha-icon { --mdc-icon-size: 16px; }
-  .pres.here { color: ${C.teal}; }
-  .pres.warn { color: var(--warning-color, #ffa600); }
-  .m { display: flex; column-gap: 9px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; }
-  .g { display: flex; column-gap: 9px; min-width: 0; }
+  /* Someone here: green, like a person at home in Home Assistant. Lights on and nobody here for
+     a while: amber, an early warning (the icon in full colour, the time readable). */
+  .pres.here { color: ${C.green}; }
+  .pres.warn { color: ${tx(C.amber, 70)}; }
+  .pres.warn ha-icon { color: ${C.amber}; }
+  /* Readings wrap only between their parts ("21.1/21.8°" stays whole). */
+  .m { display: flex; flex-wrap: wrap; column-gap: 9px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .g { display: flex; flex-wrap: wrap; column-gap: 9px; min-width: 0; }
   .g:empty { display: none; }
-  .v { display: inline-flex; align-items: center; gap: 2px; }
+  .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
   .v ha-icon { --mdc-icon-size: 14px; }
   /* The lights are the point of the card: readings are secondary. Their numbers use the quiet
-     secondary grey and their icons keep their colours, faded towards grey. Rooms with lights on
-     get a faint warm tint, so a lit room stands out on its own. */
+     secondary grey; temperature and humidity icons keep their literal colours, faded towards
+     grey, and the light level's sun is the quiet reading-icon grey (amber means a warning).
+     Rooms with lights on get a faint warm tint, so a lit room stands out on its own. */
   .v.t ha-icon { color: color-mix(in srgb, ${C.orange} 55%, ${C.grey}); }
   .v.h ha-icon { color: color-mix(in srgb, ${C.blue} 55%, ${C.grey}); }
-  .v.l ha-icon { color: color-mix(in srgb, ${C.amber} 60%, ${C.grey}); }
+  .v.l ha-icon { color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .room.lit { background: color-mix(in srgb, ${C.orange} 10%, transparent); }
   .room.missing .nm { color: var(--secondary-text-color); }
   /* Press feedback without moving anything: a scale-down shrinks the target under the
      finger and taps near the edge would be lost. */
-  .all:active, .room:active { filter: brightness(.94); }
+  .all:active, .room:active { filter: brightness(.92); }
   .all:focus-visible, .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  /* While the card measures (one frame, never painted): names, presence and readings on one line
+     at their natural width. */
+  .measure .top, .measure .m, .measure .g { flex-wrap: nowrap; }
+  .measure .room .nm { flex: none; white-space: nowrap; }
   /* When any room's readings do not fit on one line (the card measures this), every tile
      switches together: temperature on one line, humidity + light level on the next. All tiles
      keep the same height (grid-auto-rows: 1fr) even if one room has more sensors. */
   .stack .m { flex-direction: column; }
-  .stack .g { flex-wrap: wrap; column-gap: 7px; }
+  .stack .g { column-gap: 7px; }
   .stack .tile { padding: 11px 8px; gap: 8px; }
-  @container (max-width: 175px) {
-    .tile { padding: 11px 6px; gap: 6px; }
-    .stack .g { column-gap: 5px; }
-    .v { gap: 1px; }
-    .m { font-size: 11.5px; }
-    .v ha-icon { --mdc-icon-size: 13px; }
-  }
 `;
 
 class RoomLightsCard extends HTMLElement {
@@ -5797,11 +6292,11 @@ class RoomLightsCard extends HTMLElement {
           <span class="nm"></span><span class="sw"></span></button>`
       : "";
     root.innerHTML = `<style>${CSS}</style><ha-card>${header}
-      <div class="rooms" style="--cols:${Math.max(1, Math.min(4, Number(this._config.columns) || 2))}">
+      <div class="rooms" style="--cols:${this._cols()}">
         ${rooms
           .map(
             (r, i) => `<div class="room" role="button" tabindex="0" data-i="${i}"><div class="tile">
-              <div class="shape"><ha-icon></ha-icon><span class="badge"><ha-icon icon="mdi:window-open-variant"></ha-icon></span></div>
+              <div class="shape"${r.navigation_path ? ` role="button" tabindex="0"` : ""}><ha-icon></ha-icon><span class="badge"><ha-icon icon="mdi:window-open-variant"></ha-icon></span></div>
               <div class="txt"><div class="top"><div class="nm"></div><span class="pres"></span></div>
                 <div class="m"><span class="g"></span><span class="g"></span></div></div>
             </div></div>`,
@@ -5813,13 +6308,18 @@ class RoomLightsCard extends HTMLElement {
     root.querySelectorAll(".room").forEach((el) => this._bindRoom(el, rooms[Number(el.dataset.i)]));
     this._el = {
       all: root.querySelector(".all"),
+      grid: root.querySelector(".rooms"),
       rooms: [...root.querySelectorAll(".room")],
     };
     this._built = true;
+    this._colsKey = undefined;
+    // Names are measured in the dashboard's font: fit again once it has loaded.
+    document.fonts?.ready?.then(() => this._fit());
     if (this.isConnected) this.connectedCallback();
   }
 
-  /* Tap = switch the room; tap on the icon = open the room; hold = lamps sheet. */
+  /* Tap = switch the room; tap on the icon = open the room; hold = lamps sheet. The same from the
+     keyboard: Enter / Space on the tile switches it, on its icon opens the room. */
   _bindRoom(el, room) {
     let timer = null;
     let start = null;
@@ -5854,14 +6354,19 @@ class RoomLightsCard extends HTMLElement {
         this._navigate(room.navigation_path);
         return;
       }
-      this._toggle(room.entity);
+      this._toggle(room.entity, this._roomName(room));
     });
     el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        this._toggle(room.entity);
-      }
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      if (room.navigation_path && e.target.classList?.contains("shape")) return this._navigate(room.navigation_path);
+      this._toggle(room.entity, this._roomName(room));
     });
+  }
+
+  // For messages: the room's name, never an entity id.
+  _roomName(room) {
+    return room.name || this._hass?.states[room.entity]?.attributes?.friendly_name || "the room";
   }
 
   _render() {
@@ -5872,8 +6377,12 @@ class RoomLightsCard extends HTMLElement {
     // Only touch the DOM when something changed: Home Assistant pushes state several times a
     // second, and replacing text under a finger can swallow the tap.
     const set = (node, text) => {
-      if (node.textContent !== text) node.textContent = text;
+      if (node.textContent === text) return false;
+      node.textContent = text;
+      return true;
     };
+    // Anything that changes a tile's width needs (name, presence, readings) → fit again.
+    let changed = false;
 
     if (this._el.all) {
       const s = hass.states[this._config.entity];
@@ -5895,7 +6404,8 @@ class RoomLightsCard extends HTMLElement {
       if (icon.getAttribute("icon") !== m.icon) icon.setAttribute("icon", m.icon);
       icon.style.color = color;
       el.querySelector(".badge").classList.toggle("on", m.window);
-      set(el.querySelector(".nm"), m.name);
+      if (room.navigation_path && shape.getAttribute("aria-label") !== `Open ${m.name}`) shape.setAttribute("aria-label", `Open ${m.name}`);
+      if (set(el.querySelector(".nm"), m.name)) changed = true;
       const pr = presenceModel(hass, room, this._lastSeen?.[room.occupancy], this._warnMin(), m.on);
       const pel = el.querySelector(".pres");
       const phtml = !pr || pr.kind === "unknown" ? ""
@@ -5904,6 +6414,7 @@ class RoomLightsCard extends HTMLElement {
       if (pel.dataset.h !== phtml) {
         pel.innerHTML = phtml;
         pel.dataset.h = phtml;
+        changed = true;
       }
       pel.className = `pres${phtml ? " show" : ""}${pr ? ` ${pr.kind}` : ""}`;
       pel.title = !pr ? "" : pr.kind === "here" ? "Someone is here"
@@ -5912,7 +6423,6 @@ class RoomLightsCard extends HTMLElement {
       const [g1, g2] = el.querySelectorAll(".g");
       const html1 = m.temp ? this._v("t", "mdi:thermometer", m.temp) : "";
       const html2 = (m.hum ? this._v("h", "mdi:water-percent", m.hum) : "") + (m.lux ? this._v("l", "mdi:white-balance-sunny", m.lux) : "");
-      let changed = false;
       if (g1.dataset.h !== html1) {
         g1.innerHTML = html1;
         g1.dataset.h = html1;
@@ -5923,11 +6433,14 @@ class RoomLightsCard extends HTMLElement {
         g2.dataset.h = html2;
         changed = true;
       }
-      if (changed) this._fit();
     });
+    if (changed) this._fit();
   }
 
-  /* One line per tile if every room's readings fit, otherwise two lines for all of them. */
+  /* Once per frame after a change: the columns from the names (_fitRooms), then one line of
+     readings per tile if every room's fit, otherwise two lines for all of them. Measured in one
+     go (never painted in between). Without layout (tests) nothing is measured and the CSS
+     default stays: \`columns\` even columns, readings wrapping between their parts. */
   _fit() {
     if (this._fitQueued) return;
     this._fitQueued = true;
@@ -5936,13 +6449,58 @@ class RoomLightsCard extends HTMLElement {
       const card = this.shadowRoot?.querySelector("ha-card");
       if (!card || !card.isConnected) return;
       card.classList.remove("stack");
+      card.classList.add("measure");
+      this._fitRooms();
       const overflow = [...card.querySelectorAll(".m, .g")].some((m) => m.scrollWidth > m.clientWidth + 1);
+      card.classList.remove("measure");
       card.classList.toggle("stack", overflow);
     });
   }
 
+  /* The grid's columns, so that every room's name fits on one line (design tokens → Text and
+     formats). A tile needs its name (or its widest reading, if wider) + 66px around it. Even
+     columns – at most \`columns\` – as wide as the widest tile while two or more fit; else two
+     columns each as wide as its own widest tile; else one. Presence isn't counted: it drops under
+     the name in a tile too narrow for both. */
+  _fitRooms() {
+    const grid = this._el?.grid;
+    const tiles = this._el?.rooms || [];
+    const W = grid?.clientWidth;
+    if (!W || !tiles.length) return;
+    const card = grid.parentElement;
+    const had = card.classList.contains("measure");
+    card.classList.add("measure");
+    const ws = tiles.map((el) => {
+      const line = Math.ceil(el.querySelector(".nm").scrollWidth);
+      const parts = [...el.querySelectorAll(".v")].map((v) => Math.ceil(v.scrollWidth));
+      return Math.max(line, ...parts) + TILE_PAD;
+    });
+    if (!had) card.classList.remove("measure");
+    const n = this._cols();
+    const max = Math.max(...ws);
+    let cols = "minmax(0, 1fr)";
+    for (let k = n; k >= 2; k--) {
+      if (k * max + (k - 1) * 8 <= W) {
+        cols = `repeat(${k}, minmax(0, 1fr))`;
+        break;
+      }
+    }
+    if (cols === "minmax(0, 1fr)" && n >= 2 && ws.length > 1) {
+      const col = (k) => Math.max(...ws.filter((_, i) => i % 2 === k));
+      if (col(0) + col(1) + 8 <= W) cols = `minmax(${col(0)}px, 1fr) minmax(${col(1)}px, 1fr)`;
+    }
+    if (this._colsKey !== cols) {
+      this._colsKey = cols;
+      grid.style.gridTemplateColumns = cols;
+    }
+  }
+
+  _cols() {
+    return Math.max(1, Math.min(4, Number(this._config.columns) || 2));
+  }
+
   connectedCallback() {
-    // Keeps the "12m" counters moving.
+    // Keeps the "12 min" counters moving.
     clearInterval(this._tick);
     if (this._config?.rooms?.some((r) => r.occupancy)) this._tick = setInterval(() => this._hass && this._render(), 60000);
     if (typeof ResizeObserver === "undefined") return;
@@ -6051,22 +6609,24 @@ class RoomLightsCard extends HTMLElement {
   _toggleAll() {
     const s = this._hass.states[this._config.entity];
     this._haptic("light");
-    this._call(isOn(s) ? "turn_off" : "turn_on", this._config.entity);
+    this._call(isOn(s) ? "turn_off" : "turn_on", this._config.entity, this._config.name || "all lights");
   }
 
-  _toggle(entity) {
+  /* name: what a failure message calls it (the room's or lamp's name, never an entity id). */
+  _toggle(entity, name) {
     const s = this._hass.states[entity];
     this._haptic("light");
-    this._call(isOn(s) ? "turn_off" : "turn_on", entity);
+    this._call(isOn(s) ? "turn_off" : "turn_on", entity, name || s?.attributes?.friendly_name || "the light");
   }
 
-  async _call(service, entity) {
+  /* Home Assistant's own message when it gives one, else "Couldn't turn on Kitchen." */
+  async _call(service, entity, name) {
     const [domain] = entity.split(".");
     const d = domain === "light" || domain === "switch" ? domain : "homeassistant";
     try {
       await this._hass.callService(d, service, { entity_id: entity });
     } catch (err) {
-      this._fire("hass-notification", { message: err?.message || `Could not switch ${entity}` });
+      this._fire("hass-notification", { message: err?.message || `Couldn't turn ${service === "turn_off" ? "off" : "on"} ${name}.` });
     }
   }
 
@@ -6128,7 +6688,7 @@ const EDITOR_LABELS = {
 const EDITOR_HELPERS = {
   temperature: "Add more than one to show them all, in order (e.g. 21.1/21.8°).",
   lamps: "Leave empty to use the members of the room's group.",
-  occupancy: "Teal icon while someone is here, otherwise how long since they were.",
+  occupancy: "Green icon while someone is here, otherwise how long since they were (12 min, 3 h, 2 d).",
   empty_warning: "Default 2. Lights on in a room empty this long turn its time amber.",
 };
 
@@ -6143,8 +6703,8 @@ const EDITOR_CSS = `
     background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); color: var(--grey-color, #9e9e9e); }
   summary .ic ha-icon { --mdc-icon-size: 24px; }
   summary .t { flex: 1; min-width: 0; }
-  summary .t1 { font-size: 14px; font-weight: 500; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  summary .t2 { font-size: 12px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  summary .t1 { font-size: 14px; font-weight: 500; color: var(--primary-text-color); overflow-wrap: break-word; }
+  summary .t2 { font-size: 12px; color: var(--secondary-text-color); overflow-wrap: anywhere; }
   summary .chev { --mdc-icon-size: 24px; color: var(--secondary-text-color); transition: transform 150ms; }
   details[open] summary .chev { transform: rotate(180deg); }
   .body { padding: 4px 12px 12px; }
@@ -6416,7 +6976,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== vacuum-maintenance-card 2.4.2 ===== */
+/* ===== vacuum-maintenance-card 2.5.0 ===== */
 (() => {
 /*
  * Vacuum maintenance card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -6433,7 +6993,7 @@ registerRoomLightsCard();
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.4.2";
+const VMC_VERSION = "2.5.0";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -6442,6 +7002,7 @@ const C = {
   red: "var(--red-color, #f44336)",
   orange: "var(--orange-color, #ff9800)",
   blue: "var(--blue-color, #2196f3)",
+  teal: "var(--teal-color, #009688)",
   brown: "var(--brown-color, #795548)",
 };
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
@@ -6573,8 +7134,8 @@ const SHEET_CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
   button .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
   button .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
-  /* Reset is the vacuum's own action, so blue like the robot card's (orange means lights / heat). */
-  button.cta { color: #fff; background: ${C.blue}; }
+  /* Reset is a tap with no state colour of its own, so teal (design tokens → Colours). */
+  button.cta { color: #fff; background: ${C.teal}; }
   button.cta .glyph { background: rgba(255,255,255,.2); }
   button.cta .glyph ha-icon { color: #fff; }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
@@ -6854,7 +7415,7 @@ class VacuumMaintenanceCard extends HTMLElement {
         root.querySelector("button.cta")?.focus();
       } else if (b.dataset.a === "confirm") {
         this._closeSheet();
-        if (it?.reset) this._call("button", "press", { entity_id: it.reset });
+        if (it?.reset) this._call("button", "press", { entity_id: it.reset }, `reset the ${it.name.toLowerCase()}`);
       } else if (b.dataset.a === "history") {
         this._closeSheet();
         this._more(it?.entity);
@@ -6884,7 +7445,7 @@ class VacuumMaintenanceCard extends HTMLElement {
     else if (it.due) text = `${it.clean ? `Due for cleaning now.` : "Due now."}${every}`;
     else
       text = `${hText(it.left)} left${it.pct !== null ? ` (${it.pct}%)` : ""}${cleans !== null ? `, about ${fmt(cleans)} clean${cleans === 1 ? "" : "s"} at your average of ${fmt(Math.round(avg * 60))} min` : ""}.${every}`;
-    const color = it.due ? C.red : sh.confirm ? C.blue : C.grey;
+    const color = it.due ? C.red : sh.confirm ? C.teal : C.grey;
     const key = [sh.k, sh.confirm, text, !!it.reset].join("|");
     if (key === sh.key) return;
     sh.key = key;
@@ -6907,11 +7468,11 @@ class VacuumMaintenanceCard extends HTMLElement {
     this._sheet = null;
   }
 
-  async _call(domain, service, data) {
+  async _call(domain, service, data, what = "do that") {
     try {
       await this._hass.callService(domain, service, data);
     } catch (err) {
-      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "That did not work" }, bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || `Couldn't ${what}.` }, bubbles: true, composed: true }));
     }
   }
 }
@@ -6933,7 +7494,7 @@ async function registerVacuumMaintenanceCard() {
 registerVacuumMaintenanceCard();
 })();
 
-/* ===== weather-presence-card 1.3.2 ===== */
+/* ===== weather-presence-card 1.4.0 ===== */
 (() => {
 /*
  * Weather & presence card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -6942,19 +7503,22 @@ registerVacuumMaintenanceCard();
  * outdoor sensor and the forecast service's temperature) with two pills on the
  * right – who is home (tap for e.g. the security dashboard) and a link pill (tap
  * for e.g. the climate dashboard). Either pill can be left out, e.g. the link pill
- * on the very dashboard it would link to.
+ * on the very dashboard it would link to. Tap the weather for the forecast, your own
+ * temperature for its sensor (or long-press anywhere on the weather).
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.3.2";
+const WPC_VERSION = "1.4.0";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
 
+// One meaning per colour (design-tokens → Colours): green = someone home, teal = you can tap
+// this (the link pill's icon), grey = off / neutral. Weather icons keep their literal colours.
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
   teal: "var(--teal-color, #009688)",
-  orange: "var(--orange-color, #ff9800)",
+  green: "var(--green-color, #4caf50)",
   blue: "var(--blue-color, #2196f3)",
 };
 const WEATHER = {
@@ -6976,16 +7540,21 @@ const WEATHER = {
 };
 
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
+// Readable coloured text: mixed toward the text colour, never the raw colour on white.
+const tx = (c, p = 70) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-color))`;
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
-const temp = (v) => (num(v) === null ? "–" : `${num(v).toFixed(1)}°C`);
+const fmt = (n, d = 0) => (n === null ? "–" : n.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d }));
+// 14.23 → "14.2°": the entity's own value, whatever its unit (no hard-coded C).
+const temp = (v) => (num(v) === null ? "–" : `${fmt(num(v), 1)}°`);
 
+// "45 min", "3 h", "2 d" – a space and short units, like every card.
 function ago(ms) {
   const m = Math.max(0, Math.round(ms / 60000));
-  if (m < 60) return `${m}m`;
-  if (m < 1440) return `${Math.floor(m / 60)}h`;
-  return `${Math.floor(m / 1440)}d`;
+  if (m < 60) return `${m} min`;
+  if (m < 1440) return `${Math.floor(m / 60)} h`;
+  return `${Math.floor(m / 1440)} d`;
 }
 
 const CSS = `
@@ -7002,37 +7571,47 @@ const CSS = `
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .shape ha-icon { --mdc-icon-size: 24px; }
   .txt { min-width: 0; }
+  /* Text is never cut: a condition too long for its row wraps instead. */
   .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    overflow-wrap: break-word; }
   .sc { display: flex; flex-wrap: wrap; column-gap: 9px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
     color: var(--secondary-text-color); }
-  .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+  /* Each reading is its own tap target (more-info of its own sensor) and stays whole. */
+  .v { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
+    cursor: pointer; border-radius: 4px; -webkit-tap-highlight-color: transparent; }
+  .v[hidden] { display: none; }
   .v ha-icon, .pill ha-icon { flex: none; width: var(--mdc-icon-size); height: var(--mdc-icon-size); }
-  .v ha-icon { --mdc-icon-size: 14px; }
-  .v.real ha-icon { color: color-mix(in srgb, ${C.orange} 55%, ${C.grey}); }
-  .v.fc ha-icon { color: color-mix(in srgb, ${C.blue} 55%, ${C.grey}); }
+  /* Small reading icons are quiet secondary information, the same on every card. */
+  .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .pills { flex: none; display: flex; gap: 8px; align-items: center; }
   /* Primary pills: 36px – the height of the icon circle – on every screen, so circle, text block
      and pills share one centre line and the pills' edges line up with the circle. */
   .pill { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     height: 36px; padding: 0 14px 0 10px; border-radius: 18px; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: .2px;
     white-space: nowrap;
-    background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color);
     -webkit-tap-highlight-color: transparent; }
   .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
   /* The pills stay beside the weather whenever they fit there (the readings may wrap onto two
      lines). Only when they don't – measured in _fit() – do they move to a row of wide buttons
-     below it, e.g. two pills on a 375px phone. */
+     below it, e.g. two pills on a 375px phone: equal widths while both labels fit, a longer
+     label takes what it needs, and they wrap only as a last resort (the button-row pattern). */
   .wrap.stacked { flex-wrap: wrap; row-gap: 8px; }
   .wrap.stacked .wx { flex: 1 1 100%; }
-  .wrap.stacked .pills { flex: 1 1 100%; display: grid; grid-template-columns: repeat(var(--np, 2), minmax(0, 1fr)); }
-  .pill.home { background: ${tint(C.teal, 20)}; color: ${C.teal}; }
-  .pill.home ha-icon { color: ${C.teal}; }
-  .pill.link { color: var(--primary-text-color); padding-right: 4px; }
+  .wrap.stacked .pills { flex: 1 1 100%; flex-wrap: wrap; }
+  .wrap.stacked .pill { flex: 1 1 0; min-width: max-content; }
+  /* Someone home: green (Home Assistant's colour for a person at home), as an "on" pill. Away stays grey. */
+  .pill.home { background: ${tint(C.green, 18)}; color: ${tx(C.green, 70)}; }
+  .pill.home ha-icon { color: ${C.green}; }
+  .pill.link { padding-right: 4px; }
   .pill.link ha-icon { color: ${C.teal}; }
+  /* The chevron is a trailing glyph, not the pill's icon: 16px, grey. */
   .pill.link ha-icon.ch { --mdc-icon-size: 16px; color: ${C.grey}; margin-left: -3px; }
-  .pill:active, .wx:active { filter: brightness(.92); }
+  .pill:active, .wx:active, .v:active { filter: brightness(.92); }
+  /* Pressing a reading darkens the reading, not the whole weather block. */
+  .wx:has(.v:active) { filter: none; }
   .pill:focus-visible, .wx:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+  .v:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
 /* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
@@ -7169,7 +7748,7 @@ class WeatherPresenceCard extends HTMLElement {
         })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
-          weather: "Tap the weather for the forecast; long-press for your own sensor.",
+          weather: "Tap the weather for the forecast; tap your own temperature (or long-press) for its sensor.",
           hide: "E.g. on the dashboard it links to. Its settings below are kept.",
         })[s.name],
     };
@@ -7234,7 +7813,12 @@ class WeatherPresenceCard extends HTMLElement {
     const contentW = (node) => (range.selectNodeContents(node), range.getBoundingClientRect().width);
     const px = (el, prop) => parseFloat(getComputedStyle(el)[prop]) || 0;
     const wx = root.querySelector(".wx");
-    const text = Math.max(contentW(root.querySelector(".nm")), ...[...root.querySelectorAll(".sc .v")].map((v) => v.getBoundingClientRect().width));
+    // The condition's natural width: measured on one line, whether or not it is wrapping now.
+    const nm = root.querySelector(".nm");
+    nm.style.whiteSpace = "nowrap";
+    const cond = contentW(nm);
+    nm.style.whiteSpace = "";
+    const text = Math.max(cond, ...[...root.querySelectorAll(".sc .v:not([hidden])")].map((v) => v.getBoundingClientRect().width));
     const weather = root.querySelector(".shape").offsetWidth + px(wx, "columnGap") + text;
     const pillsW =
       pills.reduce((s, p) => s + contentW(p) + px(p, "paddingLeft") + px(p, "paddingRight"), 0) +
@@ -7298,11 +7882,16 @@ class WeatherPresenceCard extends HTMLElement {
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const link = this._link();
+    const c = this._config;
     const np = (this._presenceId() ? 1 : 0) + (link ? 1 : 0);
+    // The readings are built once and updated in place, so a focused one keeps its focus.
+    // Your own temperature is a button of its own (its sensor); the forecast belongs to the weather.
     root.innerHTML = `<style>${CSS}</style><ha-card><div class="wrap">
       <div class="wx" role="button" tabindex="0"><div class="shape"><ha-icon></ha-icon></div>
-        <div class="txt"><div class="nm"></div><div class="sc"></div></div></div>
-      <div class="pills" style="--np:${np || 1}${np ? "" : ";display:none"}">
+        <div class="txt"><div class="nm"></div><div class="sc">${
+          c.temperature ? `<button class="v real" data-e="${esc(c.temperature)}"><ha-icon icon="mdi:thermometer"></ha-icon><span></span></button>` : ""
+        }<span class="v fc" data-e="${esc(c.weather)}"><ha-icon icon="mdi:weather-partly-cloudy"></ha-icon><span></span></span></div></div></div>
+      <div class="pills"${np ? "" : ` style="display:none"`}>
         ${this._presenceId() ? `<button class="pill pres"><ha-icon></ha-icon><span></span></button>` : ""}
         ${link ? `<button class="pill link"><ha-icon></ha-icon><span></span><ha-icon class="ch" icon="mdi:chevron-right"></ha-icon></button>` : ""}
       </div></div></ha-card>`;
@@ -7322,8 +7911,15 @@ class WeatherPresenceCard extends HTMLElement {
     wx.addEventListener("contextmenu", (e) => e.preventDefault());
     // After a hold, the finger lifting must not "click" the dialog that just opened under it.
     wx.addEventListener("touchend", (e) => held && e.cancelable && e.preventDefault(), { passive: false });
-    wx.addEventListener("click", () => {
+    // A tap on a reading opens its own sensor; anywhere else on the weather, the forecast.
+    wx.addEventListener("click", (e) => {
       if (held) return (held = false);
+      const v = e.target.closest?.("[data-e]");
+      this._more(v ? v.dataset.e : this._config.weather);
+    });
+    wx.addEventListener("keydown", (e) => {
+      if (e.target !== wx || (e.key !== "Enter" && e.key !== " ")) return; // the reading button handles its own keys
+      e.preventDefault();
       this._more(this._config.weather);
     });
     root.querySelector(".pres")?.addEventListener("click", () => {
@@ -7360,19 +7956,22 @@ class WeatherPresenceCard extends HTMLElement {
     shape.querySelector("ha-icon").style.color = color;
     const cond = !w ? "Weather unavailable" : hass.formatEntityState ? hass.formatEntityState(w) : w.state.charAt(0).toUpperCase() + w.state.slice(1);
     set(root.querySelector(".nm"), cond);
-    const parts = [];
-    if (this._config.temperature)
-      parts.push(`<span class="v real"><ha-icon icon="mdi:thermometer"></ha-icon>${esc(this._config.temperature_name || "Real")} ${esc(temp(hass.states[this._config.temperature]?.state))}</span>`);
-    if (w)
-      parts.push(`<span class="v fc"><ha-icon icon="mdi:weather-partly-cloudy"></ha-icon>${esc(this._config.weather_name || "Forecast")} ${esc(temp(w.attributes?.temperature))}</span>`);
-    set(root.querySelector(".sc"), parts.join(""), true);
+    const real = root.querySelector(".v.real");
+    if (real) set(real.querySelector("span"), `${this._config.temperature_name || "Real"} ${temp(hass.states[this._config.temperature]?.state)}`);
+    const fc = root.querySelector(".v.fc");
+    if (fc.hidden !== !w) {
+      fc.hidden = !w;
+      changed = true;
+    }
+    if (w) set(fc.querySelector("span"), `${this._config.weather_name || "Forecast"} ${temp(w.attributes?.temperature)}`);
 
     const pres = root.querySelector(".pres");
     if (pres) {
       const home = this._home(hass.states[this._presenceId()]);
       pres.classList.toggle("home", home === true);
       pres.querySelector("ha-icon").setAttribute("icon", home ? "mdi:home-account" : "mdi:home-export-outline");
-      const label = home === null ? "Presence ?" : home ? "Home" : this._since ? `Away · ${Date.now() - this._since > HISTORY_DAYS * 86400000 ? `${HISTORY_DAYS}d+` : ago(Date.now() - this._since)}` : "Away";
+      const away = this._since ? (Date.now() - this._since > HISTORY_DAYS * 86400000 ? `${HISTORY_DAYS} d+` : ago(Date.now() - this._since)) : "";
+      const label = home === null ? "Presence –" : home ? "Home" : away ? `Away · ${away}` : "Away";
       set(pres.querySelector("span"), label);
     }
     const link = root.querySelector(".link");
@@ -7381,7 +7980,7 @@ class WeatherPresenceCard extends HTMLElement {
       link.querySelector("ha-icon").setAttribute("icon", lc.icon || "mdi:arrow-right");
       set(link.querySelector("span"), lc.name || "Open");
     }
-    // New text ("Away · 3h", a longer condition) can change what fits; check once per frame.
+    // New text ("Away · 3 h", a longer condition) can change what fits; check once per frame.
     if (changed && this._ro && !this._fitQueued) {
       this._fitQueued = true;
       requestAnimationFrame(() => {

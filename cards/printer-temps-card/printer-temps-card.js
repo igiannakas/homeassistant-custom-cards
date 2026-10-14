@@ -2,19 +2,20 @@
  * Printer temperatures card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * Heaters (temperature, target, heater power – the tile glows while heating), other
- * temperature readings, and the fans, for a Klipper / Moonraker printer. Sensors
- * are found from the Moonraker prefix; every list can be overridden. Tap any value
- * (temperature, target, power, fan) for its own more-info.
+ * temperature readings, and the fans (blue while running), for a Klipper / Moonraker
+ * printer. The summary ("Heating", "At temperature", "All heaters off") sits under the
+ * title. Sensors are found from the Moonraker prefix; every list can be overridden. Tap
+ * any value (temperature, target, power, fan) for its own more-info. Names wrap, never cut.
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.1.8";
+const PTC_VERSION = "1.2.0";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
   orange: "var(--orange-color, #ff9800)",
-  teal: "var(--teal-color, #009688)",
+  blue: "var(--blue-color, #2196f3)",
 };
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 const esc = (s) =>
@@ -78,19 +79,22 @@ const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
-     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
-     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
-     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
-  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; } /* 10px gap: titles at edge + 46, like Mushroom */
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; color: ${C.orange}; }
-  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
-  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
-  .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
-    white-space: nowrap; }
+     Two-line label row, the same on every card: a 24px icon in a 36px slot (where the glyph of a
+     Mushroom icon sits), the 14px / 500 title at edge + 46 and the 12px summary under it on the
+     same vertical line (ink-aligned, free to wrap). The icon is decorative, so no circle; it is
+     grey, and orange while a heater is on (it shows that state). */
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; }
+  .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+  .slot ha-icon { --mdc-icon-size: 24px; color: ${C.grey}; }
+  .label.on .slot ha-icon { color: ${C.orange}; }
+  .lt { flex: 1; min-width: 0; }
+  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
+  .lt.one .t { position: relative; top: 1px; } /* alone, a 20px line reads ~1px high next to the icon */
+  .s { display: block; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .s:empty { display: none; }
   .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
   .tile { box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px;
-    padding: 10px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
+    padding: 11px 10px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
   /* A heater that is on glows, like a lit room on the lights card. */
   .tile.on { background: ${tint(C.orange, 10)}; }
@@ -101,8 +105,8 @@ const CSS = `
   .tile.on .shape { background: ${tint(C.orange, 20)}; }
   .tile.on .shape ha-icon { color: ${C.orange}; }
   .txt { flex: 1; min-width: 0; }
-  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* A name too long for its tile wraps (tiles in a row stay level: grid-auto-rows 1fr). */
+  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
   /* Wraps rather than overflowing on a narrow tile. */
   .val { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 4px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
     color: var(--secondary-text-color); white-space: nowrap; }
@@ -113,17 +117,18 @@ const CSS = `
   /* Heater power sits at the end of its bar. */
   .br { display: flex; align-items: center; gap: 6px; }
   .br .bar { flex: 1; min-width: 0; }
-  .pw { min-width: 30px; text-align: right; font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color);
+  .pw { min-width: 30px; text-align: right; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color);
     white-space: nowrap; }
   .pw:empty { display: none; }
   .bar { height: 4px; border-radius: 2px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
   .bar i { display: block; height: 100%; background: ${C.orange}; border-radius: 2px; transition: width 400ms; }
   .fans { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 10px 0 0; font-size: 12px; line-height: 16px; letter-spacing: .4px;
     color: var(--secondary-text-color); }
-  .fan { all: unset; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
+  .fan { all: unset; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; white-space: nowrap; border-radius: 4px; }
   .fan ha-icon { --mdc-icon-size: 16px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
-  .fan.on ha-icon { color: ${C.teal}; }
-  .tile:active, .fan:active { filter: brightness(.94); }
+  /* A running fan is blue (something running). */
+  .fan.on ha-icon { color: ${C.blue}; }
+  .tile:active, .fan:active { filter: brightness(.92); }
   .tile:focus-visible, .fan:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
@@ -273,7 +278,8 @@ class PrinterTempsCard extends HTMLElement {
     const items = [...heaters(this._hass, this._config).filter((h) => !h.missing), ...readings(this._hass, this._config)];
     const fl = fans(this._hass, this._config);
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      <div class="label"><ha-icon icon="mdi:thermometer"></ha-icon><span class="title">${esc(this._config.title ?? "Temperatures")}</span><span class="sum"></span></div>
+      <div class="label"><div class="slot"><ha-icon icon="mdi:thermometer"></ha-icon></div>
+        <div class="lt"><div class="t">${esc(this._config.title ?? "Temperatures")}</div><span class="s"></span></div></div>
       <div class="tiles">${items
         .map((it, i) => `<div class="tile ${it.kind}" role="button" tabindex="0" data-i="${i}"><div class="hh"><span class="shape"><ha-icon icon="${esc(it.icon)}"></ha-icon></span>
           <span class="txt"><div class="nm">${esc(it.name)}</div><div class="val"></div></span></div>${it.kind === "heater" ? `<div class="br"><div class="bar"><i></i></div><button class="pw" data-e="${esc(it.power)}"></button></div>` : ""}</div>`)
@@ -302,7 +308,7 @@ class PrinterTempsCard extends HTMLElement {
   }
 
   _render() {
-    inkSchedule(this, ".txt");
+    inkSchedule(this, ".txt, .lt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -337,8 +343,11 @@ class PrinterTempsCard extends HTMLElement {
     const hs = items.filter((it) => it.kind === "heater");
     const on = hs.filter((h) => h.on);
     const sum = !on.length ? "All heaters off" : on.every((h) => h.t !== null && Math.abs(h.t - h.tg) <= 2) ? "At temperature" : "Heating";
-    const sumEl = root.querySelector(".sum");
+    const sumEl = root.querySelector(".s");
     if (sumEl.textContent !== sum) sumEl.textContent = sum;
+    root.querySelector(".lt").classList.toggle("one", !sum);
+    // The label icon shows state only while a heater is on (orange); otherwise it is decoration (grey).
+    root.querySelector(".label").classList.toggle("on", on.length > 0);
   }
 
   _more(entityId) {

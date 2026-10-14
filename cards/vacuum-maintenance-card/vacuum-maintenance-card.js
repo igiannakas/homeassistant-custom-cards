@@ -13,7 +13,7 @@
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.4.2";
+const VMC_VERSION = "2.5.0";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -22,6 +22,7 @@ const C = {
   red: "var(--red-color, #f44336)",
   orange: "var(--orange-color, #ff9800)",
   blue: "var(--blue-color, #2196f3)",
+  teal: "var(--teal-color, #009688)",
   brown: "var(--brown-color, #795548)",
 };
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
@@ -153,8 +154,8 @@ const SHEET_CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
   button .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
   button .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
-  /* Reset is the vacuum's own action, so blue like the robot card's (orange means lights / heat). */
-  button.cta { color: #fff; background: ${C.blue}; }
+  /* Reset is a tap with no state colour of its own, so teal (design tokens → Colours). */
+  button.cta { color: #fff; background: ${C.teal}; }
   button.cta .glyph { background: rgba(255,255,255,.2); }
   button.cta .glyph ha-icon { color: #fff; }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
@@ -434,7 +435,7 @@ class VacuumMaintenanceCard extends HTMLElement {
         root.querySelector("button.cta")?.focus();
       } else if (b.dataset.a === "confirm") {
         this._closeSheet();
-        if (it?.reset) this._call("button", "press", { entity_id: it.reset });
+        if (it?.reset) this._call("button", "press", { entity_id: it.reset }, `reset the ${it.name.toLowerCase()}`);
       } else if (b.dataset.a === "history") {
         this._closeSheet();
         this._more(it?.entity);
@@ -464,7 +465,7 @@ class VacuumMaintenanceCard extends HTMLElement {
     else if (it.due) text = `${it.clean ? `Due for cleaning now.` : "Due now."}${every}`;
     else
       text = `${hText(it.left)} left${it.pct !== null ? ` (${it.pct}%)` : ""}${cleans !== null ? `, about ${fmt(cleans)} clean${cleans === 1 ? "" : "s"} at your average of ${fmt(Math.round(avg * 60))} min` : ""}.${every}`;
-    const color = it.due ? C.red : sh.confirm ? C.blue : C.grey;
+    const color = it.due ? C.red : sh.confirm ? C.teal : C.grey;
     const key = [sh.k, sh.confirm, text, !!it.reset].join("|");
     if (key === sh.key) return;
     sh.key = key;
@@ -487,11 +488,11 @@ class VacuumMaintenanceCard extends HTMLElement {
     this._sheet = null;
   }
 
-  async _call(domain, service, data) {
+  async _call(domain, service, data, what = "do that") {
     try {
       await this._hass.callService(domain, service, data);
     } catch (err) {
-      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "That did not work" }, bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || `Couldn't ${what}.` }, bubbles: true, composed: true }));
     }
   }
 }

@@ -25,8 +25,26 @@ function states(over = {}) {
   eq(tiles().map((t) => t.querySelector(".nm").textContent), ["Nozzle", "Bed", "Chamber", "Build plate", "Stepper body", "Toolhead board"]);
   eq([0, 1, 2, 3].map(val), ["20.0°Off", "21.3°Off", "22.1°Off", "21.0°"]);
   assert(!tiles().some((t) => t.classList.contains("on")));
-  assert.strictEqual(r.querySelector(".sum").textContent, "All heaters off");
+  assert.strictEqual(r.querySelector(".s").textContent, "All heaters off");
   eq([...r.querySelectorAll(".fan span")].map((f) => f.textContent), ["Part 0%", "Hotend 0%", "Exhaust 0%"]);
+  // Two-line label: the summary sits under the title (not squeezed onto its right), ink-aligned.
+  assert(r.querySelector(".label .lt .t + .s"), "summary under the title");
+  assert.strictEqual(r.querySelector(".label .t").textContent, "Temperatures");
+  assert(!r.querySelector(".lt").classList.contains("one"));
+  // The label icon is decoration (grey) while nothing heats.
+  assert(!r.querySelector(".label").classList.contains("on"));
+  const css = r.querySelector("style").textContent;
+  assert(!/text-overflow:\s*ellipsis/.test(css), "no clipped text");
+  assert(!/line-clamp/.test(css));
+  assert(!/margin-left:\s*auto/.test(css), "no summary pushed to the right of the title");
+  assert(/\.slot ha-icon \{[^}]*color: var\(--grey-color/.test(css), "label icon grey");
+  assert(/\.label\.on \.slot ha-icon \{ color: var\(--orange-color/.test(css), "orange while heating");
+  assert(/\.fan\.on ha-icon \{ color: var\(--blue-color/.test(css), "a running fan is blue");
+  assert(!/teal/.test(css), "no teal: nothing here is a pick");
+  assert(/\.tile \{[^}]*padding: 11px 10px/.test(css), "tile padding 11px 10px");
+  assert(/\.pw \{[^}]*font-size: 12px/.test(css), "heater power 12px");
+  assert(/\.tile:active, \.fan:active \{ filter: brightness\(\.92\)/.test(css), "press .92");
+  assert(!/font-size: (10|11\.5|17)px/.test(css), "only the type scale's sizes");
 
   // Heating: nozzle and bed on → glow, target and power, bar; summary Heating.
   card.hass = hass(states({
@@ -41,7 +59,8 @@ function states(over = {}) {
   assert(tiles()[0].classList.contains("on") && tiles()[1].classList.contains("on") && !tiles()[2].classList.contains("on"));
   assert.strictEqual(tiles()[0].querySelector(".bar i").style.width, "38.4%");
   assert.strictEqual(tiles()[2].querySelector(".bar i").style.width, "0%");
-  assert.strictEqual(r.querySelector(".sum").textContent, "Heating");
+  assert.strictEqual(r.querySelector(".s").textContent, "Heating");
+  assert(r.querySelector(".label").classList.contains("on"), "label icon shows heating");
   assert(r.querySelectorAll(".fan")[1].classList.contains("on"));
   assert.strictEqual(r.querySelectorAll(".fan span")[1].textContent, "Hotend 100%");
 
@@ -50,7 +69,7 @@ function states(over = {}) {
     "number.voron_extruder_target": { state: "250", attributes: {} }, "sensor.voron_extruder_temperature": { state: "249.3", attributes: {} },
     "sensor.voron_extruder_power": { state: "22", attributes: {} },
   }));
-  assert.strictEqual(r.querySelector(".sum").textContent, "At temperature");
+  assert.strictEqual(r.querySelector(".s").textContent, "At temperature");
 
   // A tap opens more-info for the temperature / fan entity.
   tiles()[1].click();
@@ -70,7 +89,7 @@ function states(over = {}) {
   eq([...c2.shadowRoot.querySelectorAll(".tile .nm")].map((n) => n.textContent), ["Nozzle", "Bed", "Build plate", "Toolhead board"]);
   const c3 = mount({ prefix: "voron", title: "Temps", heaters: [{ name: "Hotend", heater: "extruder" }], readings: [{ name: "Room", entity: "sensor.voron_buildplate_temp" }], fans: [] }, states());
   eq([...c3.shadowRoot.querySelectorAll(".tile .nm")].map((n) => n.textContent), ["Hotend", "Room"]);
-  assert.strictEqual(c3.shadowRoot.querySelector(".title").textContent, "Temps");
+  assert.strictEqual(c3.shadowRoot.querySelector(".t").textContent, "Temps");
   assert.strictEqual(c3.shadowRoot.querySelector(".fans").style.display, "none");
 
   console.log("printer-temps-card: all tests passed");

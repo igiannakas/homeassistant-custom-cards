@@ -50,17 +50,42 @@ const cfg = {
   const r = card.shadowRoot;
   const q = (s) => r.querySelector(s);
   const acts = () => [...r.querySelectorAll(".act")].map((b) => b.textContent);
+  // "Name · State" is joined with a no-break space before the dot; compare with plain spaces.
+  const nm = (root) => root.querySelector(".nm").textContent.replace(/\u00a0/g, " ");
+  const txt = (n) => n.textContent.replace(/\u00a0/g, " ");
 
   // Idle: Ready, message, plug with watts, totals, Power off only. No printer operations
   // (home, pause, resume, cancel, E-stop) anywhere – those are done on the printer.
-  assert.strictEqual(q(".nm").textContent, "Voron · Ready");
+  assert.strictEqual(nm(r), "Voron · Ready");
   assert.strictEqual(q(".msg").textContent, "Printer is ready");
   assert.strictEqual(q(".pill .tog span").textContent, "On");
   assert.strictEqual(q(".pill .w").textContent, "142 W");
   assert(q(".pill").classList.contains("on"));
   assert.strictEqual(q(".job").style.display, "none");
   eq([...r.querySelectorAll(".stats b")].map((b) => b.textContent), ["0.84 kWh", "1,342", "4,826 h", "412.3 km"]);
+  eq([...r.querySelectorAll(".stats span")].map((b) => b.textContent), ["Today", "Prints", "Printed", "Filament"], "labels capitalised");
   eq(acts(), ["Power off"]);
+  // The state word never splits and stays with its dot; the name may wrap before it.
+  assert.strictEqual(q(".nm .st .w").textContent, "Ready");
+  assert(q(".nm").innerHTML.includes("&nbsp;·"), q(".nm").innerHTML);
+
+  // Text is never clipped: no ellipsis or line clamp anywhere; the button row is the flex pattern.
+  const css = [...r.querySelectorAll("style")].map((x) => x.textContent).join("");
+  assert(!/text-overflow:\s*ellipsis/.test(css), "no clipped text");
+  assert(!/line-clamp/.test(css), "no line clamp");
+  assert(/\.acts \{ display: flex; flex-wrap: wrap; gap: 8px; \}/.test(css), "button row wraps");
+  assert(/\.act \{[^}]*flex: 1 1 0; min-width: max-content;[^}]*letter-spacing: \.2px/.test(css), "equal pills that keep their label");
+  // Power on and Power off are orange, like the power pill.
+  assert(/\.act\.poweroff ha-icon, \.act\.poweron ha-icon \{ color: var\(--orange-color/.test(css), "power buttons orange");
+  assert(/\.cbar \{ height: 8px;/.test(css), "compact job bar 8px");
+
+  // The state circle is a tap target: the printer's more-info, by click or keyboard.
+  const circle = q(".head .shape");
+  assert.strictEqual(circle.getAttribute("role"), "button");
+  assert.strictEqual(circle.getAttribute("tabindex"), "0");
+  circle.click();
+  circle.dispatchEvent(new t.window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, composed: true }));
+  eq(t.events.splice(0), [["more-info", "sensor.voron_current_print_state"], ["more-info", "sensor.voron_current_print_state"]]);
   assert(!/e-?stop|emergency|home_all|pause_print|resume_print|cancel_print/i.test(r.innerHTML), "no printer operations");
   const pwr = r.querySelector(".act.poweroff");
   card.hass = hass(states());
@@ -84,6 +109,20 @@ const cfg = {
   await tick();
   dlg = document.querySelector("psc-confirm-dialog");
   assert(dlg, "asks first");
+  // Reference dialog: one glyph (the title's), the text under the title, a rule above the buttons;
+  // no printer name and no second glyph. Orange, like the button that opened it.
+  {
+    const d = dlg.shadowRoot;
+    assert.strictEqual(d.querySelector(".title").textContent, "Power off");
+    assert.strictEqual(d.querySelector(".text").textContent, "The printer shuts down safely, then its plug turns off.");
+    assert.strictEqual(d.querySelectorAll(".dialog > .row").length, 1, "title row only");
+    assert.strictEqual([...d.querySelectorAll(".glyph")].filter((g) => !g.closest("button")).length, 1, "no second glyph");
+    assert(!d.querySelector(".primary, .secondary, .body"), "no device-name line");
+    assert(!/Voron/.test(d.textContent), "the printer isn't named again");
+    assert(d.querySelector(".confirm").getAttribute("style").includes("--orange-color"));
+    assert.strictEqual(d.querySelector(".confirm").textContent, "Power off", "title and button use the same verb");
+    assert(/\.buttons \{[^}]*border-top: 1px solid/.test(d.querySelector("style").textContent), "1px rule above the buttons");
+  }
   dlg.shadowRoot.querySelector(".cancel").click();
   await tick();
   assert(!document.querySelector("psc-confirm-dialog"));
@@ -96,12 +135,22 @@ const cfg = {
 
   // Printing: job block with progress, time left, layers, filament, speed; no buttons.
   card.hass = hass(states(printing()));
-  assert.strictEqual(q(".nm").textContent, "Voron · Printing");
+  assert.strictEqual(nm(r), "Voron · Printing");
   assert.strictEqual(q(".msg").textContent, "bracket_v3.gcode");
   assert.strictEqual(q(".job").style.display, "");
-  assert(q(".pct").textContent.startsWith("62%1h 23m left · done "), q(".pct").textContent);
+  assert(/^62%1 h 23 min left · ends \d\d:\d\d$/.test(txt(q(".pct"))), txt(q(".pct")));
+  // Each part of the job line stays whole; the line breaks only between parts.
+  eq([...r.querySelectorAll(".pct .when .p")].map((x) => x.textContent).map((x) => x.replace(/\d\d:\d\d/, "hh:mm")), ["1 h 23 min left", "ends hh:mm"]);
+  assert(q(".pct .when").innerHTML.includes("&nbsp;· "));
+  // Durations: "45 min", "3 h", "1 h 5 min".
+  for (const [hours, text] of [[0.75, "45 min"], [3, "3 h"], [1.0833, "1 h 5 min"]]) {
+    card.hass = hass(states({ ...printing(), ...Object.fromEntries([p("print_time_left", hours)]) }));
+    assert.strictEqual(q(".pct .when .p").textContent, `${text} left`);
+  }
+  card.hass = hass(states(printing()));
   assert.strictEqual(q(".pbar i").style.width, "62%");
-  assert.strictEqual(q(".l1").textContent, "Layer 141 / 230 · 12.3 m filament");
+  assert.strictEqual(txt(q(".l1")), "Layer 141 / 230 · 12.3 m filament");
+  eq([...r.querySelectorAll(".l1 .p")].map((x) => x.textContent), ["Layer 141 / 230", "12.3 m filament"]);
   assert.strictEqual(q(".l2").textContent, "250 mm/s");
   assert.strictEqual(q(".thumb img").getAttribute("src"), "/api/camera_proxy/camera.voron_thumbnail?token=a");
   assert.strictEqual(q(".stats").style.display, "none");
@@ -113,57 +162,62 @@ const cfg = {
     "sensor.voron_filament_used", "sensor.voron_print_speed", "camera.voron_thumbnail",
   ]);
 
-  // Plug while printing: asks, in red, and says the print ends.
+  // Plug while printing: asks, in red (it would end the print), and says so.
   q(".pill .tog").click();
   await tick();
   dlg = document.querySelector("psc-confirm-dialog");
-  assert(dlg.shadowRoot.textContent.includes("is printing"));
+  assert(dlg.shadowRoot.querySelector(".text").textContent.includes("ends the current print"));
   assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--red-color"));
+  assert.strictEqual(dlg.shadowRoot.querySelector(".title").textContent, "Turn the plug off");
+  assert.strictEqual(dlg.shadowRoot.querySelector(".confirm").textContent, "Turn off");
   dlg.shadowRoot.querySelector(".confirm").click();
   await tick();
   eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.voron" }]);
 
   // Paused: no buttons either.
   card.hass = hass(states({ ...printing(), ...Object.fromEntries([p("current_print_state", "paused")]) }));
-  assert.strictEqual(q(".nm").textContent, "Voron · Paused");
+  assert.strictEqual(nm(r), "Voron · Paused");
   eq(acts(), []);
 
-  // Complete: job stays visible as "Done", idle buttons back.
+  // Complete: job stays visible as "Complete" (the state word, not "Done"), idle buttons back.
   card.hass = hass(states({ ...printing(), ...Object.fromEntries([p("current_print_state", "complete"), p("progress", 100)]) }));
-  assert.strictEqual(q(".nm").textContent, "Voron · Complete");
-  assert.strictEqual(q(".pct").textContent, "100%Done");
+  assert.strictEqual(nm(r), "Voron · Complete");
+  assert.strictEqual(q(".pct").textContent, "100%Complete");
   assert.strictEqual(q(".l2").textContent, "");
   eq(acts(), ["Power off"]);
 
   // Plug on but Moonraker not answering: "Please wait", with the reason, and no buttons.
   const down = { ...Object.fromEntries([p("printer_state", "unavailable"), p("totals_jobs", "unavailable"), p("totals_print_time", "unavailable"), p("totals_filament_used", "unavailable")]) };
   card.hass = hass(states(down));
-  assert.strictEqual(q(".nm").textContent, "Voron · Please wait");
+  assert.strictEqual(nm(r), "Voron · Please wait");
   assert.strictEqual(q(".msg").textContent, "Waiting for the printer");
   eq(acts(), []);
   eq([...r.querySelectorAll(".stats b")].map((b) => b.textContent), ["0.84 kWh", "–", "–", "–"], "no fake 0 h while totals are unavailable");
   card.hass = hass(states({ ...down, "script.power_off_3d_printer": { state: "on", attributes: {} } }));
   assert.strictEqual(q(".msg").textContent, "Shutting down", "the safe power-off script is running");
   card.hass = hass(states(Object.fromEntries([p("printer_state", "startup")])));
-  assert.strictEqual(q(".nm").textContent, "Voron · Please wait");
+  assert.strictEqual(nm(r), "Voron · Please wait");
   assert.strictEqual(q(".msg").textContent, "Klipper is starting");
 
   // Error state.
   card.hass = hass(states(Object.fromEntries([p("printer_state", "shutdown"), p("printer_message", "MCU 'mcu' shutdown")])));
-  assert.strictEqual(q(".nm").textContent, "Voron · Error");
+  assert.strictEqual(nm(r), "Voron · Error");
   assert.strictEqual(q(".msg").textContent, "MCU 'mcu' shutdown");
 
   // Plug off: the pill hides and the only button is Power on, which asks first.
   card.hass = hass(states({ "switch.voron": { state: "off", attributes: {} }, "sensor.tasmota_energy_power_2": { state: "0", attributes: {} } }));
-  assert.strictEqual(q(".nm").textContent, "Voron · Off");
-  assert.strictEqual(q(".msg").textContent, "Power is off");
+  assert.strictEqual(nm(r), "Voron · Off");
+  assert.strictEqual(q(".msg").textContent, "", "no line repeating Off");
   assert(q(".pill").hidden, "no pill while the plug is off");
   eq(acts(), ["Power on"]);
   r.querySelector(".act.poweron").click();
   await tick();
   dlg = document.querySelector("psc-confirm-dialog");
-  assert(dlg && dlg.shadowRoot.textContent.includes("starts up"), "power on asks first");
-  assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--green-color"));
+  assert(dlg && dlg.shadowRoot.querySelector(".text").textContent.includes("starts up"), "power on asks first");
+  assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--orange-color"), "orange, like Power off and the pill");
+  assert(dlg.shadowRoot.querySelector(".row .glyph").getAttribute("style").includes("--orange-color"));
+  assert.strictEqual(dlg.shadowRoot.querySelector(".title").textContent, "Power on");
+  assert.strictEqual(dlg.shadowRoot.querySelector(".confirm").textContent, "Power on");
   dlg.shadowRoot.querySelector(".cancel").click();
   await tick();
   assert.strictEqual(calls.length, 0, "cancel leaves the plug off");
@@ -179,10 +233,30 @@ const cfg = {
   q(".pill .tog").click();
   await tick();
   dlg = document.querySelector("psc-confirm-dialog");
-  assert(dlg && dlg.shadowRoot.textContent.includes("Cut power"), "plug off asks first");
+  assert(dlg && dlg.shadowRoot.querySelector(".title").textContent === "Turn the plug off", "plug off asks first");
+  assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--orange-color"), "orange while idle (the pill's colour)");
+  assert(dlg.shadowRoot.querySelector(".text").textContent.includes("without a shutdown"));
   dlg.shadowRoot.querySelector(".cancel").click();
   await tick();
   assert.strictEqual(calls.length, 0, "cancel leaves the plug on");
+
+  // A failed call without a message from HA: "Couldn't …" with the name, never an entity id.
+  {
+    const bad = { ...hass(states()), callService: async () => { throw {}; } };
+    card.hass = bad;
+    r.querySelector(".act.poweroff").click();
+    await tick();
+    document.querySelector("psc-confirm-dialog").shadowRoot.querySelector(".confirm").click();
+    await tick();
+    eq(t.events.splice(0), [["notification", "Couldn't power off Voron."]]);
+    card.hass = { ...hass(states()), callService: async () => { throw new Error("Service not found"); } };
+    q(".pill .tog").click();
+    await tick();
+    document.querySelector("psc-confirm-dialog").shadowRoot.querySelector(".confirm").click();
+    await tick();
+    eq(t.events.splice(0), [["notification", "Service not found"]], "HA's own message when there is one");
+    card.hass = hass(states());
+  }
 
   // Upstream plug (power_sensor_switch): the power sensor measures a strip that feeds the printer's
   // own plug and other things. Printer on: the usual On | watts pill.
@@ -200,7 +274,7 @@ const cfg = {
     assert(u(".pill .w ha-icon").hidden, "no second plug glyph beside the toggle");
     // Printer off, strip on: just the watts – no toggle (Power on below does that), no glow.
     uc.hass = hass(ups(false, true, 12));
-    assert.strictEqual(u(".nm").textContent, "Voron · Off");
+    assert.strictEqual(nm(ur), "Voron · Off");
     assert(!u(".pill").hidden, "watts stay while the strip is on");
     assert(!u(".pill").classList.contains("on"), "no glow while the printer is off");
     assert(u(".pill .tog").hidden, "no toggle while the printer is off");
@@ -232,7 +306,7 @@ const cfg = {
   eq([...bare.shadowRoot.querySelectorAll(".act")].map((b) => b.textContent), []);
   assert.strictEqual(bare.shadowRoot.querySelectorAll(".stats b").length, 3);
   assert(!bare.shadowRoot.querySelector(".pill"));
-  assert.strictEqual(bare.shadowRoot.querySelector(".nm").textContent, "Printer · Ready");
+  assert.strictEqual(nm(bare.shadowRoot), "Printer · Ready");
 
   // Chamber light (a Klipper output pin, 0–100): a third button, glows while on, toggles at once.
   const LED = "number.voron_output_pin_chamber_leds";
@@ -245,7 +319,6 @@ const cfg = {
   const lb = lr.querySelector(".act.light");
   assert(lb.classList.contains("on"));
   assert.strictEqual(lb.querySelector("ha-icon").getAttribute("icon"), "mdi:led-strip-variant");
-  assert.strictEqual(lr.querySelector(".acts").style.getPropertyValue("--n"), "2");
   lb.click();
   await tick();
   assert(!document.querySelector("psc-confirm-dialog"), "light toggles without asking");
@@ -344,9 +417,10 @@ const cfg = {
     const cr = cc.shadowRoot;
     assert(cr.querySelector("ha-card.compact"));
     assert(!cr.querySelector(".act") && !cr.querySelector(".camera"), "no buttons or camera in compact");
-    assert.strictEqual(cr.querySelector(".nm").textContent, "Voron · Printing 62%");
+    assert.strictEqual(nm(cr), "Voron · Printing 62%");
     assert.strictEqual(cr.querySelector(".sc").textContent, "bracket_v3", "file on its own line, without .gcode");
-    assert(/^1h 23m left · done \d\d:\d\d$/.test(cr.querySelector(".sc2").textContent), cr.querySelector(".sc2").textContent);
+    assert(/^1 h 23 min left · ends \d\d:\d\d$/.test(txt(cr.querySelector(".sc2"))), cr.querySelector(".sc2").textContent);
+    assert.strictEqual(cr.querySelectorAll(".sc2 .p").length, 2, "each time stays whole");
     assert(!cr.querySelector(".cbar").hidden);
     assert.strictEqual(cr.querySelector(".cbar i").style.width, "62%");
     assert.strictEqual(cr.querySelector(".watts span").textContent, "142 W");
@@ -361,11 +435,11 @@ const cfg = {
     const shape = cr.querySelector(".shape");
     cc.hass = hass(states());
     assert.strictEqual(cr.querySelector(".shape"), shape, "updated in place");
-    assert.strictEqual(cr.querySelector(".nm").textContent, "Voron · Ready");
+    assert.strictEqual(nm(cr), "Voron · Ready");
     assert(cr.querySelector(".cbar").hidden);
     assert.strictEqual(cr.querySelector(".sc2").textContent, "", "second line only while printing");
     cc.hass = hass(states({ "switch.voron": { state: "off", attributes: {} }, "sensor.tasmota_energy_power_2": { state: "0", attributes: {} } }));
-    assert.strictEqual(cr.querySelector(".nm").textContent, "Voron · Off");
+    assert.strictEqual(nm(cr), "Voron · Off");
     assert.strictEqual(cr.querySelector(".sc").textContent, "Today 0.84 kWh");
     assert(cr.querySelector(".watts").hidden, "no watts while the plug is off");
     // Upstream plug: watts while the strip is on, neutral while the printer is off.
@@ -375,7 +449,7 @@ const cfg = {
     assert(!ur.querySelector(".watts").hidden && !ur.querySelector(".watts").classList.contains("off"));
     assert.strictEqual(ur.querySelector(".watts span").textContent, "142 W");
     uc.hass = hass(states({ "switch.voron": { state: "off", attributes: {} }, [up]: { state: "on", attributes: {} }, "sensor.tasmota_energy_power_2": { state: "12", attributes: {} } }));
-    assert.strictEqual(ur.querySelector(".nm").textContent, "Voron · Off");
+    assert.strictEqual(nm(ur), "Voron · Off");
     assert.strictEqual(ur.querySelector(".sc").textContent, "Today 0.84 kWh");
     assert(!ur.querySelector(".watts").hidden, "watts while the strip is on");
     assert(ur.querySelector(".watts").classList.contains("off"), "without the glow");

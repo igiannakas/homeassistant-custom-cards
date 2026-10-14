@@ -7,19 +7,29 @@
 </p>
 
 - **Weather**: condition with a matching icon and colour (sunny amber, rain
-  blue…), your own outdoor sensor's temperature and the weather service's.
-  Tap for the forecast; long-press for your own sensor.
-- **Presence pill**: teal "Home" while someone is home; grey "Away · 3h" when
-  not, with how long the house has been empty. That time comes from the
-  history, so a Home Assistant restart does not reset it. Tap goes to
-  `presence.navigation_path` (or opens the entity).
-- **Link pill**: a plain "go there" pill, e.g. to your climate dashboard. Turn on
-  **Hide this pill** to drop it where it makes no sense, such as on the climate
-  dashboard itself; its name, icon and path are kept for when you turn it back on.
+  blue…), your own outdoor sensor's temperature and the weather service's, e.g.
+  "Real 14.2°" – the sensor's own value with a degree sign, whatever its unit.
+  Tap the weather for the forecast; tap your own temperature (or long-press anywhere
+  on the weather) for your sensor. The weather also opens with Enter or Space.
+  A long condition wraps onto a second line; it is never cut off.
+- **Presence pill**: green "Home" while someone is home (Home Assistant's colour for
+  a person at home); grey "Away · 3 h" when not, with how long the house has been
+  empty ("45 min", "3 h", "2 d", "7 d+"). That time comes from the history, so a
+  Home Assistant restart does not reset it. "Presence –" while the entity is
+  unavailable. Tap goes to `presence.navigation_path` (or opens the entity).
+- **Link pill**: a plain "go there" pill, e.g. to your climate dashboard, with a teal
+  icon (you can tap it) and a grey chevron. Turn on **Hide this pill** to drop it
+  where it makes no sense, such as on the climate dashboard itself; its name, icon
+  and path are kept for when you turn it back on.
 - The pills are 36px buttons, the height of the weather icon's circle, on every screen. They stay beside the
   weather whenever they fit (the two readings may wrap onto two lines), e.g. both
   pills on a 440px iPhone Pro Max. When they don't fit, e.g. both pills on a 375px
-  phone, they become a row of wide buttons under the weather.
+  phone, they become a row of wide buttons under the weather: equal widths while
+  both labels fit, a longer label takes the width it needs.
+
+Colours follow the shared convention: green = someone home, teal = you can tap this,
+grey = away / neutral; the reading icons are a quiet grey and weather icons keep their
+literal colours.
 
 ## Configuration
 

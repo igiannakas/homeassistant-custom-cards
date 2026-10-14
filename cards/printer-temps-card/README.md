@@ -8,11 +8,15 @@ Moonraker printer.
 </p>
 
 - **Heater tiles**: temperature, then "Off" or "→ target", and a power bar with
-  the heater power at its end. A heater that is on **glows orange**, like a lit room on the lights card.
-- **Readings**: other temperatures as plain tiles.
-- **Fans**: one line, coloured while running.
-- **Label row**: "All heaters off", "Heating" or "At temperature" (every heater
-  that is on is within 2° of its target).
+  the heater power at its end. A heater that is on **glows orange** (heat), like a lit room
+  on the lights card.
+- **Readings**: other temperatures as plain tiles. Readings are shown as `21.4°`.
+- **Names** are never cut off: a name too long for its tile wraps, and the tiles in a row
+  stay the same height.
+- **Fans**: one line, the icon **blue while the fan runs** (blue means running).
+- **Label row**: the title with the summary under it – "All heaters off", "Heating" or
+  "At temperature" (every heater that is on is within 2° of its target). The thermometer
+  icon is grey, and orange while a heater is on.
 - Tap a value – temperature, target, power, fan – for its own more-info; the rest
   of a tile opens its temperature. Sensors that do not exist are left out.
 

@@ -41,7 +41,7 @@ message: sensor.epaper_epaper_screen_text
 | `presence.last_seen` | `input_datetime` with when that was. |
 | `presence.navigation_path` | Where tapping the title goes (e.g. the camera dashboard). Without it, tapping opens the `occupied` entity. |
 | `alarm` | `input_boolean` or `switch` that arms the alarm. |
-| `door` | Door sensor; any state containing `open` (or `on`) counts as open. |
+| `door` | Door sensor; any state containing `open` (or `on`) counts as open ("Door open", red). |
 | `tv.entity` | TV on/off entity. `tv.navigation_path` is where tapping goes. |
 | `climate.temperature` | Temperature sensor shown on the climate button. |
 | `climate.state` | Text describing the AC – anything with `cool` or `heat` in it colours the button; `off` shows "Off". |
@@ -55,23 +55,39 @@ drops that part.
 
 **Presence (title line)**
 
-- Occupied – teal house, the `occupied` text underneath.
+- Occupied – green house (green means someone home, as in Home Assistant), the
+  `occupied` text underneath.
 - Empty, someone seen within the last hour – orange.
 - Empty longer than that – red.
 - When empty, the line reads "A person was last seen in the *room* today at 16:09"
-  (or "yesterday at …", "on Oct 03 at …").
+  (or "yesterday at …", "on 03 Oct at …"; times are 24-hour).
+- Nothing is cut off: the title breaks only before the state word ("Greece ·
+  Occupied" keeps the dot with the name) and the line underneath wraps in full.
+- The house icon is a button (tap, or Enter / Space): it goes to
+  `presence.navigation_path`, like the title.
 
-**Alarm switch** – red "Armed" or grey "Disarmed". Tapping asks first; the
-dialog explains that the CCTV alarm system starts or stops sending push
-notifications.
+**Alarm chip** – red "Armed" (a red-tinted pill, like every "on" pill) or grey
+"Disarmed"; "Alarm –" when the entity is unavailable. The word always shows: on a
+narrow card the text beside it wraps instead. Tapping asks first, in a red dialog
+both ways (the Armed chip's colour): "Arm alarm" / "Disarm alarm", with a line
+saying that the CCTV alarm system starts or stops sending push notifications. If
+Home Assistant can't change it, its own message shows, else "Couldn't change the
+alarm."
 
-**Status buttons** – grey while normal:
+**Status buttons** – grey while normal; each label names its object ("Door
+closed", "TV off", "25.1° · Off"), and an unknown state reads "–" ("Door –"). The
+buttons share one row at equal widths while every label fits; a longer label takes
+the width it needs, and a button wraps to a second row only if the row can't hold
+them all. Labels are never cut off.
 
 | Button | Colour when it needs attention | Tap |
 |---|---|---|
-| Door | red when open | opens the door's details |
+| Door | red when open ("Door open") | opens the door's details |
 | TV | amber when on | `tv.navigation_path` |
 | Climate | blue when cooling, red when heating | `climate.navigation_path` |
+
+A coloured button is tinted 18% with its label in the colour (mixed toward the
+text colour so it stays readable) – the same "on" pill as on the other cards.
 
 **ePaper line** – always shown. The message is quoted and wraps in full;
 "ePaper screen is blank" when empty. Tapping opens the sensor's details

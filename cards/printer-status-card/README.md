@@ -6,7 +6,7 @@
 ┌──────────────────────────────────────────────────────┐
 │ (nozzle) Voron · Printing               (plug) On | 142 W │
 │          bracket_v3.gcode                                   │
-│ ┌──────┐ 62%  1h 23m left · done 15:42                      │
+│ ┌──────┐ 62%  1 h 23 min left · ends 15:42                  │
 │ │ img  │ ███████████████░░░░░░░░░                           │
 │ └──────┘ Layer 141 / 230 · 12.3 m filament                  │
 │          250 mm/s                                           │
@@ -16,34 +16,43 @@
 └──────────────────────────────────────────────────────┘
 ```
 
-- **Header**: state in its colour (Off, Ready, Printing, Paused, Complete,
-  Cancelled, Error) and the printer's message – or the file name during a job. While
-  the plug is on but the printer isn't answering it says **Please wait**, with why:
-  "Shutting down" (the `power_off_script` is running), "Klipper is starting", or
-  "Waiting for the printer".
-- **Power pill**: shown while the plug is on, with its live watts. Tap On to cut
-  the plug: it asks first, and warns in red while a print is running. Tap the watts for
-  the power sensor. When the plug is off the toggle goes away and the Power on button
+- **Header**: state in its colour (Off grey, Ready grey, Printing blue, Paused amber,
+  Complete green, Cancelled grey, Error red) and the printer's message – or the file name
+  during a job. While the plug is on but the printer isn't answering it says **Please wait**,
+  with why: "Shutting down" (the `power_off_script` is running), "Klipper is starting", or
+  "Waiting for the printer". While the printer is off there is no second line – "Voron · Off"
+  says it. Nothing is cut off: the name, the file name and the message wrap, and "Name ·
+  State" breaks only before the state word. Tap the state circle (or the text) for the
+  printer's more-info.
+- **Power pill** (orange while on): shown while the plug is on, with its live watts. Tap On
+  to turn the plug off: it asks first ("Turn the plug off" – orange, or red while a print is
+  running, because cutting the power then ends the print). Tap the watts for the power sensor. When the plug is off the toggle goes away and the Power on button
   below takes its place. If the power sensor measures an upstream plug that also feeds
   other things (`power_sensor_switch`, e.g. a strip with the printer, a filament dryer and
   a screen), the watts stay – on their own, without the glow – whenever that plug is on.
-- **Job**: thumbnail, progress, time left and finish time, layer, filament used and
-  speed. Stays up after the print as "Done" / "Cancelled".
-- **Idle**: energy used today, prints, hours printed and kilometres of filament.
+- **Job**: thumbnail, progress, time left and finish time ("1 h 23 min left · ends 15:42"),
+  layer, filament used and speed. Each part of a line stays whole; on a narrow card the line
+  breaks only between parts. Stays up after the print as "Complete" / "Cancelled".
+- **Idle**: energy used Today, Prints, hours Printed and kilometres of Filament.
 - **Camera**: any card you like (e.g. Frigate card), shown inside this one – only while there is
   a picture: the printer must be reachable (plug on and Moonraker's printer state not
   unavailable) and the camera must actually serve an image. The card asks Home Assistant for a
   small still of the camera (`/api/camera_proxy/…`) every 15 s while hidden and every 60 s while
   shown; an error hides the camera card, so it never sits there trying to connect.
 - **Buttons** are power only: Power on when the plug is off, a safe Power off when the
-  printer is idle, nothing while it prints. Both ask first. Printer operations – homing,
-  pause, resume, cancel, emergency stop – are left out on purpose: do those on the printer.
+  printer is idle, nothing while it prints. Both are orange (power, like the pill) and both
+  ask first, in an orange dialog whose title and button use the same words. The buttons share
+  the row equally and never cut a label; if they don't fit, one wraps. Printer operations –
+  homing, pause, resume, cancel, emergency stop – are left out on purpose: do those on the
+  printer.
 - **Chamber light** (optional, `light`): an extra button that glows while the light is
   on and shows its level when dimmed ("Light 25%"). A tap toggles it at once. For a
   Klipper output pin (a 0–100 `number`), on returns to the last level it had, or to
   `light_on` (default full). Hold the button for the light's more-info.
 - **Tap any value** (progress, time left, finish time, layer, filament, speed,
   today's energy, totals, the state) for its own more-info.
+- **Errors**: if Home Assistant refuses an action, its message shows; otherwise "Couldn't
+  power on Voron." (or whatever you tried), with the name, never an entity id.
 
 ## Compact layout (overview pages)
 
@@ -51,10 +60,11 @@
 wording as the full card, nothing to operate:
 
 - The icon in its state colour, "Voron · Printing 62%" (or Ready, Off, Please wait, Error…).
-- Underneath, what matters now: the file name (wraps, no `.gcode`) and "1h 23m left · done 15:42"
-  on its own line while printing, with a progress bar; "file · finished 15:41" when complete;
-  "Chamber 24° · 4 of 8 loaded" when ready (chamber sensor and Happy Hare lane sensors, when
-  they exist); "Today 0.25 kWh" when off; the printer's message otherwise.
+- Underneath, what matters now: the file name (wraps, no `.gcode`) and "1 h 23 min left ·
+  ends 15:42" on its own line while printing, with an 8px progress bar; "file · finished 15:41"
+  when complete; "Chamber 24° · 4 of 8 loaded" when ready (chamber sensor and Happy Hare lane
+  sensors, when they exist); "Today 0.25 kWh" when off; the printer's message otherwise. Lines
+  wrap only between their parts (times in 24-hour en-GB form).
 - Live watts in a pill while the plug is on – or, with `power_sensor_switch`, whenever that
   upstream plug is on (without the glow while the printer itself is off).
 - The icon and the watts stay centred on the text, however many lines it wraps to; padding and

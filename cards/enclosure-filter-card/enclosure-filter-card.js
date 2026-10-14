@@ -2,18 +2,19 @@
  * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * A printer enclosure's filter / vent (e.g. a StealthMax): the vent position as a
- * segmented selector, intake and exhaust side by side (temperature, humidity, VOC,
- * VOC with manual calibration), and any extra readings (e.g. the delta) as a small
- * line. Tap any value for its own more-info.
+ * segmented selector (a tap moves the selection at once; it falls back if Home Assistant
+ * doesn't confirm), intake and exhaust side by side (temperature, humidity, VOC, VOC with
+ * manual calibration), the summary under the title, and any extra readings (e.g. the delta),
+ * each with its unit, as a small line. Tap any value for its own more-info.
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.1.7";
+const EFC_VERSION = "1.2.0";
 const EFC_TAG = "enclosure-filter-card";
+const PENDING_MS = 45000; // how long a vent move shows before Home Assistant confirms it
 
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
-  teal: "var(--teal-color, #009688)",
   green: "var(--green-color, #4caf50)",
   amber: "var(--amber-color, #ffc107)",
   orange: "var(--orange-color, #ff9800)",
@@ -32,6 +33,15 @@ const esc = (s) =>
 const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
 const fmt = (n, d = 0) => (n === null ? "–" : n.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d }));
 
+/* A reading with its unit, as the cards write them: "48%", "21.4°" (no C), "612 ppm". */
+function withUnit(text, unit) {
+  const u = String(unit || "").trim();
+  if (!u || text === "–") return text;
+  if (u === "%") return `${text}%`;
+  if (/^°[CF]?$/.test(u)) return `${text}°`;
+  return `${text} ${u}`;
+}
+
 /* "0" → Closed, "100" → Open, numbers as they are. */
 function optionLabel(o) {
   if (String(o) === "0") return "Closed";
@@ -47,39 +57,45 @@ const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
-     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
-     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
-     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
-  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; } /* 10px gap: titles at edge + 46, like Mushroom */
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; color: ${C.teal}; }
-  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
-  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
-  .sum { margin-left: auto; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
-    white-space: nowrap; }
+     Two-line label row, the same on every card: a 24px icon in a 36px slot (where the glyph of a
+     Mushroom icon sits), the 14px / 500 title at edge + 46 and the 12px summary under it on the
+     same vertical line (ink-aligned, free to wrap). The icon is decorative: grey, no circle. */
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; }
+  .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+  .slot ha-icon { --mdc-icon-size: 24px; color: ${C.grey}; }
+  .lt { flex: 1; min-width: 0; }
+  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
+  .lt.one .t { position: relative; top: 1px; } /* alone, a 20px line reads ~1px high next to the icon */
+  .s { display: block; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .s:empty { display: none; }
+  /* Summary parts stay whole; the line wraps only between them. */
+  .p { white-space: nowrap; }
   .vent { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; }
-  .vl { font-size: 12px; letter-spacing: .4px; color: var(--secondary-text-color); }
-  .seg { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 2px; padding: 3px;
-    border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
-  .opt { all: unset; box-sizing: border-box; min-width: 0; height: 32px; border-radius: 9px; cursor: pointer; text-align: center;
-    font-size: 12px; line-height: 32px; font-weight: 500; letter-spacing: .2px; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
+  .vl { flex: none; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  /* Segmented selector (32px segments in a 38px track), as on the robot vacuum card. A label too
+     long for its segment wraps (the segment grows), never cut; a single word is never split. */
+  .seg { flex: 1; min-width: 0; display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
+  .opt { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: min-content; min-height: 32px; padding: 0 6px; border-radius: 9px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; line-height: 16px; font-weight: 500;
+    color: var(--secondary-text-color); overflow-wrap: break-word; -webkit-tap-highlight-color: transparent; }
   .opt.on { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
   .io { display: flex; align-items: stretch; gap: 8px; }
-  .side { box-sizing: border-box; flex: 1; min-width: 0; padding: 10px; border-radius: 10px; cursor: pointer;
+  .side { box-sizing: border-box; flex: 1; min-width: 0; padding: 11px 10px; border-radius: 10px; cursor: pointer;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); display: grid; gap: 1px; -webkit-tap-highlight-color: transparent; }
   .vals { display: flex; flex-wrap: wrap; gap: 1px 10px; }
-  .h { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  .h { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
   .v, .x { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; line-height: 16px;
     letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; cursor: pointer; border-radius: 4px;
     -webkit-tap-highlight-color: transparent; }
+  /* An extra reading's name may wrap on a narrow card; its value and unit stay together. */
+  .x { display: block; white-space: normal; overflow-wrap: break-word; }
   .v:active, .x:active { filter: brightness(.85); }
   .v:focus-visible, .x:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .arrow { align-self: center; --mdc-icon-size: 20px; color: color-mix(in srgb, var(--secondary-text-color) 45%, transparent); }
   .extra { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 10px 0 0; }
   .extra:empty { display: none; }
-  .opt:active, .side:active { filter: brightness(.94); }
+  .opt:active, .side:active { filter: brightness(.92); }
   .opt:focus-visible, .side:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
@@ -207,6 +223,7 @@ class EnclosureFilterCard extends HTMLElement {
     if (!config) throw new Error("Missing configuration");
     this._config = { intake: {}, exhaust: {}, ...config };
     this._built = false;
+    this._pending = {};
     if (this._hass) this._render();
   }
 
@@ -223,6 +240,25 @@ class EnclosureFilterCard extends HTMLElement {
     return { columns: "full", rows: "auto" };
   }
 
+  disconnectedCallback() {
+    clearTimeout(this._pendTimer);
+  }
+
+  /* A vent move shown before Home Assistant confirms it (like the vacuum's floor switch): the
+     pressed segment moves at once; the real state takes over once it matches, or after 45 s. */
+  _pend(k, v) {
+    this._pending[k] = { v, t: Date.now() };
+  }
+  _shown(k, actual) {
+    const p = this._pending[k];
+    if (!p) return actual;
+    if (p.v === actual || Date.now() - p.t > PENDING_MS) {
+      delete this._pending[k];
+      return actual;
+    }
+    return p.v;
+  }
+
   _options() {
     const s = this._hass.states[this._config.vent];
     return (s?.attributes?.options || []).filter((o) => isFinite(Number(o)));
@@ -233,9 +269,10 @@ class EnclosureFilterCard extends HTMLElement {
     const opts = this._config.vent ? this._options() : [];
     const side = (k, title) => `<div class="side ${k}" role="button" tabindex="0"><div class="h">${esc(title)}</div><div class="vals"></div></div>`;
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      <div class="label"><ha-icon icon="mdi:air-filter"></ha-icon><span class="title">${esc(this._config.title ?? "Filter")}</span><span class="sum"></span></div>
-      ${opts.length ? `<div class="vent"><span class="vl">Vent</span><div class="seg" style="--n:${opts.length}">
-        ${opts.map((o) => `<button class="opt" data-o="${esc(o)}">${esc(optionLabel(o))}</button>`).join("")}</div></div>` : ""}
+      <div class="label"><div class="slot"><ha-icon icon="mdi:air-filter"></ha-icon></div>
+        <div class="lt"><div class="t">${esc(this._config.title ?? "Filter")}</div><span class="s"></span></div></div>
+      ${opts.length ? `<div class="vent"><span class="vl">Vent</span><div class="seg" role="group" aria-label="Vent">
+        ${opts.map((o) => `<button class="opt" data-o="${esc(o)}" aria-pressed="false">${esc(optionLabel(o))}</button>`).join("")}</div></div>` : ""}
       <div class="io">${side("in", this._config.intake_name || "Intake")}<ha-icon class="arrow" icon="mdi:arrow-right-thick"></ha-icon>${side("out", this._config.exhaust_name || "Exhaust")}</div>
       <div class="extra"></div></ha-card>`;
     root.querySelectorAll(".opt").forEach((b) => b.addEventListener("click", () => this._select(b.dataset.o)));
@@ -281,7 +318,7 @@ class EnclosureFilterCard extends HTMLElement {
   }
 
   _render() {
-    inkSchedule(this, ".side");
+    inkSchedule(this, ".side, .lt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -289,18 +326,24 @@ class EnclosureFilterCard extends HTMLElement {
     const set = (n, v) => {
       if (n && n.innerHTML !== v) n.innerHTML = v;
     };
-    const vent = this._hass.states[this._config.vent]?.state;
-    root.querySelectorAll(".opt").forEach((b) => b.classList.toggle("on", b.dataset.o === vent));
+    const vent = this._shown("vent", this._hass.states[this._config.vent]?.state);
+    if (!this._pending.vent) clearTimeout(this._pendTimer);
+    root.querySelectorAll(".opt").forEach((b) => {
+      const on = b.dataset.o === vent;
+      b.classList.toggle("on", on);
+      if (b.getAttribute("aria-pressed") !== String(on)) b.setAttribute("aria-pressed", String(on));
+    });
     const a = this._side(this._config.intake);
     const b = this._side(this._config.exhaust);
     set(root.querySelector(".side.in .vals"), a.html);
     set(root.querySelector(".side.out .vals"), b.html);
+    // The summary, under the title: each part whole, the line breaking only between parts.
     const sum = [
       vent && !isFinite(Number(vent)) ? `Vent: ${vent}` : "",
       a.voc != null && b.voc != null ? `VOC ${fmt(a.voc)} → ${fmt(b.voc)}` : "",
-    ].filter(Boolean).join(" · ");
-    const s = root.querySelector(".sum");
-    if (s.textContent !== sum) s.textContent = sum;
+    ].filter(Boolean).map((p) => `<span class="p">${esc(p)}</span>`).join("&nbsp;· ");
+    set(root.querySelector(".s"), sum);
+    root.querySelector(".lt").classList.toggle("one", !sum);
     const extra = (this._config.details || [])
       .map((d) => (typeof d === "string" ? { entity: d } : d))
       .filter((d) => this._hass.states[d.entity])
@@ -308,19 +351,30 @@ class EnclosureFilterCard extends HTMLElement {
         const st = this._hass.states[d.entity];
         const n = num(st.state);
         const name = d.name || st.attributes.friendly_name || d.entity;
-        return `<button class="x" data-e="${esc(d.entity)}">${esc(name)} ${n === null ? esc(st.state) : fmt(n, Math.abs(n) < 100 && n % 1 ? 1 : 0)}</button>`;
+        const value = n === null
+          ? (["unknown", "unavailable"].includes(st.state) ? "–" : st.state)
+          : withUnit(fmt(n, Math.abs(n) < 100 && n % 1 ? 1 : 0), st.attributes.unit_of_measurement);
+        return `<button class="x" data-e="${esc(d.entity)}">${esc(name)} <span class="p">${esc(value)}</span></button>`;
       })
       .join("");
     set(root.querySelector(".extra"), extra);
   }
 
+  /* The pressed segment moves at once; it falls back at once if Home Assistant refuses, else
+     when the 45 s are up without the vent's state agreeing. */
   async _select(option) {
     const id = this._config.vent;
     const [domain] = id.split(".");
+    this._pend("vent", option);
+    this._render();
+    clearTimeout(this._pendTimer);
+    this._pendTimer = setTimeout(() => this._render(), PENDING_MS + 50);
     try {
       await this._hass.callService(domain === "input_select" ? "input_select" : "select", "select_option", { entity_id: id, option });
     } catch (err) {
-      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "Could not move the vent" }, bubbles: true, composed: true }));
+      delete this._pending.vent;
+      this._render();
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "Couldn't move the vent." }, bubbles: true, composed: true }));
     }
   }
 

@@ -12,6 +12,8 @@ window.customElements.define("home-assistant", class extends window.HTMLElement 
 const { document } = window;
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 const eq = (a, b, m) => assert.strictEqual(JSON.stringify(a), JSON.stringify(b), m);
+// Status lines join their parts with "&nbsp;· " (the dot stays with the part before it).
+const text = (el) => el.textContent.replace(/\u00a0/g, " ");
 
 const calls = [];
 const TH = ["climate.a", "climate.b", "climate.c", "climate.d"];
@@ -53,16 +55,22 @@ const cfg = {
   eq(modes().map((m) => m.querySelector(".name").textContent), ["Off", "Away", "Night", "Day", "Boost"]);
   eq(modes().map((m) => m.classList.contains("on")), [true, false, false, false, false]);
   assert.strictEqual(r.querySelector(".title").textContent, "Heating");
-  assert.strictEqual(r.querySelector(".status").textContent, "All rooms · Off");
+  assert.strictEqual(text(r.querySelector(".status")), "All rooms · Off");
   assert(modes()[0].getAttribute("style").includes("--cyan-color"));
+  // The summary sits under the title (two-line label), its parts unbreakable.
+  assert(r.querySelector(".label > .lt > .title + .status"), "title and summary in one text block");
+  assert.strictEqual(r.querySelector(".status").innerHTML, '<span class="p">All rooms</span>&nbsp;· <span class="p">Off</span>');
+  assert(!r.querySelector(".lt").classList.contains("one"));
+  // icon_color set: the header icon keeps the user's colour.
+  assert(r.querySelector(".label > ha-icon").style.color.includes("--orange-color"));
 
   // Rooms on different presets → nothing highlighted, "Mixed".
   card.hass = hass(["eco", "eco", "comfort", "eco"]);
   eq(modes().map((m) => m.classList.contains("on")), [false, false, false, false, false]);
-  assert.strictEqual(r.querySelector(".status").textContent, "Mixed");
+  assert.strictEqual(text(r.querySelector(".status")), "Mixed");
   card.hass = hass(Array(4).fill("eco"));
   assert(modes()[2].classList.contains("on"));
-  assert.strictEqual(r.querySelector(".status").textContent, "All rooms · Night");
+  assert.strictEqual(text(r.querySelector(".status")), "All rooms · Night");
 
   // Taps: scripts run straight away; Away / Boost open their confirmation pop-ups (hash).
   const navs = [];
@@ -89,6 +97,9 @@ const cfg = {
   const cr = cool.shadowRoot;
   eq([...cr.querySelectorAll(".mode")].map((m) => m.classList.contains("on")), [false, true]);
   assert(cr.querySelector(".switch").classList.contains("on"));
+  assert(cr.querySelector(".switch").getAttribute("style").includes("--teal-color"), "a switch is teal unless switch_color is set");
+  // No thermostats: the summary is just the active mode's name.
+  assert.strictEqual(text(cr.querySelector(".status")), "Low");
   assert.strictEqual(cr.querySelector(".switch .swl").textContent, "Automatic");
   cr.querySelector(".switch").click();
   await tick();
@@ -101,7 +112,7 @@ const cfg = {
     switch_tap_action: { action: "navigate", navigation_path: "#summer-mode" } });
   h2.hass = hass(Array(4).fill("frost_protection"), { "input_boolean.summer": "on" });
   const hr = h2.shadowRoot;
-  assert.strictEqual(hr.querySelector(".status").textContent, "All rooms · Off");
+  assert.strictEqual(text(hr.querySelector(".status")), "All rooms · Off");
   assert.strictEqual(hr.querySelector(".switch .swl").textContent, "Summer");
   assert(hr.querySelector(".switch").classList.contains("on"));
   hr.querySelector(".switch").click();
@@ -137,7 +148,17 @@ const cfg = {
   let dlg = document.querySelector("cmc-confirm-dialog");
   assert(dlg, "asks first");
   const dt = dlg.shadowRoot.textContent;
-  assert(dt.includes("Boost heating") && dt.includes("All rooms") && dt.includes("Every room heats to 21 °C"), dt);
+  assert(dt.includes("Boost heating") && dt.includes("Every room heats to 21 °C"), dt);
+  // Reference layout: one glyph, the text under the title, a rule above the buttons; the old
+  // subject line (and its second glyph) is gone – with a text, the subject isn't shown at all.
+  const ds = dlg.shadowRoot;
+  assert(!dt.includes("All rooms"), "no subject line");
+  assert(!ds.querySelector(".body, .primary, .secondary"));
+  assert.strictEqual(ds.querySelectorAll(".dialog > .row").length, 1);
+  assert.strictEqual(ds.querySelectorAll(".row .glyph ha-icon").length, 1, "no second glyph");
+  assert.strictEqual(ds.querySelector(".text").textContent, "Every room heats to 21 °C for 30 minutes.");
+  const dcss = ds.querySelector("style").textContent;
+  assert(/\.buttons \{[^}]*border-top: 1px solid/.test(dcss) && !/17px/.test(dcss));
   assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--red-color"));
   assert.strictEqual(rendered.length, 1, "only template strings go to the server");
   dlg.shadowRoot.querySelector(".cancel").click();
@@ -157,6 +178,7 @@ const cfg = {
   await tick(); await tick();
   dlg = document.querySelector("cmc-confirm-dialog");
   assert.strictEqual(dlg.shadowRoot.querySelector(".title").textContent, "Day");
+  assert(!dlg.shadowRoot.querySelector(".text"), "confirmation: true → no text line");
   window.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await tick();
@@ -187,7 +209,8 @@ const cfg = {
   const ar = ac.shadowRoot;
   const icon = () => ar.querySelector(".label > ha-icon");
   assert.strictEqual(ar.querySelector(".title").textContent, "Heating controls");
-  assert.strictEqual(ar.querySelector(".status").textContent, "Heating · Living Room, Study", "friendly names without 'Thermostat'; names override");
+  assert.strictEqual(text(ar.querySelector(".status")), "Heating · Living Room, Study", "friendly names without 'Thermostat'; names override");
+  assert.strictEqual(ar.querySelector(".status").innerHTML, '<span class="p">Heating</span>&nbsp;· <span class="p">Living Room</span>, <span class="p">Study</span>');
   assert.strictEqual(icon().getAttribute("icon"), "mdi:radiator");
   assert(icon().style.color.includes("--orange-color"), icon().style.color);
   assert(ar.querySelector(".modes .mode.on"), "the tiles still show the mode");
@@ -197,12 +220,12 @@ const cfg = {
   assert.strictEqual(keep.textContent, "Idle");
   assert(icon().style.color.includes("--grey-color"));
   ac.hass = th(["heating", "idle", "idle", "idle"], "on");
-  assert.strictEqual(keep.textContent, "Summer · heating locked", "the lock wins");
+  assert.strictEqual(text(keep), "Summer · heating locked", "the lock wins");
   assert.strictEqual(icon().getAttribute("icon"), "mdi:weather-sunny");
   assert(icon().style.color.includes("--amber-color"));
   ac.hass = th(["heating", "idle", "idle", "idle"]);
   assert.strictEqual(icon().getAttribute("icon"), "mdi:radiator", "icon comes back");
-  assert.strictEqual(keep.textContent, "Heating · Living Room");
+  assert.strictEqual(text(keep), "Heating · Living Room");
 
   // A flag tile (active: {attribute, state}) glows on its own, next to the active mode.
   const fc = document.createElement("climate-modes-card");
@@ -213,10 +236,9 @@ const cfg = {
   fc.hass = fh([false, false, false, false]);
   const on = () => [...fc.shadowRoot.querySelectorAll(".mode")].filter((b) => b.classList.contains("on")).map((b) => b.textContent.trim());
   eq(on(), ["Day", "Schedule"], "following the schedule: the mode and the flag both glow");
-  assert(fc.shadowRoot.querySelector(".modes").classList.contains("many"));
   fc.hass = fh([false, true, false, false]);
   eq(on(), ["Day"], "one room overridden: the flag goes out");
-  assert.strictEqual(fc.shadowRoot.querySelector(".status").textContent, "All rooms · Day", "the flag never becomes the mode");
+  assert.strictEqual(text(fc.shadowRoot.querySelector(".status")), "All rooms · Day", "the flag never becomes the mode");
   fc.setConfig({ ...fc._config, lock: { entity: "input_boolean.summer" } });
   const lh = fh([false, false, false, false]); lh.states["input_boolean.summer"] = { state: "on", attributes: {} };
   fc.hass = lh;
@@ -251,6 +273,122 @@ const cfg = {
   await tick();
   assert.strictEqual(window.location.pathname, "/lovelace/0", "the switch does not navigate");
   eq(calls.pop(), ["homeassistant", "turn_on", { entity_id: "input_boolean.summer" }]);
+
+  // Colours (design tokens → Colours). Without icon_color the header icon takes the active
+  // mode's colour, grey when no mode is on.
+  const dc = document.createElement("climate-modes-card");
+  document.body.appendChild(dc);
+  const { icon_color, ...noColour } = cfg;
+  dc.setConfig({ ...noColour, modes: [...cfg.modes.slice(0, 4).map((m, i) => (i === 0 ? { ...m, color: "grey" } : m)),
+    { name: "Plain", icon: "mdi:help", preset: "plain", tap_action: { ...run("script.plain"), confirmation: { subject: "All rooms" } } }],
+    header_tap_action: { action: "navigate", navigation_path: "/lovelace/heat", confirmation: true } });
+  dc.hass = hass(Array(4).fill("eco"));
+  const dr = dc.shadowRoot;
+  const head = () => dr.querySelector(".label > ha-icon").style.color;
+  assert(head().includes("--purple-color"), "the active mode's colour: " + head());
+  dc.hass = hass(["eco", "away", "eco", "eco"]);
+  assert(head().includes("--grey-color"), "mixed → grey");
+  dc.hass = hass(Array(4).fill("frost_protection"));
+  assert(head().includes("--grey-color"), "Off (grey) → grey");
+  // A tile with no colour of its own still glows grey (header grey too), but asks in teal (not
+  // blue); its old subject stands in for the missing text.
+  dc.hass = hass(Array(4).fill("plain"));
+  const plain = dr.querySelectorAll(".mode")[4];
+  assert(plain.getAttribute("style").includes("--grey-color") && plain.classList.contains("on"));
+  assert(head().includes("--grey-color"));
+  plain.click();
+  await tick(); await tick();
+  dlg = document.querySelector("cmc-confirm-dialog");
+  assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--teal-color"), "uncoloured tile → teal dialog");
+  assert.strictEqual(dlg.shadowRoot.querySelector(".text").textContent, "All rooms", "subject is the text when there is none");
+  dlg.shadowRoot.querySelector(".cancel").click();
+  await tick();
+  // A grey tile (Off) asks in teal too: a filled grey button would look disabled.
+  const grey = document.createElement("climate-modes-card");
+  document.body.appendChild(grey);
+  grey.setConfig({ ...cfg, modes: [{ name: "Away", icon: "mdi:home-export-outline", color: "grey", preset: "away",
+    tap_action: { ...run("script.away"), confirmation: { title: "Away mode", text: "Every room drops to its away temperature." } } }] });
+  grey.hass = hass(Array(4).fill("away"));
+  assert(grey.shadowRoot.querySelector(".mode").getAttribute("style").includes("--grey-color"), "glows grey");
+  grey.shadowRoot.querySelector(".mode").click();
+  await tick(); await tick();
+  dlg = document.querySelector("cmc-confirm-dialog");
+  assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--teal-color"), "grey tile → teal dialog");
+  dlg.shadowRoot.querySelector(".cancel").click();
+  await tick();
+  // The header's dialog takes the header icon's colour; while it is grey, teal.
+  dc.hass = hass(Array(4).fill("eco"));
+  dr.querySelector(".label > ha-icon").click();
+  await tick(); await tick();
+  dlg = document.querySelector("cmc-confirm-dialog");
+  assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--purple-color"), "header dialog = header icon colour");
+  dlg.shadowRoot.querySelector(".cancel").click();
+  await tick();
+  dc.hass = hass(["eco", "away", "eco", "eco"]);
+  dr.querySelector(".label .title").click();
+  await tick(); await tick();
+  dlg = document.querySelector("cmc-confirm-dialog");
+  assert(dlg.shadowRoot.querySelector(".confirm").getAttribute("style").includes("--teal-color"), "grey header → teal dialog");
+  dlg.shadowRoot.querySelector(".cancel").click();
+  await tick();
+  // A lock without its own colour is grey (an off state, not a warning).
+  const lc = document.createElement("climate-modes-card");
+  document.body.appendChild(lc);
+  lc.setConfig({ ...cfg, status: "activity", lock: { entity: "input_boolean.summer", text: "Summer · heating locked" } });
+  lc.hass = hass(Array(4).fill("eco"), { "input_boolean.summer": "on" });
+  assert(lc.shadowRoot.querySelector(".label > ha-icon").style.color.includes("--grey-color"), "lock default grey");
+  assert.strictEqual(lc.shadowRoot.querySelector(".status").innerHTML, '<span class="p">Summer</span>&nbsp;· <span class="p">heating locked</span>');
+  // No summary → the title alone, 1px low to centre on the icon.
+  const one = document.createElement("climate-modes-card");
+  document.body.appendChild(one);
+  one.setConfig({ title: "Cooling", icon: "mdi:snowflake", modes: [{ name: "Off", active: { entity: "input_number.ac", state: "0" } }] });
+  one.hass = hass([], { "input_number.ac": "2" });
+  assert(one.shadowRoot.querySelector(".lt").classList.contains("one"));
+  assert.strictEqual(one.shadowRoot.querySelector(".status").textContent, "");
+
+  // Failures: Home Assistant's message (above), else "Couldn't <what you tried>." with names.
+  const toasts = [];
+  card.addEventListener("hass-notification", (e) => toasts.push(e.detail.message));
+  card.hass = { ...hass(Array(4).fill("eco")), callService: async () => { throw {}; } };
+  modes()[2].click();
+  await tick();
+  const sc = document.createElement("climate-modes-card");
+  document.body.appendChild(sc);
+  sc.setConfig({ ...cfg, switch: "input_boolean.summer", switch_name: "Summer" });
+  sc.addEventListener("hass-notification", (e) => toasts.push(e.detail.message));
+  const sh = hass(Array(4).fill("eco"), { "input_boolean.summer": "on" });
+  sh.states["input_boolean.summer"].attributes.friendly_name = "Summer mode";
+  sc.hass = { ...sh, callService: async () => { throw {}; } };
+  sc.shadowRoot.querySelector(".switch").click();
+  await tick();
+  eq(toasts, ["Couldn't switch to Night.", "Couldn't turn Summer mode off."]);
+
+  // Mode tiles: names never cut and never below 12px. One row while every tile fits; else even,
+  // balanced rows; a name wraps only when it is wider than the whole card. jsdom has no layout,
+  // so the measurements are given here.
+  const def = (el, k, v) => Object.defineProperty(el, k, { value: v, configurable: true });
+  const fr = fc.shadowRoot;
+  const fitAt = (W, nameW = 50) => {
+    const box = fr.querySelector(".modes");
+    def(box, "clientWidth", W);
+    box.querySelectorAll(".name").forEach((n) => def(n, "scrollWidth", nameW));
+    fc._fitModes();
+    return [box.classList.contains("fit") ? Number(box.style.getPropertyValue("--cols")) : 0, box.classList.contains("wrap")];
+  };
+  // Six tiles, 50px names → 70px each.
+  eq(fitAt(500), [0, false], "all six fit: one flex row");
+  eq(fitAt(400), [3, false], "five would fit: 3 + 3, not 5 + 1");
+  eq(fitAt(300), [3, false], "three per row");
+  eq(fitAt(200), [2, false]);
+  eq(fitAt(60), [1, true], "one column; only then does a name wrap");
+  eq(fitAt(500, 60), [3, false], "longer names → fewer per row");
+  const css = fr.querySelector("style").textContent;
+  assert(!/text-overflow:\s*ellipsis|line-clamp/.test(css), "no clipped text");
+  assert(!/font-size: (1[01]|11\.5)px|@container/.test(css), "names never shrink below 12px");
+  assert(/\.modes \{ display: flex; flex-wrap: wrap; gap: 8px; \}/.test(css) && /\.mode \{[^}]*flex: 1 1 0; min-width: max-content;/.test(css), "CSS default: a flex row that wraps");
+  assert(/\.mode \{[^}]*padding: 11px 10px;/.test(css), "tile padding 11px 10px");
+  assert(/\.mode\.on \{ background: color-mix\(in srgb, var\(--c\) 10%, transparent\)/.test(css), "active tint 10%");
+  assert(/\.status \.p \{ white-space: nowrap; \}/.test(css));
 
   console.log("ALL CLIMATE-MODES TESTS PASSED");
   process.exit(0);

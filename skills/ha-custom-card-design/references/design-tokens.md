@@ -6,38 +6,38 @@ and Bubble Card without looking foreign. Copy them; don't eyeball them.
 ## Colours
 
 **The convention: a colour is a meaning, and each meaning has one colour** – the same on every
-card, built on Home Assistant's own semantic colours (red error, amber warning, green good,
-grey off). Colour a control by what it *means*, never to decorate it:
+card, built on Home Assistant's own colours. Colour a control by what it *means*, never to
+decorate it (decided 14 Oct 2026):
 
-| Colour | Means | Vacuum cards |
+| Colour | Means | Examples |
 |---|---|---|
-| Blue | Something running, or the action that starts it (in progress) | Cleaning / Returning, Clean + Resume (filled), rooms picked for the next clean, the Cleaning mode tile, a dock job while it runs, every robot confirmation |
-| Teal | Presence / home / automations that follow you | Auto clean when away (pill and its confirmation, both ways) |
-| Amber | Needs attention soon, but not broken | Paused, mop not attached, a part due soon, battery ≤ 30% |
-| Red | Error / needs you now | Robot or dock error, a tank to empty or refill, a part due now, battery ≤ 15% |
-| Green | Good | Battery above 30% |
-| Orange | Lights, heat, power – never a warning | – (not used on the vacuum cards) |
-| Grey | Off / idle / neutral | Docked, Idle, Dock, the dock jobs at rest, a part that's fine |
+| Teal | **You can tap or pick this** – the accent for anything interactive that has no state colour of its own | The energy card's circle, a link pill's icon, the Cleaning mode tile, rooms picked for the next clean, current values in a sheet, a toggle that's on, Auto clean when away |
+| Blue | **Something running**, and the button that starts it | Cleaning / Returning, printing, Clean + Resume (filled), a dock job while it runs, the room the robot is cleaning; cooling (literally cold) |
+| Green | **Good, and someone home** (Home Assistant colours a person at home green) | Battery above 30%, VOC under 150, dry filament, a room or the house occupied, the Home pill |
+| Amber | **Early warning** – needs attention soon | Paused, a part due soon, battery ≤ 30%, VOC 150+, mop not attached |
+| Orange | **Lights, heat and power – and the step before red on a scale** | A lit room, heating, a plug / watts, the printer's power; Poor air, VOC 250+, wet filament, presence lost within the hour |
+| Red | **A call for attention** | An error, a tank to empty, a part due now, battery ≤ 15%, door open, alarm armed, house empty for over an hour, heating on while away |
+| Grey | **Off, idle or neutral** – and every purely decorative icon | Docked, Idle, a part that's fine, a header icon that isn't tappable and shows no state |
 
-- A confirmation takes the colour of the control that opened it (teal pill → teal dialog). A
-  warning goes in the words ("This ends the current clean"), not in an orange button.
-- Literal colours are the one exception: clean water is blue and dirty water brown, because
-  that's what they are.
-- Home Assistant's own default for an active vacuum is teal (`--state-vacuum-active-color`).
-  These cards use blue because blue already means "in progress" here (the printer) and teal
-  means presence. Swap `cleaning`/`returning` to teal only if every card follows.
+- **Confirmations** take the colour of the control that opened it – its "on" colour, both ways
+  (teal Auto clean pill → teal dialog to turn it on or off; orange power pill → orange dialog).
+  Red only when the action would throw away something running (cutting a printer's power
+  mid-print). Otherwise a warning goes in the words ("This ends the current clean").
+- **Literal colours** are the exception: clean water blue, dirty water brown, weather icons.
+- Tinted circle = tap target: `tint(colour, 20)` behind a full-colour icon. A plain (untinted)
+  icon is decoration and stays grey unless it shows a state.
 
 Use HA's theme variables with fallbacks, so dark mode and custom themes just work:
 
 ```js
 const C = {
-  grey:   "var(--grey-color, #9e9e9e)",
-  teal:   "var(--teal-color, #009688)",   // presence, home, MMU, filters
-  orange: "var(--orange-color, #ff9800)", // lights, heat, power
-  amber:  "var(--amber-color, #ffc107)",  // warnings, summer mode
-  green:  "var(--green-color, #4caf50)",  // good / dry / excellent
-  red:    "var(--red-color, #f44336)",    // alarm, ventilate, error
-  blue:   "var(--blue-color, #2196f3)",   // printing / in progress
+  grey:   "var(--grey-color, #9e9e9e)",   // off, idle, decorative
+  teal:   "var(--teal-color, #009688)",   // you can tap / pick this
+  blue:   "var(--blue-color, #2196f3)",   // running, and the button that starts it
+  green:  "var(--green-color, #4caf50)",  // good, someone home
+  amber:  "var(--amber-color, #ffc107)",  // early warning
+  orange: "var(--orange-color, #ff9800)", // lights, heat, power; the step before red
+  red:    "var(--red-color, #f44336)",    // a call for attention
 };
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 // Readable coloured text – mix toward the text colour, never the raw colour on white.
@@ -50,7 +50,8 @@ const text = (c, p = 75) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-c
 | Active tile glow (lit, heating, alarm) | `tint(colour, 10)` |
 | Neutral tile background | `rgba(var(--rgb-primary-text-color, 33,33,33), .04)` |
 | Neutral pill / segment track | `rgba(var(--rgb-primary-text-color, 33,33,33), .05)` |
-| Pill that is "on" | `tint(colour, 18)` background, `text(colour, 70)` label |
+| Pill that is "on" | `tint(colour, 18)` background, `text(colour, 70)` label – on every card |
+| Press feedback | `:active { filter: brightness(.92); }` – on every card |
 | Small reading icons | `color-mix(in srgb, var(--secondary-text-color) 55%, transparent)` |
 | Coloured status text | amber 70%, green 75%, orange 80%, red 85% toward text colour |
 
@@ -70,7 +71,7 @@ Tiers used for readings, so the same number gets the same colour everywhere:
 | Reading, status, secondary line | 12px / 400 / .4px, line 16px | secondary text |
 | Bold value inside a reading line | 14px / 500 | primary text |
 | Label-row title (every card header) | 14px / 500 / .1px | primary text |
-| Label-row summary (right) | 12px / 500 / .4px | secondary text |
+| Label-row summary (under the title) | 12px / 400 / .4px, line 16px | secondary text |
 | Mode tile / segment label | 12px / 500 | primary or secondary |
 | Pill text | 13px / 600 / .2px | state colour or secondary |
 | Big number (progress %) | 20px / 600 | primary text |
@@ -92,22 +93,24 @@ Everything inherits `var(--ha-font-family-body, Roboto, sans-serif)`.
   template cards; an 8px gap left titles 2px short of the Mushroom card above). (Tried an 18px icon flush left and an 18px icon centred:
   both read as misaligned next to Mushroom icons.) Verify by measuring the svg rects, not the
   host elements. Title 14px / 500
-  with `position: relative; top: 1px` (a 20px line box reads ~1px high next to an icon),
-  `margin-left: auto` summary. A header switch (All lights, Summer) is 40×24 with a 20px
+  with `position: relative; top: 1px` (a 20px line box reads ~1px high next to an icon) when it
+  is alone; with a summary the two lines sit under each other (`.lt` = title + `.s`), the summary
+  ink-aligned and free to wrap. A header switch (All lights, Summer) is 40×24 with a 20px
   knob and lives in the label row, so every card's header looks the same.
 - **Icon shape:** 36×36 circle, 24px icon (`--mdc-icon-size: 24px`). **Anything tappable gets it**,
   header icons included (e.g. an `icon_tap_action` that opens a view): background
   `color-mix(in srgb, currentColor 20%, transparent)` so the circle follows the icon's live colour,
   `border-radius: 50%`, `cursor: pointer`, `role="button"`, `tabindex="0"`, Enter/Space to activate.
   Decorative icons stay bare – the circle is the tap signal.
-- **Tile:** radius 10, padding 8–10, a 36px shape and text block with a 10px gap.
+- **Tile:** radius 10, padding 11px 10px, a 36px shape and text block with a 10px gap.
   `grid-auto-rows: 1fr` keeps rows level.
 - **Pills:** see *Size tiers* below – primary 36 (the icon circle), secondary 30.
 - **Segmented selector:** a track with 3px padding, radius 12. Segments are 32px high
   with radius 9, and the selected one has the card background plus
   `box-shadow: 0 1px 3px rgba(0,0,0,.15)`.
 - **Action buttons** (card-bottom actions) are primary pills: 36, radius 18, 13px / 600, 18px
-  icon. Use orange icons for destructive actions.
+  icon, or call-to-action pills (44) when they are the card's main job. Their icons take the
+  colour of what they control (orange for power, blue for start); see *Colours* for dialogs.
 - **Progress / power bar:** 4px (8px for a job progress bar), radius half the height,
   track `rgba(primary-text-rgb, .08)`.
 - **Switch (in sheets):** 44×26 track, 20px knob, coloured when on.
@@ -167,6 +170,30 @@ cells) and 8px gaps, never through extra height.
   phone-width screenshot (count faint anti-aliased pixels; ink edges in the same pixel column).
   Report the numbers.
 
+## Text and formats
+
+- **Text is never cut off.** No `text-overflow: ellipsis`, no `overflow: hidden` on a label, no
+  fixed height on anything with text. A short label (a name) never wraps inside a pill either.
+- **Grids of names are fitted to the names:** measure each name's natural width and set the
+  columns – even columns as wide as the longest while two fit; else two columns each as wide as
+  its own longest; else one (`_fitRooms` on the robot vacuum card). Re-fit on resize and font load.
+- **Rows of buttons:** `display: flex; flex-wrap: wrap; gap: 8px` with each button
+  `flex: 1 1 0; min-width: max-content` – equal while they fit, a longer label takes what it
+  needs, wrap as a last resort.
+- **Status lines** wrap only between their parts: each part a `white-space: nowrap` span,
+  joined with `&nbsp;· ` so the dot stays with the part before it.
+- **A card's summary goes under its title** (two-line label row, ink-aligned, free to wrap),
+  never squeezed onto the right of the title row.
+- **Every value is its own tap target** (more-info of its own sensor); the card or tile as a
+  whole may navigate.
+- **Formats:** durations `45 min`, `3 h`, `1 h 23 min`, `2 d` (a space, short units); readings
+  `21.4°` (no C), `48%`, `612 ppm`, `12 µg/m³`, `1,204 kWh` (`toLocaleString`), times `14:05`
+  (en-GB); unknown or unavailable `–`; every reading keeps its unit.
+- **Errors:** HA's own message when there is one, else "Couldn't <what you tried>." with the
+  friendly name – never an entity id.
+- Text sizes: 20 / 16 / 15 (dialog title / rows / body text), 14 (names, titles, values), 13 (pill
+  text), 12 (readings, status, chips), 11 (captions under numbers, legends). Nothing in between.
+
 ## Dialogs and sheets (Bubble Card look)
 
 ```css
@@ -183,9 +210,11 @@ cells) and 8px gaps, never through extra height.
 ## States that read well
 
 - Lights: lit room = orange glow. A motion icon (`mdi:motion-sensor`) appears when the
-  room is occupied, and "Xm" since the last presence is aligned with the room name.
+  room is occupied, and "12 min" since the last presence is aligned with the room name.
   "Lights on, no presence" gets flagged after a short delay (2 min).
 - Heating mode tiles: the active mode glows in its own colour.
 - Air quality: Excellent (leaf, green) → Elevated (info, amber) → Poor (alert, orange)
-  → Ventilate (open window, red glow).
+  → Ventilate (open window, red glow). The words differ by level, not just by colour.
+- Presence: someone here (green) → left within the hour (orange) → empty for longer (red on
+  a house; grey "12 min ago" on a room).
 - Printer: off grey, ready grey, printing blue, paused amber, complete green, error red.

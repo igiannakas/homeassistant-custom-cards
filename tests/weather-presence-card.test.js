@@ -55,7 +55,7 @@ const cfg = {
   const r = card.shadowRoot;
   const txt = (s) => r.querySelector(s).textContent.replace(/\s+/g, " ").trim();
   assert.strictEqual(txt(".nm"), "Cloudy");
-  eq([...r.querySelectorAll(".sc .v")].map((v) => v.textContent), ["Real 14.2°C", "Met Office 14.6°C"]);
+  eq([...r.querySelectorAll(".sc .v")].map((v) => v.textContent), ["Real 14.2°", "Met Office 14.6°"], "readings in °, no hard-coded C");
   assert.strictEqual(r.querySelector(".shape ha-icon").getAttribute("icon"), "mdi:weather-cloudy");
   assert.strictEqual(txt(".pres span"), "Home");
   assert(r.querySelector(".pres").classList.contains("home"));
@@ -93,21 +93,21 @@ const cfg = {
   await tick(10);
   const r2 = c2.shadowRoot;
   assert(!r2.querySelector(".pres").classList.contains("home"));
-  assert.strictEqual(r2.querySelector(".pres span").textContent, "Away · 3h");
+  assert.strictEqual(r2.querySelector(".pres span").textContent, "Away · 3 h");
   assert.strictEqual(r2.querySelector(".pres ha-icon").getAttribute("icon"), "mdi:home-export-outline");
-  // Someone arrives, then leaves now → 0m.
+  // Someone arrives, then leaves now → 0 min.
   c2.hass = hass("on");
   const left = hass("off");
   left.states["input_boolean.home_master"].last_changed = new Date().toISOString();
   c2.hass = left;
-  assert.strictEqual(r2.querySelector(".pres span").textContent, "Away · 0m");
+  assert.strictEqual(r2.querySelector(".pres span").textContent, "Away · 0 min");
 
   // Without presence / link config the pills are simply not there.
   const c3 = document.createElement("weather-presence-card");
   c3.setConfig({ weather: "weather.mo" });
   c3.hass = hass();
   assert(!c3.shadowRoot.querySelector(".pill"));
-  eq([...c3.shadowRoot.querySelectorAll(".sc .v")].map((v) => v.textContent), ["Forecast 14.6°C"]);
+  eq([...c3.shadowRoot.querySelectorAll(".sc .v")].map((v) => v.textContent), ["Forecast 14.6°"]);
 
   // link.hide drops the link pill but keeps presence; the presence pill gets the whole row.
   assert(form.includes(`"name":"hide"`), "hide toggle in the editor");
@@ -118,12 +118,12 @@ const cfg = {
   const r4 = c4.shadowRoot;
   assert(!r4.querySelector(".link"), "hidden link pill is not rendered");
   assert.strictEqual(r4.querySelector(".pres span").textContent, "Home");
-  assert(r4.querySelector(".pills").getAttribute("style").includes("--np:1"), "one pill → one column");
-  assert(!r4.querySelector(".pills").getAttribute("style").includes("display:none"));
+  assert(!(r4.querySelector(".pills").getAttribute("style") || "").includes("display:none"));
+  eq([...r4.querySelectorAll(".pill")].map((p) => p.className), ["pill pres home"], "one pill");
   // Turning it back on (editor toggle off) brings the pill back with its kept settings.
   c4.setConfig({ ...cfg, link: { ...cfg.link, hide: false } });
   assert.strictEqual(r4.querySelector(".link span").textContent, "Climate");
-  assert(r4.querySelector(".pills").getAttribute("style").includes("--np:2"));
+  assert.strictEqual(r4.querySelectorAll(".pill").length, 2);
 
   // A link with nowhere to go (editor-cleared {} or a name without a path) is not a dead "Open" pill.
   for (const link of [{}, { name: "Climate" }, { hide: false }]) {
@@ -148,6 +148,63 @@ const cfg = {
   c6.setConfig({ weather: "weather.mo", link: { ...cfg.link, hide: true } });
   c6.hass = hass();
   assert(c6.shadowRoot.querySelector(".pills").getAttribute("style").includes("display:none"));
+
+  // Design rules (design-tokens): text is never cut, colours by meaning, press .92.
+  const css = r.querySelector("style").textContent;
+  assert(!/text-overflow:\s*ellipsis/.test(css), "no ellipsis anywhere");
+  assert(!/line-clamp/.test(css));
+  assert(!/\.nm \{[^}]*(nowrap|overflow: hidden)/.test(css), "the condition wraps instead of being cut");
+  assert(/\.pill\.home \{ background: color-mix\(in srgb, var\(--green-color[^)]*\) 18%, transparent\); color: color-mix\(in srgb, var\(--green-color[^)]*\) 70%, var\(--primary-text-color\)\)/.test(css),
+    "Home pill: green on-pill token (tint 18%, text 70%)");
+  assert(/\.pill\.home ha-icon \{ color: var\(--green-color/.test(css));
+  assert(!/--orange-color/.test(css), "reading icons are no longer orange");
+  assert(/\.v ha-icon \{[^}]*color: color-mix\(in srgb, var\(--secondary-text-color\) 55%, transparent\)/.test(css), "reading icons: secondary 55%");
+  assert(/\.pill \{[^}]*color: var\(--primary-text-color\)/.test(css), "pill text in the primary colour");
+  assert(/\.pill\.link ha-icon \{ color: var\(--teal-color/.test(css), "link icon stays teal (tap target)");
+  assert(/\.wrap\.stacked \.pill \{ flex: 1 1 0; min-width: max-content; \}/.test(css), "stacked pills: flex button row");
+  assert(!/grid-template-columns/.test(css) && !/--np/.test(css), "no fixed pill grid any more");
+  assert(/\.pill:active, \.wx:active, \.v:active \{ filter: brightness\(\.92\); \}/.test(css));
+
+  // Your own temperature is its own tap target; the forecast reading opens the weather.
+  more.length = 0;
+  r.querySelector(".v.real span").click();
+  r.querySelector(".v.fc").click();
+  eq(more, ["sensor.out", "weather.mo"], "tap a reading → its own more-info");
+  assert.strictEqual(r.querySelector(".v.real").localName, "button", "keyboard reaches your own sensor too");
+  // Readings are updated in place (a focused reading keeps its focus).
+  const realEl = r.querySelector(".v.real");
+  const s2 = hass();
+  s2.states["sensor.out"] = { ...s2.states["sensor.out"], state: "-2" };
+  card.hass = s2;
+  assert.strictEqual(r.querySelector(".v.real"), realEl);
+  assert.strictEqual(realEl.textContent, "Real -2.0°");
+  // Enter / Space on the weather block → forecast; keys on the reading button are its own.
+  more.length = 0;
+  const K = (t, key) => new window.KeyboardEvent(t, { key, bubbles: true, cancelable: true });
+  r.querySelector(".wx").dispatchEvent(K("keydown", "Enter"));
+  r.querySelector(".wx").dispatchEvent(K("keydown", " "));
+  realEl.dispatchEvent(K("keydown", "Enter"));
+  eq(more, ["weather.mo", "weather.mo"]);
+
+  // Presence unknown → "–"; left 45 minutes ago → "45 min"; empty all week → "7 d+".
+  const unk = hass();
+  unk.states["input_boolean.home_master"].state = "unavailable";
+  const c7 = document.createElement("weather-presence-card");
+  c7.setConfig(cfg);
+  c7.hass = unk;
+  assert.strictEqual(c7.shadowRoot.querySelector(".pres span").textContent, "Presence –");
+  c7.hass = hass("on");
+  const left45 = hass("off");
+  left45.states["input_boolean.home_master"].last_changed = new Date(Date.now() - 45 * 60e3).toISOString();
+  c7.hass = left45;
+  assert.strictEqual(c7.shadowRoot.querySelector(".pres span").textContent, "Away · 45 min");
+  const week = hass("off");
+  week.callWS = async () => ({ "input_boolean.home_master": [{ s: "off", lu: (now - 6 * 86400e3) / 1000 }] });
+  const c8 = document.createElement("weather-presence-card");
+  c8.setConfig(cfg);
+  c8.hass = week;
+  await tick(10);
+  assert.strictEqual(c8.shadowRoot.querySelector(".pres span").textContent, "Away · 7 d+");
 
   console.log("ALL WEATHER-PRESENCE TESTS PASSED");
   process.exit(0);

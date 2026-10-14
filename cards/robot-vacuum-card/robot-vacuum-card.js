@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.6.3";
+const RVC_VERSION = "2.7.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -50,7 +50,8 @@ const human = (s) => {
 function mins(sec) {
   if (sec === null) return "–";
   const m = Math.max(0, Math.round(sec / 60));
-  return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min` : `${m} min`;
+  // "45 min", "3 h", "1 h 5 min" – the same format on every card (design tokens → Text and formats).
+  return m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`;
 }
 // A past moment as "today 10:00", "yesterday 10:00", "Sat 10:00" or "10 Oct".
 function when(iso, now = new Date()) {
@@ -454,7 +455,7 @@ const SEG_CSS = `
   .seg[hidden] { display: none; }
   .set { display: grid; gap: 6px; }
   .k { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); }
-  .k b { font-weight: 500; margin-left: 6px; color: ${tx(C.blue, 75)}; }
+  .k b { font-weight: 500; margin-left: 6px; color: ${tx(C.teal, 75)}; }
 `;
 
 /* The Cleaning mode sheet (Bubble look), holding the same panel as layout: mode. */
@@ -577,8 +578,8 @@ const CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color); -webkit-tap-highlight-color: transparent; }
   .rooms.wrap .chip { white-space: normal; padding-top: 7px; padding-bottom: 7px; }
   .chip ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; flex: none; }
-  .chip.sel { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
-  .chip.sel ha-icon { color: ${C.blue}; }
+  .chip.sel { background: ${tint(C.teal, 18)}; color: ${tx(C.teal)}; }
+  .chip.sel ha-icon { color: ${C.teal}; }
   .chip.now { box-shadow: inset 0 0 0 1.5px ${tint(C.blue, 60)}; }
   .chip[aria-disabled="true"] { cursor: default; }
   .chip[disabled] { opacity: .45; cursor: default; }
@@ -621,8 +622,8 @@ const CSS = `
      chevron – so it reads as "settings" and never as one more room. */
   .modetile { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 11px 10px; border-radius: 10px;
     cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
-  .modetile .shape { background: ${tint(C.blue, 20)}; }
-  .modetile .shape ha-icon { color: ${C.blue}; }
+  .modetile .shape { background: ${tint(C.teal, 20)}; }
+  .modetile .shape ha-icon { color: ${C.teal}; }
   .modetile .chev { --mdc-icon-size: 20px; color: ${C.grey}; flex: none; }
   .modetile[disabled] { opacity: .45; cursor: default; }
   .modetile:active { filter: brightness(.92); }
@@ -1158,7 +1159,7 @@ class RobotVacuumCard extends HTMLElement {
     const icon = JOBS.find((j) => j[0] === k)?.[1] || "mdi:robot-vacuum";
     // The dialog takes the colour of the button you tapped (a job glows blue while it runs).
     if (c && !(await this._ask(c.title, on ? "mdi:stop-circle-outline" : icon, C.blue, c.text, c.label))) return;
-    return this._call("switch", on ? "turn_off" : "turn_on", { entity_id: id });
+    return this._call("switch", on ? "turn_off" : "turn_on", { entity_id: id }, `${on ? "stop" : "start"} the dock`);
   }
 
   /* ---- Cleaning mode panel (layout: mode) ---- */
@@ -1260,7 +1261,7 @@ class RobotVacuumCard extends HTMLElement {
     const root = host.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${MODE_SHEET_CSS}</style><div class="backdrop"></div>
       <div class="dialog" role="dialog" aria-modal="true" aria-label="Cleaning mode">
-        <div class="row"><div class="glyph" style="background:${tint(C.blue, 20)}"><ha-icon icon="mdi:tune-variant" style="color:${C.blue}"></ha-icon></div>
+        <div class="row"><div class="glyph" style="background:${tint(C.teal, 20)}"><ha-icon icon="mdi:tune-variant" style="color:${C.teal}"></ha-icon></div>
           <div class="title">Cleaning mode</div></div>
         <div class="seg tabs"></div><div class="sets"></div>
         <div class="actions"><button class="done"><span class="glyph"><ha-icon icon="mdi:check"></ha-icon></span>Done</button></div></div>`;
@@ -1299,9 +1300,9 @@ class RobotVacuumCard extends HTMLElement {
     // Show the choice at once; the robot's answer confirms it (or it falls back after a while).
     this._pend(k, v);
     this._render();
-    if (k === "fan") return this._call("vacuum", "set_fan_speed", { entity_id: id, fan_speed: v });
+    if (k === "fan") return this._call("vacuum", "set_fan_speed", { entity_id: id, fan_speed: v }, "change the suction power");
     const ent = { mode: f.mode, water: f.mop_water, route: f.mop_route }[k];
-    if (ent) return this._call("select", "select_option", { entity_id: ent, option: v });
+    if (ent) return this._call("select", "select_option", { entity_id: ent, option: v }, "change the cleaning mode");
   }
 
   /* Rooms and segment ids per map, from roborock.get_maps (or the maps: option). */
@@ -1424,12 +1425,12 @@ class RobotVacuumCard extends HTMLElement {
   }
 
   async _switchFloor(name) {
-    const ok = await this._ask(`Switch to ${name}`, "mdi:layers-outline", C.blue, `Place the robot on the ${name}, then confirm.`, "Confirm");
+    const ok = await this._ask(`Switch to ${name}`, "mdi:layers-outline", C.teal, `Place the robot on the ${name}, then confirm.`, "Confirm");
     if (!ok) return;
     this._sel.clear();
     this._pend("floor", name);
     this._render();
-    return this._call("select", "select_option", { entity_id: this._found.map_select, option: name });
+    return this._call("select", "select_option", { entity_id: this._found.map_select, option: name }, `switch to the ${name}`);
   }
 
   /* Every button asks first except Pause (the user's choice). */
@@ -1455,12 +1456,12 @@ class RobotVacuumCard extends HTMLElement {
       this._sel.clear();
       this._render();
       const target = segs.length ? segs : all;
-      if (target.length) return this._call("vacuum", "send_command", { entity_id: id, command: "app_segment_clean", params: [{ segments: target, repeat: twice ? 2 : 1 }] });
-      return this._call("vacuum", "start", { entity_id: id });
+      if (target.length) return this._call("vacuum", "send_command", { entity_id: id, command: "app_segment_clean", params: [{ segments: target, repeat: twice ? 2 : 1 }] }, "start the clean");
+      return this._call("vacuum", "start", { entity_id: id }, "start the clean");
     }
-    if (k === "pause") return this._call("vacuum", "pause", { entity_id: id });
+    if (k === "pause") return this._call("vacuum", "pause", { entity_id: id }, "pause the robot");
     if (k === "resume") {
-      if (await this._ask("Resume", "mdi:play", C.blue, "The robot carries on with the paused clean.", "Resume")) this._call("vacuum", "start", { entity_id: id });
+      if (await this._ask("Resume", "mdi:play", C.blue, "The robot carries on with the paused clean.", "Resume")) this._call("vacuum", "start", { entity_id: id }, "resume the clean");
       return;
     }
     if (k === "dock") {
@@ -1468,7 +1469,7 @@ class RobotVacuumCard extends HTMLElement {
       // Blue like every robot action; the warning is in the words (orange means lights / heat).
       const ok = await this._ask("Return to the dock", "mdi:home-import-outline", C.blue,
         ends ? "This ends the current clean. The robot goes back to the dock." : "The robot goes back to the dock.", "Dock");
-      if (ok) this._call("vacuum", "return_to_base", { entity_id: id });
+      if (ok) this._call("vacuum", "return_to_base", { entity_id: id }, "send the robot to the dock");
       return;
     }
     if (k === "auto") {
@@ -1481,15 +1482,15 @@ class RobotVacuumCard extends HTMLElement {
       if (!ok) return;
       const [domain] = a.split(".");
       const svc = ["automation", "input_boolean", "switch"].includes(domain) ? domain : "homeassistant";
-      return this._call(svc, on ? "turn_off" : "turn_on", { entity_id: a });
+      return this._call(svc, on ? "turn_off" : "turn_on", { entity_id: a }, `turn ${on ? "off" : "on"} ${label}`);
     }
   }
 
-  async _call(domain, service, data) {
+  async _call(domain, service, data, what = "do that") {
     try {
       await this._hass.callService(domain, service, data);
     } catch (err) {
-      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "That did not work" }, bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || `Couldn't ${what}.` }, bubbles: true, composed: true }));
     }
   }
 }

@@ -9,14 +9,17 @@
  * (plug off) or a safe Power off (idle), and an optional chamber light toggle (glows while
  * on; hold it for the light's more-info). Printer operations – homing, pause, resume,
  * cancel – are left to the printer itself on purpose. Power on, Power off and turning the
- * plug off always ask first. Tap any value for its own more-info (the watts on the power
- * pill too). Sensors are found from the Moonraker prefix (e.g. "voron").
+ * plug off always ask first (orange like the power pill; red only when cutting the plug would
+ * end a print). Tap any value for its own more-info (the watts on the power pill too), or the
+ * state circle for the printer's. Sensors are found from the Moonraker prefix (e.g. "voron").
+ * Text is never cut off: names, file names and status lines wrap (status lines only between
+ * their parts).
  * `layout: compact` is a one-row summary for an overview page (state, what matters now,
  * a progress bar while printing, live watts); a tap anywhere opens `navigation_path`.
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.6.0";
+const PSC_VERSION = "1.7.0";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -33,11 +36,24 @@ const esc = (s) =>
 const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
 const fmt = (n, d = 0) => (n === null ? "–" : n.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d }));
 
-/* 1.383 h → "1h 23m" */
-function hm(hours) {
+/* 1.383 h → "1 h 23 min", 0.75 h → "45 min", 3 h → "3 h" */
+function dur(hours) {
   if (hours === null) return "–";
   const m = Math.max(0, Math.round(hours * 60));
-  return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`;
+  if (m < 60) return `${m} min`;
+  return m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m / 60} h`;
+}
+/* A clock time, en-GB: "15:42". */
+const clock = (d) => d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+/* A status line: each part stays whole (nowrap) and the line wraps only between parts, the dot
+   staying with the part before it. A part is text, or {t, e} (opens entity e), or {t, free}
+   (a file name, which may break anywhere). */
+function line(list) {
+  return list
+    .map((p) => (typeof p === "string" ? { t: p } : p))
+    .filter((p) => p && p.t)
+    .map((p) => `<span class="${p.free ? "f" : "p"}"${p.e ? ` data-e="${esc(p.e)}"` : ""}>${esc(p.t)}</span>`)
+    .join("&nbsp;· ");
 }
 /* "4825h 49m 38s" → 4826 */
 function hoursFrom(text) {
@@ -90,12 +106,13 @@ function model(hass, cfg) {
   return {
     key,
     state: STATES[key],
-    message: !plugOn ? "Power is off" : key === "busy" ? busyMsg : msg,
+    // Off: the state word already says so ("Voron · Off"), so no line under it.
+    message: !plugOn ? "" : key === "busy" ? busyMsg : msg,
     plug: plug ? { on: plugOn, watts, live: meterOn && watts !== null } : null,
     file: s("filename") && !["unknown", "unavailable"].includes(s("filename")) ? s("filename") : "",
     progress: num(s("progress")),
     left: num(s("print_time_left")),
-    eta: etaDate && !isNaN(etaDate) ? etaDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "",
+    eta: etaDate && !isNaN(etaDate) ? clock(etaDate) : "",
     layer: num(s("current_layer")),
     layers: num(s("total_layer")),
     filament: num(s("filament_used")),
@@ -110,7 +127,7 @@ function model(hass, cfg) {
     ended: (() => {
       const t = st(`sensor.${p}_current_print_state`)?.last_changed;
       const d = t ? new Date(t) : null;
-      return d && !isNaN(d) ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+      return d && !isNaN(d) ? clock(d) : "";
     })(),
     chamber: num(st(cfg.chamber_sensor || `sensor.${p}_heater_chamber_temperature`)?.state),
     lanes: (() => {
@@ -122,27 +139,29 @@ function model(hass, cfg) {
   };
 }
 
-/* Compact layout: the state word, the line under it, and whether to show a progress bar. */
+/* Compact layout: the state word, the line under it (status-line parts, see line()), and
+   whether to show a progress bar. */
 function compactText(m, cfg) {
-  const file = m.file.replace(/\.gcode$/i, "");
+  const file = { t: m.file.replace(/\.gcode$/i, ""), free: true };
   const pct = m.progress === null ? "" : ` ${Math.round(m.progress)}%`;
+  const msg = { t: m.message, free: true };
   if (m.key === "printing" || m.key === "paused") {
     // The file gets its own line (it may wrap); the times stay together on the next one.
     return {
       word: `${m.state.word}${pct}`,
-      line: file,
-      line2: [m.left === null ? "" : `${hm(m.left)} left`, m.eta ? `done ${m.eta}` : ""].filter(Boolean).join(" · "),
+      line: [file],
+      line2: [m.left === null ? "" : `${dur(m.left)} left`, m.eta ? `ends ${m.eta}` : ""],
       bar: true,
     };
   }
-  if (m.key === "complete") return { word: m.state.word, line: [file, m.ended ? `finished ${m.ended}` : ""].filter(Boolean).join(" · ") };
-  if (m.key === "cancelled") return { word: m.state.word, line: file };
-  if (m.key === "off") return { word: m.state.word, line: cfg.energy_today && m.today !== null ? `Today ${fmt(m.today, 2)} kWh` : m.message };
+  if (m.key === "complete") return { word: m.state.word, line: [file, m.ended ? `finished ${m.ended}` : ""] };
+  if (m.key === "cancelled") return { word: m.state.word, line: [file] };
+  if (m.key === "off") return { word: m.state.word, line: [cfg.energy_today && m.today !== null ? `Today ${fmt(m.today, 2)} kWh` : ""] };
   if (m.key === "ready") {
     const bits = [m.chamber === null ? "" : `Chamber ${fmt(m.chamber)}°`, m.lanes ? `${m.lanes.loaded} of ${m.lanes.total} loaded` : ""].filter(Boolean);
-    return { word: m.state.word, line: bits.join(" · ") || m.message };
+    return { word: m.state.word, line: bits.length ? bits : [msg] };
   }
-  return { word: m.state.word, line: m.message };
+  return { word: m.state.word, line: [msg] };
 }
 
 /* Chamber light: a light / switch / input_boolean, or a 0–100 number (a Klipper output pin). */
@@ -159,7 +178,8 @@ function lightModel(s, id) {
 }
 
 /* Which power buttons fit the state: [key, label, icon]. Printer operations (home, pause,
-   resume, cancel) are deliberately not here – they are done on the printer. */
+   resume, cancel) are deliberately not here – they are done on the printer. Both power
+   buttons are orange, like the power pill (orange means power). */
 function actions(key) {
   if (key === "off") return [["poweron", "Power on", "mdi:power"]];
   if (["printing", "paused", "busy"].includes(key)) return [];
@@ -188,10 +208,10 @@ const DIALOG_CSS = `
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
   .title { font-size: 20px; line-height: 26px; font-weight: 600; }
-  .body { margin-top: 20px; }
-  .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
-  .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; }
-  .buttons { margin-top: 20px; display: grid; gap: 8px; }
+  /* The text sits under the title, starting on its line (8 + 42px glyph + 6px gap). No printer
+     name: the dialog opens from the printer's own card. */
+  .text { margin: 12px 0 0 56px; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
+  .buttons { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); display: grid; gap: 8px; }
   button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
     border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
@@ -206,7 +226,7 @@ const DIALOG_CSS = `
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
 
-function confirmDialog({ title, icon, color, primary, secondary, confirmLabel }) {
+function confirmDialog({ title, icon, color, text, confirmLabel }) {
   return new Promise((resolve) => {
     const host = document.createElement("psc-confirm-dialog");
     const root = host.attachShadow({ mode: "open" });
@@ -214,8 +234,7 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
       <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
         <div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(icon)}" style="color:${color}"></ha-icon></div>
           <div class="title">${esc(title)}</div></div>
-        <div class="row body"><div class="glyph"><ha-icon icon="mdi:printer-3d" style="color:${color}"></ha-icon></div>
-          <div><div class="primary">${esc(primary)}</div><div class="secondary">${esc(secondary)}</div></div></div>
+        <div class="text">${esc(text)}</div>
         <div class="buttons">
           <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
           <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
@@ -253,10 +272,10 @@ const CSS = `
   ha-card.compact { padding: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   ha-card.compact:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
   .crow { display: flex; align-items: center; gap: 10px; }
-  .crow .sc { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
-  .cbar { height: 4px; border-radius: 2px; margin-top: 6px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
+  /* A job progress bar is 8px, here as on the full card. */
+  .cbar { height: 8px; border-radius: 4px; margin-top: 6px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
   .cbar[hidden], .sc:empty { display: none; }
-  .cbar i { display: block; height: 100%; border-radius: 2px; background: var(--c, ${C.blue}); transition: width 300ms; }
+  .cbar i { display: block; height: 100%; border-radius: 4px; background: var(--c, ${C.blue}); transition: width 300ms; }
   .watts { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 10px; border-radius: 18px;
     font-size: 13px; font-weight: 600; letter-spacing: .2px; white-space: nowrap;
     background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
@@ -270,13 +289,20 @@ const CSS = `
   .head { display: flex; align-items: center; gap: 10px; padding: 0 0 10px; }
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .shape ha-icon { --mdc-icon-size: 24px; }
+  /* The state circle opens the printer's more-info, like the vacuum's (a tinted circle = tap target). */
+  .head .shape { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .txt { flex: 1; min-width: 0; }
-  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Text is never cut off: a line too long for its box wraps instead. "Name · State" breaks only
+     before the state word, the dot staying with the name. */
+  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
   .nm .st { font-weight: 400; color: var(--secondary-text-color); }
-  .sc { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pill { flex: none; display: inline-flex; align-items: stretch; height: 36px; border-radius: 18px; overflow: hidden;
+  .nm .w { white-space: nowrap; }
+  /* Status lines wrap only between their parts ("1 h 23 min left" stays whole); a file name or a
+     message may break anywhere. */
+  .sc { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); overflow-wrap: anywhere; }
+  .p { white-space: nowrap; }
+  .f { overflow-wrap: anywhere; }
+  .pill { flex: none; display: inline-flex; align-items: stretch; height: 36px; border-radius: 18px;
     font-size: 13px; font-weight: 600; letter-spacing: .2px; white-space: nowrap;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color); }
   .pill button { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
@@ -299,8 +325,10 @@ const CSS = `
   .thumb img { width: 100%; height: 100%; object-fit: contain; }
   .thumb ha-icon { --mdc-icon-size: 30px; color: ${C.grey}; }
   .jt { flex: 1; min-width: 0; }
-  .pct { font-size: 20px; line-height: 26px; font-weight: 600; color: var(--primary-text-color); white-space: nowrap; }
-  .pct .when { font-size: 12px; font-weight: 400; letter-spacing: .4px; color: var(--secondary-text-color); margin-left: 8px; }
+  /* "62%" and the times beside it; on a narrow card the times move under it rather than being cut. */
+  .pct { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; font-size: 20px; line-height: 26px; font-weight: 600;
+    color: var(--primary-text-color); }
+  .pct .when { min-width: 0; font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: .4px; color: var(--secondary-text-color); }
   .pbar { height: 8px; border-radius: 4px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); margin: 4px 0 6px; overflow: hidden; }
   .pbar i { display: block; height: 100%; border-radius: 4px; transition: width 400ms; }
   .camera { margin: 0 0 10px; border-radius: 10px; overflow: hidden; }
@@ -310,21 +338,24 @@ const CSS = `
     border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); -webkit-tap-highlight-color: transparent; }
   .stats > button:first-child { border-left: none; }
   .stats b { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--primary-text-color); white-space: nowrap; }
-  .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); }
-  .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; }
+  .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); overflow-wrap: break-word; padding: 0 4px; }
+  /* Button row: equal widths while every label fits, a longer label takes what it needs, and only
+     if the row can't hold them all does one wrap. */
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; }
   .acts:empty { display: none; }
   /* Primary pills: 36px, the height of the icon circle (one size for every main action). */
-  .act { all: unset; box-sizing: border-box; height: 36px; border-radius: 18px; cursor: pointer; display: flex; align-items: center;
-    justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--primary-text-color);
+  .act { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: max-content; height: 36px; border-radius: 18px; padding: 0 14px 0 10px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
+    font-size: 13px; font-weight: 600; letter-spacing: .2px; color: var(--primary-text-color);
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); -webkit-tap-highlight-color: transparent; }
   .act ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
-  .act.poweroff ha-icon { color: ${C.orange}; }
-  .act.poweron ha-icon { color: ${C.green}; }
+  /* Power on and Power off: orange, like the power pill (orange means power). */
+  .act.poweroff ha-icon, .act.poweron ha-icon { color: ${C.orange}; }
   /* Chamber light: glows while on, like a lit room on the lights card. */
   .act.light.on { background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
   .act.light.on ha-icon { color: ${C.orange}; }
   .act .lvl { font-weight: 400; opacity: .8; }
-  .pill button:active, .act:active { filter: brightness(.92); }
+  .pill button:active, .act:active, .head .shape:active, .stats > button:active { filter: brightness(.92); }
   .pill button:focus-visible, .act:focus-visible, [data-e]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
@@ -531,9 +562,9 @@ class PrinterStatusCard extends HTMLElement {
     if (ic.getAttribute("icon") !== m.state.icon) ic.setAttribute("icon", m.state.icon);
     ic.style.color = m.state.color;
     const t = compactText(m, this._config);
-    set(".nm", `${esc(this._config.name || "Printer")} <span class="st">· ${esc(t.word)}</span>`, true);
-    set(".sc:not(.sc2)", t.line);
-    set(".sc2", t.line2 || "");
+    set(".nm", `${esc(this._config.name || "Printer")}<span class="st">&nbsp;· <span class="w">${esc(t.word)}</span></span>`, true);
+    set(".sc:not(.sc2)", line(t.line), true);
+    set(".sc2", line(t.line2 || []), true);
     const bar = root.querySelector(".cbar");
     bar.hidden = !t.bar;
     if (t.bar) {
@@ -551,9 +582,10 @@ class PrinterStatusCard extends HTMLElement {
   _build() {
     if (this._config.layout === "compact") return this._buildCompact();
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
+    const stateId = `sensor.${esc(this._config.prefix)}_current_print_state`;
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      <div class="head"><div class="shape"><ha-icon></ha-icon></div>
-        <div class="txt" data-e="sensor.${esc(this._config.prefix)}_current_print_state" role="button" tabindex="0"><div class="nm"></div><div class="sc msg"></div></div>
+      <div class="head"><div class="shape" data-e="${stateId}" role="button" tabindex="0" aria-label="Printer details"><ha-icon></ha-icon></div>
+        <div class="txt" data-e="${stateId}" role="button" tabindex="0"><div class="nm"></div><div class="sc msg"></div></div>
         ${this._config.power_switch ? `<div class="pill"><button class="tog"><ha-icon icon="mdi:power-plug"></ha-icon><span></span></button><button class="w"${this._config.power_sensor ? ` data-e="${esc(this._config.power_sensor)}"` : ""}><ha-icon icon="mdi:power-plug" hidden></ha-icon><span></span></button></div>` : ""}</div>
       <div class="job"><div class="thumb" data-e="${esc(this._config.thumbnail || `camera.${this._config.prefix}_thumbnail`)}"><ha-icon icon="mdi:cube-outline"></ha-icon></div>
         <div class="jt"><div class="pct"></div><div class="pbar"><i></i></div><div class="sc l1"></div><div class="sc l2"></div></div></div>
@@ -569,7 +601,7 @@ class PrinterStatusCard extends HTMLElement {
     };
     card.addEventListener("click", open);
     card.addEventListener("keydown", (e) => {
-      if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(".txt")) {
+      if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(".txt, .shape")) {
         e.preventDefault();
         open(e);
       }
@@ -677,7 +709,8 @@ class PrinterStatusCard extends HTMLElement {
     const ic = shape.querySelector("ha-icon");
     if (ic.getAttribute("icon") !== m.state.icon) ic.setAttribute("icon", m.state.icon);
     ic.style.color = m.state.color;
-    set(".nm", `${esc(this._config.name || "Printer")} <span class="st">· ${esc(m.state.word)}</span>`, true);
+    // Name · state; on a narrow card the state word wraps whole, the dot staying with the name.
+    set(".nm", `${esc(this._config.name || "Printer")}<span class="st">&nbsp;· <span class="w">${esc(m.state.word)}</span></span>`, true);
     const active = ["printing", "paused", "complete", "cancelled"].includes(m.key) && m.file;
     set(".msg", active ? m.file : m.message);
 
@@ -705,15 +738,19 @@ class PrinterStatusCard extends HTMLElement {
     if (active) {
       const pct = m.progress === null ? 0 : Math.max(0, Math.min(100, m.progress));
       const p = this._config.prefix;
-      const e = (key, text) => `<span data-e="sensor.${esc(p)}_${key}">${esc(text)}</span>`;
+      const e = (key, t) => ({ t, e: `sensor.${p}_${key}` });
+      // "1 h 23 min left · ends 15:42" while it runs ("ends", so a time is never read as done);
+      // the state word once it has finished.
       const when =
-        m.key === "complete" ? "Done" : m.key === "cancelled" ? "Cancelled" : `${e("print_time_left", `${hm(m.left)} left`)}${m.eta ? ` · ${e("print_eta", `done ${m.eta}`)}` : ""}`;
-      set(".pct", `${e("progress", `${fmt(pct)}%`)}<span class="when">${when}</span>`, true);
+        m.key === "complete" || m.key === "cancelled"
+          ? [m.state.word]
+          : [e("print_time_left", `${dur(m.left)} left`), m.eta ? e("print_eta", `ends ${m.eta}`) : ""];
+      set(".pct", `${line([e("progress", `${fmt(pct)}%`)])}<span class="when">${line(when)}</span>`, true);
       const bar = root.querySelector(".pbar i");
       bar.style.width = `${pct}%`;
       bar.style.background = m.state.color;
-      set(".l1", [m.layers ? e("current_layer", `Layer ${fmt(m.layer)} / ${fmt(m.layers)}`) : "", m.filament !== null ? e("filament_used", `${fmt(m.filament, 1)} m filament`) : ""].filter(Boolean).join(" · "), true);
-      set(".l2", m.key === "printing" && m.speed !== null ? e("print_speed", `${fmt(m.speed)} mm/s`) : "", true);
+      set(".l1", line([m.layers ? e("current_layer", `Layer ${fmt(m.layer)} / ${fmt(m.layers)}`) : "", m.filament !== null ? e("filament_used", `${fmt(m.filament, 1)} m filament`) : ""]), true);
+      set(".l2", m.key === "printing" && m.speed !== null ? line([e("print_speed", `${fmt(m.speed)} mm/s`)]) : "", true);
       const thumb = root.querySelector(".thumb");
       if (m.thumb && thumb.dataset.src !== m.thumb) {
         thumb.dataset.src = m.thumb;
@@ -728,11 +765,11 @@ class PrinterStatusCard extends HTMLElement {
     if (!active) {
       const cells = [];
       const p = this._config.prefix;
-      if (this._config.energy_today) cells.push([`${fmt(m.today, 2)} kWh`, "today", this._config.energy_today]);
+      if (this._config.energy_today) cells.push([m.today === null ? "–" : `${fmt(m.today, 2)} kWh`, "Today", this._config.energy_today]);
       cells.push(
-        [fmt(m.jobs), "prints", `sensor.${p}_totals_jobs`],
-        [m.hours === null ? "–" : `${fmt(m.hours)} h`, "printed", `sensor.${p}_totals_print_time`],
-        [m.km === null ? "–" : `${fmt(m.km, 1)} km`, "filament", `sensor.${p}_totals_filament_used`],
+        [fmt(m.jobs), "Prints", `sensor.${p}_totals_jobs`],
+        [m.hours === null ? "–" : `${fmt(m.hours)} h`, "Printed", `sensor.${p}_totals_print_time`],
+        [m.km === null ? "–" : `${fmt(m.km, 1)} km`, "Filament", `sensor.${p}_totals_filament_used`],
       );
       stats.style.gridTemplateColumns = `repeat(${cells.length}, minmax(0, 1fr))`;
       set(".stats", cells.map(([b, s, id]) => `<button data-e="${esc(id)}"><b>${esc(b)}</b><span>${esc(s)}</span></button>`).join(""), true);
@@ -748,7 +785,6 @@ class PrinterStatusCard extends HTMLElement {
     const keys = acts.map((a) => a[0]).join();
     if (keys !== this._actKeys) {
       const box = root.querySelector(".acts");
-      box.style.setProperty("--n", String(acts.length || 1));
       box.innerHTML = acts
         .map(([k, label, icon]) =>
           k === "light"
@@ -810,63 +846,70 @@ class PrinterStatusCard extends HTMLElement {
     const l = this._m?.light;
     if (!id || !l) return;
     const [domain] = id.split(".");
+    const what = `turn ${l.on ? "off" : "on"} ${this._hass.states[id]?.attributes?.friendly_name || "the light"}`;
     if (l.numeric) {
       // A Klipper output pin: off is 0; on goes back to the last level seen, or light_on (default: full).
       const on = this._lastLight || num(this._config.light_on) || l.max;
-      return this._call(domain, "set_value", { entity_id: id, value: l.on ? 0 : on });
+      return this._call(domain, "set_value", { entity_id: id, value: l.on ? 0 : on }, what);
     }
     const svc = domain === "light" || domain === "switch" || domain === "input_boolean" ? domain : "homeassistant";
-    return this._call(svc, l.on ? "turn_off" : "turn_on", { entity_id: id });
+    return this._call(svc, l.on ? "turn_off" : "turn_on", { entity_id: id }, what);
   }
 
+  /* Power on / Power off: orange both ways, like the power pill and the buttons. The dialog
+     opens from the printer's own card, so it doesn't name the printer again. */
   async _action(k) {
-    const name = this._config.name || "Printer";
-    const press = (id) => this._call("button", "press", { entity_id: id });
+    const name = this._config.name || "the printer";
     if (k === "poweron") {
       const ok = await confirmDialog({
-        title: "Power on", icon: "mdi:power", color: C.green, primary: name,
-        secondary: `The plug turns on and ${name} starts up.`, confirmLabel: "Power on",
+        title: "Power on", icon: "mdi:power", color: C.orange,
+        text: "The plug turns on and the printer starts up.", confirmLabel: "Power on",
       });
       if (!ok) return;
       const id = this._config.power_switch;
       const [domain] = id.split(".");
-      return this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_on", { entity_id: id });
+      return this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_on", { entity_id: id }, `power on ${name}`);
     }
     if (k === "poweroff") {
       const ok = await confirmDialog({
-        title: "Power off", icon: "mdi:power", color: C.orange, primary: name,
-        secondary: `${name} shuts down safely, then its plug turns off.`, confirmLabel: "Power off",
+        title: "Power off", icon: "mdi:power", color: C.orange,
+        text: "The printer shuts down safely, then its plug turns off.", confirmLabel: "Power off",
       });
       if (ok) {
-        const [domain] = this._config.power_off_script.split(".");
-        domain === "button" ? press(this._config.power_off_script) : this._call("script", "turn_on", { entity_id: this._config.power_off_script });
+        const id = this._config.power_off_script;
+        const [domain] = id.split(".");
+        domain === "button"
+          ? this._call("button", "press", { entity_id: id }, `power off ${name}`)
+          : this._call("script", "turn_on", { entity_id: id }, `power off ${name}`);
       }
     }
   }
 
-  /* Plug pill (shown only while on): off asks first and warns while printing. */
+  /* Plug pill (shown only while on): off asks first – orange like the pill, red only while a
+     print is running, because cutting the power would end it. */
   async _togglePlug() {
     const id = this._config.power_switch;
     const on = this._m?.plug?.on;
     const [domain] = id.split(".");
     if (!on) return this._action("poweron");
-    const name = this._config.name || "Printer";
     const busy = ["printing", "paused"].includes(this._m.key);
     const ok = await confirmDialog({
-      title: "Cut power", icon: "mdi:power-plug-off", color: busy ? C.red : C.orange, primary: name,
-      secondary: busy
-        ? `${name} is printing. Cutting power now ends the print.`
-        : `The plug switches off at once, without a shutdown.${this._config.power_off_script ? " Use Power off for a safe shutdown." : ""}`,
-      confirmLabel: "Turn plug off",
+      title: "Turn the plug off", icon: "mdi:power-plug-off", color: busy ? C.red : C.orange,
+      text: busy
+        ? "This ends the current print. The power goes at once, without a shutdown."
+        : `The power goes at once, without a shutdown.${this._config.power_off_script ? " Power off shuts the printer down safely first." : ""}`,
+      confirmLabel: "Turn off",
     });
-    if (ok) this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_off", { entity_id: id });
+    const plug = this._hass.states[id]?.attributes?.friendly_name || "the plug";
+    if (ok) this._call(domain === "input_boolean" ? "input_boolean" : "switch", "turn_off", { entity_id: id }, `turn off ${plug}`);
   }
 
-  async _call(domain, service, data) {
+  /* HA's own message when it has one, else "Couldn't <what you tried>." – never an entity id. */
+  async _call(domain, service, data, what = "do that") {
     try {
       await this._hass.callService(domain, service, data);
     } catch (err) {
-      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || "That did not work" }, bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || `Couldn't ${what}.` }, bubbles: true, composed: true }));
     }
   }
 }

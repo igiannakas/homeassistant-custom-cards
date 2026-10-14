@@ -206,7 +206,7 @@ const cfg = {
     eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.vacuum_cleaner_dock_mop_drying" }]);
     card.hass = full(states());
   }
-  // The Cleaning mode tile: two lines, a blue circle and a chevron – not one more room pill.
+  // The Cleaning mode tile: two lines, a teal circle and a chevron – not one more room pill.
   assert(!q(".modetile").hidden);
   assert.strictEqual(q(".modetile .nm").textContent, "Cleaning mode");
   assert.strictEqual(text(".modetile .mode-line"), "Vac & mop · Turbo · Standard mop");

@@ -5,26 +5,33 @@
  * tile per room underneath with its temperature, humidity and light level.
  * Tap a tile to switch the room, tap its icon to open the room's dashboard,
  * long-press for the room's individual lamps. Nothing asks first – lights are
- * cheap to switch back.
+ * cheap to switch back. Names are never cut: the grid takes as many columns as
+ * the longest room name (with its presence) allows.
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.3.7";
+const RLC_VERSION = "1.4.0";
 const RLC_TAG = "room-lights-card";
 
+// One meaning per colour (design tokens → Colours): orange = lights, green = someone here,
+// amber = early warning, red = a call for attention, grey = off.
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
   orange: "var(--orange-color, #ff9800)",
   red: "var(--red-color, #f44336)",
   blue: "var(--blue-color, #2196f3)",
   amber: "var(--amber-color, #ffc107)",
-  teal: "var(--teal-color, #009688)",
+  green: "var(--green-color, #4caf50)",
 };
 const HOLD_MS = 500;
 const HISTORY_DAYS = 3;
 const MOVE_PX = 10;
+// A tile around its text: 10px padding + 36px icon + 10px gap … 10px padding.
+const TILE_PAD = 66;
 
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
+// Readable coloured text – mixed toward the text colour, never the raw colour on white.
+const tx = (c, p = 70) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-color))`;
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const list = (v) => (v === undefined || v === null || v === "" ? [] : Array.isArray(v) ? v.filter(Boolean) : [v]);
@@ -35,7 +42,9 @@ function reading(hass, ids, digits, unit, space) {
   const vals = list(ids).map((id) => {
     const s = hass.states[id];
     const n = s ? Number(s.state) : NaN;
-    return s && s.state !== "" && isFinite(n) ? n.toFixed(digits) : "–";
+    return s && s.state !== "" && isFinite(n)
+      ? n.toLocaleString("en-GB", { minimumFractionDigits: digits, maximumFractionDigits: digits })
+      : "–";
   });
   if (!vals.length) return null;
   return `${vals.join("/")}${space ? " " : ""}${unit}`;
@@ -52,17 +61,18 @@ function lampName(friendly, room) {
   return n.charAt(0).toUpperCase() + n.slice(1);
 }
 
-/* "12m", "3h", "2d" */
+/* "12 min", "3 h", "2 d" (design tokens → Formats) */
 function ago(ms) {
   const m = Math.max(0, Math.round(ms / 60000));
-  if (m < 60) return `${m}m`;
-  if (m < 1440) return `${Math.floor(m / 60)}h`;
-  return `${Math.floor(m / 1440)}d`;
+  if (m < 60) return `${m} min`;
+  if (m < 1440) return `${Math.floor(m / 60)} h`;
+  return `${Math.floor(m / 1440)} d`;
 }
 
 /*
- * Who is in the room: occupied → teal motion sensor; empty → how long since someone was there.
- * Lights on in a room that has been empty for a while → amber, so lights left on stand out.
+ * Who is in the room: occupied → green motion sensor (someone home); empty → how long since
+ * someone was there. Lights on in a room that has been empty for a while → amber (an early
+ * warning), so lights left on stand out.
  */
 function presenceModel(hass, room, lastSeen, warnMin, lightsOn) {
   const id = room.occupancy;
@@ -74,7 +84,7 @@ function presenceModel(hass, room, lastSeen, warnMin, lightsOn) {
   if (since === null) return { kind: "empty", text: "" };
   const ms = Date.now() - since;
   const warn = lightsOn && ms >= warnMin * 60000;
-  return { kind: warn ? "warn" : "empty", text: ms > HISTORY_DAYS * 86400000 ? `${HISTORY_DAYS}d+` : ago(ms) };
+  return { kind: warn ? "warn" : "empty", text: ms > HISTORY_DAYS * 86400000 ? `${HISTORY_DAYS} d+` : ago(ms) };
 }
 
 function roomModel(hass, room) {
@@ -162,12 +172,13 @@ const SHEET_CSS = `
   .head { display: flex; align-items: center; gap: 6px; padding-left: 8px; }
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
-  .title { font-size: 20px; line-height: 26px; font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Text is never cut: a long room or lamp name wraps (the row grows past 56px) instead. */
+  .title { font-size: 20px; line-height: 26px; font-weight: 600; min-width: 0; overflow-wrap: break-word; }
   .list, .buttons { margin-top: 20px; display: grid; gap: 8px; }
   /* The actions are set apart from the lamp list by a divider and extra space. */
   .buttons { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
-  button { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; height: 56px;
-    padding: 0 12px 0 10px; border-radius: 28px; cursor: pointer; font-size: 16px; line-height: 24px; font-weight: 600;
+  button { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 10px; min-height: 56px;
+    padding: 6px 12px 6px 10px; border-radius: 28px; cursor: pointer; font-size: 16px; line-height: 24px; font-weight: 600;
     letter-spacing: .1px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color);
     -webkit-tap-highlight-color: transparent; }
   button .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
@@ -176,7 +187,7 @@ const SHEET_CSS = `
   button.open { background: ${C.orange}; color: #fff; }
   button.open .glyph { background: rgba(255,255,255,.2); }
   button.open .glyph ha-icon { color: #fff; }
-  button.open .nm, .lamp .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  button.open .nm, .lamp .nm { flex: 1; min-width: 0; overflow-wrap: break-word; }
   .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
   .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
@@ -186,7 +197,10 @@ const SHEET_CSS = `
   .lamp.missing { opacity: .5; }
   button:active { filter: brightness(.92); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
-  .empty { padding: 0 8px; font-size: 15px; line-height: 21px; color: var(--primary-text-color); }
+  /* No lamps: a line under the title, on the title's line (8 + 42px glyph + 6px gap), like the
+     text of every other dialog. */
+  .list.none { margin-top: 12px; }
+  .empty { margin-left: 56px; font-size: 15px; line-height: 21px; color: var(--secondary-text-color); }
   @keyframes fade { from { opacity: 0; } }
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
@@ -258,7 +272,8 @@ class RoomLampsSheet {
     const open = root.querySelector(".open");
     if (open) {
       open.querySelector("ha-icon").setAttribute("icon", m.icon);
-      const label = `Open ${m.name}`;
+      // The title already names the room; the button doesn't repeat it.
+      const label = "Open room";
       if (open.querySelector(".nm").textContent !== label) open.querySelector(".nm").textContent = label;
     }
     root.querySelector(".dialog").setAttribute("aria-label", m.name);
@@ -268,6 +283,7 @@ class RoomLampsSheet {
     const keys = items.map((l) => l.id).join();
     if (box.dataset.keys !== keys) {
       box.dataset.keys = keys;
+      box.classList.toggle("none", !items.length);
       box.innerHTML = items.length
         ? items
             .map((l) => `<button class="lamp" role="switch" data-id="${esc(l.id)}"><span class="glyph"><ha-icon></ha-icon></span>
@@ -321,67 +337,76 @@ const CSS = `
     justify-content: center; transition: background-color 180ms; }
   /* Same size as Mushroom / tile card icons: 36 px circle, 24 px icon. */
   .shape ha-icon { --mdc-icon-size: 24px; transition: color 180ms; }
-  /* Text matches Mushroom / tile cards: names 14px medium, readings 12px regular, same colour. */
+  /* Text matches Mushroom / tile cards: names 14px medium, readings 12px regular, same colour.
+     Nothing is cut off: a label too long for its box wraps instead. */
   .all .nm { position: relative; top: 1px; flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    overflow-wrap: break-word; }
   .all .sw { flex: 0 0 auto; width: 40px; height: 24px; border-radius: 12px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
   .all .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .all.on .sw { background: ${C.orange}; }
   .all.on .sw::after { transform: translateX(16px); }
+  /* Rooms: an even grid, \`columns\` across at most. The card measures every room's name and
+     takes fewer columns when they would not fit (_fitRooms): even columns while the longest fits;
+     else two columns each as wide as its own longest; else one. Names are never cut. */
   .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
-  .room { position: relative; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
-    container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
+  .room { position: relative; min-width: 0; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
+    cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
     -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
   .tile { display: flex; align-items: center; gap: 10px; height: 100%; box-sizing: border-box; padding: 11px 10px; min-height: 58px; }
   .room .shape { cursor: pointer; }
+  /* With a room view, the icon is its own button (it opens the room): keyboard and focus too. */
+  .room .shape[role="button"]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .badge { position: absolute; top: -3px; right: -3px; width: 16px; height: 16px; border-radius: 50%; display: none;
     align-items: center; justify-content: center; background: ${C.red}; }
   .badge ha-icon { --mdc-icon-size: 11px; color: #fff; }
   .badge.on { display: flex; }
   .txt { flex: 1; min-width: 0; }
-  .room .nm { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* Presence sits on the name's own line, so it always lines up with the room title. */
-  .top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  /* Presence sits on the name's own line, so it lines up with the room title. When a tile is too
+     narrow for both, it drops under the name (it wraps, never cuts) – the columns follow the names
+     only, so a ticking "12 min" never reflows the grid. */
+  .top { display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; min-width: 0; }
+  .room .nm { flex: 0 1 auto; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+    overflow-wrap: break-word; }
   .pres { flex: 0 0 auto; display: none; align-items: center; gap: 2px; height: 20px; font-size: 12px; line-height: 20px;
-    font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); }
+    font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; }
   .pres.show { display: inline-flex; }
   .pres ha-icon { --mdc-icon-size: 16px; }
-  .pres.here { color: ${C.teal}; }
-  .pres.warn { color: var(--warning-color, #ffa600); }
-  .m { display: flex; column-gap: 9px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; }
-  .g { display: flex; column-gap: 9px; min-width: 0; }
+  /* Someone here: green, like a person at home in Home Assistant. Lights on and nobody here for
+     a while: amber, an early warning (the icon in full colour, the time readable). */
+  .pres.here { color: ${C.green}; }
+  .pres.warn { color: ${tx(C.amber, 70)}; }
+  .pres.warn ha-icon { color: ${C.amber}; }
+  /* Readings wrap only between their parts ("21.1/21.8°" stays whole). */
+  .m { display: flex; flex-wrap: wrap; column-gap: 9px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .g { display: flex; flex-wrap: wrap; column-gap: 9px; min-width: 0; }
   .g:empty { display: none; }
-  .v { display: inline-flex; align-items: center; gap: 2px; }
+  .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
   .v ha-icon { --mdc-icon-size: 14px; }
   /* The lights are the point of the card: readings are secondary. Their numbers use the quiet
-     secondary grey and their icons keep their colours, faded towards grey. Rooms with lights on
-     get a faint warm tint, so a lit room stands out on its own. */
+     secondary grey; temperature and humidity icons keep their literal colours, faded towards
+     grey, and the light level's sun is the quiet reading-icon grey (amber means a warning).
+     Rooms with lights on get a faint warm tint, so a lit room stands out on its own. */
   .v.t ha-icon { color: color-mix(in srgb, ${C.orange} 55%, ${C.grey}); }
   .v.h ha-icon { color: color-mix(in srgb, ${C.blue} 55%, ${C.grey}); }
-  .v.l ha-icon { color: color-mix(in srgb, ${C.amber} 60%, ${C.grey}); }
+  .v.l ha-icon { color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .room.lit { background: color-mix(in srgb, ${C.orange} 10%, transparent); }
   .room.missing .nm { color: var(--secondary-text-color); }
   /* Press feedback without moving anything: a scale-down shrinks the target under the
      finger and taps near the edge would be lost. */
-  .all:active, .room:active { filter: brightness(.94); }
+  .all:active, .room:active { filter: brightness(.92); }
   .all:focus-visible, .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  /* While the card measures (one frame, never painted): names, presence and readings on one line
+     at their natural width. */
+  .measure .top, .measure .m, .measure .g { flex-wrap: nowrap; }
+  .measure .room .nm { flex: none; white-space: nowrap; }
   /* When any room's readings do not fit on one line (the card measures this), every tile
      switches together: temperature on one line, humidity + light level on the next. All tiles
      keep the same height (grid-auto-rows: 1fr) even if one room has more sensors. */
   .stack .m { flex-direction: column; }
-  .stack .g { flex-wrap: wrap; column-gap: 7px; }
+  .stack .g { column-gap: 7px; }
   .stack .tile { padding: 11px 8px; gap: 8px; }
-  @container (max-width: 175px) {
-    .tile { padding: 11px 6px; gap: 6px; }
-    .stack .g { column-gap: 5px; }
-    .v { gap: 1px; }
-    .m { font-size: 11.5px; }
-    .v ha-icon { --mdc-icon-size: 13px; }
-  }
 `;
 
 class RoomLightsCard extends HTMLElement {
@@ -434,11 +459,11 @@ class RoomLightsCard extends HTMLElement {
           <span class="nm"></span><span class="sw"></span></button>`
       : "";
     root.innerHTML = `<style>${CSS}</style><ha-card>${header}
-      <div class="rooms" style="--cols:${Math.max(1, Math.min(4, Number(this._config.columns) || 2))}">
+      <div class="rooms" style="--cols:${this._cols()}">
         ${rooms
           .map(
             (r, i) => `<div class="room" role="button" tabindex="0" data-i="${i}"><div class="tile">
-              <div class="shape"><ha-icon></ha-icon><span class="badge"><ha-icon icon="mdi:window-open-variant"></ha-icon></span></div>
+              <div class="shape"${r.navigation_path ? ` role="button" tabindex="0"` : ""}><ha-icon></ha-icon><span class="badge"><ha-icon icon="mdi:window-open-variant"></ha-icon></span></div>
               <div class="txt"><div class="top"><div class="nm"></div><span class="pres"></span></div>
                 <div class="m"><span class="g"></span><span class="g"></span></div></div>
             </div></div>`,
@@ -450,13 +475,18 @@ class RoomLightsCard extends HTMLElement {
     root.querySelectorAll(".room").forEach((el) => this._bindRoom(el, rooms[Number(el.dataset.i)]));
     this._el = {
       all: root.querySelector(".all"),
+      grid: root.querySelector(".rooms"),
       rooms: [...root.querySelectorAll(".room")],
     };
     this._built = true;
+    this._colsKey = undefined;
+    // Names are measured in the dashboard's font: fit again once it has loaded.
+    document.fonts?.ready?.then(() => this._fit());
     if (this.isConnected) this.connectedCallback();
   }
 
-  /* Tap = switch the room; tap on the icon = open the room; hold = lamps sheet. */
+  /* Tap = switch the room; tap on the icon = open the room; hold = lamps sheet. The same from the
+     keyboard: Enter / Space on the tile switches it, on its icon opens the room. */
   _bindRoom(el, room) {
     let timer = null;
     let start = null;
@@ -491,14 +521,19 @@ class RoomLightsCard extends HTMLElement {
         this._navigate(room.navigation_path);
         return;
       }
-      this._toggle(room.entity);
+      this._toggle(room.entity, this._roomName(room));
     });
     el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        this._toggle(room.entity);
-      }
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      if (room.navigation_path && e.target.classList?.contains("shape")) return this._navigate(room.navigation_path);
+      this._toggle(room.entity, this._roomName(room));
     });
+  }
+
+  // For messages: the room's name, never an entity id.
+  _roomName(room) {
+    return room.name || this._hass?.states[room.entity]?.attributes?.friendly_name || "the room";
   }
 
   _render() {
@@ -509,8 +544,12 @@ class RoomLightsCard extends HTMLElement {
     // Only touch the DOM when something changed: Home Assistant pushes state several times a
     // second, and replacing text under a finger can swallow the tap.
     const set = (node, text) => {
-      if (node.textContent !== text) node.textContent = text;
+      if (node.textContent === text) return false;
+      node.textContent = text;
+      return true;
     };
+    // Anything that changes a tile's width needs (name, presence, readings) → fit again.
+    let changed = false;
 
     if (this._el.all) {
       const s = hass.states[this._config.entity];
@@ -532,7 +571,8 @@ class RoomLightsCard extends HTMLElement {
       if (icon.getAttribute("icon") !== m.icon) icon.setAttribute("icon", m.icon);
       icon.style.color = color;
       el.querySelector(".badge").classList.toggle("on", m.window);
-      set(el.querySelector(".nm"), m.name);
+      if (room.navigation_path && shape.getAttribute("aria-label") !== `Open ${m.name}`) shape.setAttribute("aria-label", `Open ${m.name}`);
+      if (set(el.querySelector(".nm"), m.name)) changed = true;
       const pr = presenceModel(hass, room, this._lastSeen?.[room.occupancy], this._warnMin(), m.on);
       const pel = el.querySelector(".pres");
       const phtml = !pr || pr.kind === "unknown" ? ""
@@ -541,6 +581,7 @@ class RoomLightsCard extends HTMLElement {
       if (pel.dataset.h !== phtml) {
         pel.innerHTML = phtml;
         pel.dataset.h = phtml;
+        changed = true;
       }
       pel.className = `pres${phtml ? " show" : ""}${pr ? ` ${pr.kind}` : ""}`;
       pel.title = !pr ? "" : pr.kind === "here" ? "Someone is here"
@@ -549,7 +590,6 @@ class RoomLightsCard extends HTMLElement {
       const [g1, g2] = el.querySelectorAll(".g");
       const html1 = m.temp ? this._v("t", "mdi:thermometer", m.temp) : "";
       const html2 = (m.hum ? this._v("h", "mdi:water-percent", m.hum) : "") + (m.lux ? this._v("l", "mdi:white-balance-sunny", m.lux) : "");
-      let changed = false;
       if (g1.dataset.h !== html1) {
         g1.innerHTML = html1;
         g1.dataset.h = html1;
@@ -560,11 +600,14 @@ class RoomLightsCard extends HTMLElement {
         g2.dataset.h = html2;
         changed = true;
       }
-      if (changed) this._fit();
     });
+    if (changed) this._fit();
   }
 
-  /* One line per tile if every room's readings fit, otherwise two lines for all of them. */
+  /* Once per frame after a change: the columns from the names (_fitRooms), then one line of
+     readings per tile if every room's fit, otherwise two lines for all of them. Measured in one
+     go (never painted in between). Without layout (tests) nothing is measured and the CSS
+     default stays: \`columns\` even columns, readings wrapping between their parts. */
   _fit() {
     if (this._fitQueued) return;
     this._fitQueued = true;
@@ -573,13 +616,58 @@ class RoomLightsCard extends HTMLElement {
       const card = this.shadowRoot?.querySelector("ha-card");
       if (!card || !card.isConnected) return;
       card.classList.remove("stack");
+      card.classList.add("measure");
+      this._fitRooms();
       const overflow = [...card.querySelectorAll(".m, .g")].some((m) => m.scrollWidth > m.clientWidth + 1);
+      card.classList.remove("measure");
       card.classList.toggle("stack", overflow);
     });
   }
 
+  /* The grid's columns, so that every room's name fits on one line (design tokens → Text and
+     formats). A tile needs its name (or its widest reading, if wider) + 66px around it. Even
+     columns – at most \`columns\` – as wide as the widest tile while two or more fit; else two
+     columns each as wide as its own widest tile; else one. Presence isn't counted: it drops under
+     the name in a tile too narrow for both. */
+  _fitRooms() {
+    const grid = this._el?.grid;
+    const tiles = this._el?.rooms || [];
+    const W = grid?.clientWidth;
+    if (!W || !tiles.length) return;
+    const card = grid.parentElement;
+    const had = card.classList.contains("measure");
+    card.classList.add("measure");
+    const ws = tiles.map((el) => {
+      const line = Math.ceil(el.querySelector(".nm").scrollWidth);
+      const parts = [...el.querySelectorAll(".v")].map((v) => Math.ceil(v.scrollWidth));
+      return Math.max(line, ...parts) + TILE_PAD;
+    });
+    if (!had) card.classList.remove("measure");
+    const n = this._cols();
+    const max = Math.max(...ws);
+    let cols = "minmax(0, 1fr)";
+    for (let k = n; k >= 2; k--) {
+      if (k * max + (k - 1) * 8 <= W) {
+        cols = `repeat(${k}, minmax(0, 1fr))`;
+        break;
+      }
+    }
+    if (cols === "minmax(0, 1fr)" && n >= 2 && ws.length > 1) {
+      const col = (k) => Math.max(...ws.filter((_, i) => i % 2 === k));
+      if (col(0) + col(1) + 8 <= W) cols = `minmax(${col(0)}px, 1fr) minmax(${col(1)}px, 1fr)`;
+    }
+    if (this._colsKey !== cols) {
+      this._colsKey = cols;
+      grid.style.gridTemplateColumns = cols;
+    }
+  }
+
+  _cols() {
+    return Math.max(1, Math.min(4, Number(this._config.columns) || 2));
+  }
+
   connectedCallback() {
-    // Keeps the "12m" counters moving.
+    // Keeps the "12 min" counters moving.
     clearInterval(this._tick);
     if (this._config?.rooms?.some((r) => r.occupancy)) this._tick = setInterval(() => this._hass && this._render(), 60000);
     if (typeof ResizeObserver === "undefined") return;
@@ -688,22 +776,24 @@ class RoomLightsCard extends HTMLElement {
   _toggleAll() {
     const s = this._hass.states[this._config.entity];
     this._haptic("light");
-    this._call(isOn(s) ? "turn_off" : "turn_on", this._config.entity);
+    this._call(isOn(s) ? "turn_off" : "turn_on", this._config.entity, this._config.name || "all lights");
   }
 
-  _toggle(entity) {
+  /* name: what a failure message calls it (the room's or lamp's name, never an entity id). */
+  _toggle(entity, name) {
     const s = this._hass.states[entity];
     this._haptic("light");
-    this._call(isOn(s) ? "turn_off" : "turn_on", entity);
+    this._call(isOn(s) ? "turn_off" : "turn_on", entity, name || s?.attributes?.friendly_name || "the light");
   }
 
-  async _call(service, entity) {
+  /* Home Assistant's own message when it gives one, else "Couldn't turn on Kitchen." */
+  async _call(service, entity, name) {
     const [domain] = entity.split(".");
     const d = domain === "light" || domain === "switch" ? domain : "homeassistant";
     try {
       await this._hass.callService(d, service, { entity_id: entity });
     } catch (err) {
-      this._fire("hass-notification", { message: err?.message || `Could not switch ${entity}` });
+      this._fire("hass-notification", { message: err?.message || `Couldn't turn ${service === "turn_off" ? "off" : "on"} ${name}.` });
     }
   }
 
@@ -765,7 +855,7 @@ const EDITOR_LABELS = {
 const EDITOR_HELPERS = {
   temperature: "Add more than one to show them all, in order (e.g. 21.1/21.8°).",
   lamps: "Leave empty to use the members of the room's group.",
-  occupancy: "Teal icon while someone is here, otherwise how long since they were.",
+  occupancy: "Green icon while someone is here, otherwise how long since they were (12 min, 3 h, 2 d).",
   empty_warning: "Default 2. Lights on in a room empty this long turn its time amber.",
 };
 
@@ -780,8 +870,8 @@ const EDITOR_CSS = `
     background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); color: var(--grey-color, #9e9e9e); }
   summary .ic ha-icon { --mdc-icon-size: 24px; }
   summary .t { flex: 1; min-width: 0; }
-  summary .t1 { font-size: 14px; font-weight: 500; color: var(--primary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  summary .t2 { font-size: 12px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  summary .t1 { font-size: 14px; font-weight: 500; color: var(--primary-text-color); overflow-wrap: break-word; }
+  summary .t2 { font-size: 12px; color: var(--secondary-text-color); overflow-wrap: anywhere; }
   summary .chev { --mdc-icon-size: 24px; color: var(--secondary-text-color); transition: transform 150ms; }
   details[open] summary .chev { transform: rotate(180deg); }
   .body { padding: 4px 12px 12px; }

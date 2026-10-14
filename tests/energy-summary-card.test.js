@@ -80,7 +80,7 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
   // Live power follows state without refetching statistics.
   const n = ws.length;
   card.hass = hass("1234.6");
-  assert.deepStrictEqual(stat("now"), ["Now", "1235W", "29p/h"]);
+  assert.deepStrictEqual(stat("now"), ["Now", "1,235W", "29p/h"], "numbers with toLocaleString");
   card.hass = hass("12345");
   assert.deepStrictEqual(stat("now"), ["Now", "12.3kW", "£2.93/h"]);
   card.hass = hass("unavailable");
@@ -109,10 +109,46 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
 
   // Tap → Energy dashboard.
   const navs = [];
+  const more = [];
   window.addEventListener("location-changed", () => navs.push(window.location.pathname));
+  card.addEventListener("hass-more-info", (e) => more.push(e.detail.entityId));
   r.querySelector("ha-card").click();
   await tick();
   assert.deepStrictEqual(navs, ["/lovelace/energy"]);
+  // The circle and the empty area navigate too; each number opens its own sensor and does not navigate.
+  r.querySelector(".shape").click();
+  r.querySelector(".stat.today .k").click();
+  r.querySelector(".stat.today .c").click();
+  assert.deepStrictEqual(navs, ["/lovelace/energy", "/lovelace/energy", "/lovelace/energy", "/lovelace/energy"]);
+  r.querySelector(".stat.now .v").click();
+  r.querySelector(".stat.today .v small").click();
+  r.querySelector(".stat.yesterday .v").click();
+  r.querySelector(".stat.month .v").click();
+  await tick();
+  assert.deepStrictEqual(more, ["sensor.power", "sensor.daily", "sensor.daily", "sensor.daily"], "each number → its own more-info");
+  assert.strictEqual(navs.length, 4, "a number never navigates");
+  // Keyboard: Enter / Space on the card navigates; the numbers are buttons, so they handle their own keys.
+  const K = (key) => new window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+  r.querySelector("ha-card").dispatchEvent(K("Enter"));
+  r.querySelector("ha-card").dispatchEvent(K(" "));
+  assert.strictEqual(navs.length, 6);
+  r.querySelector(".stat.now .v").dispatchEvent(K("Enter"));
+  assert.strictEqual(navs.length, 6, "Enter on a number is the number's");
+  assert.strictEqual(r.querySelector(".stat.now .v").localName, "button");
+  assert.strictEqual(r.querySelector("ha-card").getAttribute("tabindex"), "0");
+
+  // Design rules: nothing cut, the circle stays on phones, no colour on values, captions/units ≥ 11px.
+  const css = r.querySelector("style").textContent;
+  assert(!/text-overflow:\s*ellipsis/.test(css) && !/overflow:\s*hidden/.test(css), "no ellipsis or clipping");
+  assert(!/\.shape \{[^}]*display:\s*none/.test(css), "the circle is never dropped");
+  assert(!/font-size:\s*10px/.test(css), "no 10px text");
+  assert(/\.stat \{[^}]*flex: 1 1 0; min-width: max-content/.test(css), "stats wrap rather than truncate");
+  assert(!/\.now \.v \{[^}]*teal/.test(css), "Now is not teal");
+  assert(/\.v \{[^}]*color: var\(--primary-text-color\)/.test(css));
+  assert(/\.c \{[^}]*color: var\(--secondary-text-color\)/.test(css), "costs in the secondary colour");
+  assert(/\.row \{[^}]*gap: 10px; padding: 12px 10px/.test(css), "first text at edge + 46");
+  assert(/ha-card:active, \.v:active \{ filter: brightness\(\.92\); \}/.test(css));
+  assert(r.querySelector(".shape").getAttribute("style").includes("--teal-color"), "the circle keeps its teal");
 
   // Own price overrides the Energy settings; a price entity is read live.
   const c2 = document.createElement("energy-summary-card");
@@ -162,6 +198,25 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
   c6.hass = hass("616.44", "9.50");
   await tick(10);
   assert.strictEqual(c6.shadowRoot.querySelector(".stat.today .v").textContent, "7.99kWh");
+
+  // Big totals are grouped: 1,204kWh.
+  changes.month0 = 1204.4;
+  const c7 = document.createElement("energy-summary-card");
+  document.body.appendChild(c7);
+  c7.setConfig(cfg);
+  c7.hass = hass();
+  await tick(10);
+  assert.strictEqual(c7.shadowRoot.querySelector(".stat.month .v").textContent, "1,204kWh");
+  // Without a navigation path, the card opens the power sensor (and a number still its own).
+  const c8 = document.createElement("energy-summary-card");
+  document.body.appendChild(c8);
+  c8.setConfig({ power: "sensor.power", energy: "sensor.daily" });
+  c8.hass = hass();
+  const more8 = [];
+  c8.addEventListener("hass-more-info", (e) => more8.push(e.detail.entityId));
+  c8.shadowRoot.querySelector("ha-card").click();
+  c8.shadowRoot.querySelector(".stat.today .v").click();
+  assert.deepStrictEqual(more8, ["sensor.power", "sensor.daily"]);
 
   assert.throws(() => new Card().setConfig({}));
   console.log("ALL ENERGY-SUMMARY TESTS PASSED");

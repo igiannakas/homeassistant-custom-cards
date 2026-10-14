@@ -155,14 +155,14 @@ const cfg = {
   assert(rooms()[0].querySelector(".v.h ha-icon[icon='mdi:water-percent']"));
   assert(rooms()[0].querySelector(".v.l ha-icon[icon='mdi:white-balance-sunny']"));
 
-  // Presence on the name's line: occupied = teal person; empty = time since last seen, from
-  // history (not the restart); nothing in the history window = "3d+".
+  // Presence on the name's line: occupied = green motion sensor; empty = time since last seen,
+  // from history (not the restart); nothing in the history window = "3 d+".
   await tick(10);
   const pres = (i) => rooms()[i].querySelector(".top .pres");
   assert(pres(0).classList.contains("here") && pres(0).querySelector("ha-icon[icon='mdi:motion-sensor']"));
-  eq(pres(1).textContent, "12m");
+  eq(pres(1).textContent, "12 min");
   assert(pres(1).classList.contains("empty"), "kitchen lights off → plain");
-  eq(pres(2).textContent, "3d+");
+  eq(pres(2).textContent, "3 d+");
   assert(wsCalls.filter((t) => t === "history/history_during_period").length === 1, "history read once");
   // Lights on in a room empty for longer than the threshold → warning.
   card.hass = hass({ "light.kitchen": ["on", { friendly_name: "Kitchen" }] });
@@ -182,11 +182,12 @@ const cfg = {
   card.hass = h3;
   assert(!pres(1).classList.contains("warn"), "1 min → not yet");
   card._lastSeen["binary_sensor.k_occ"] = now - 12 * 60e3;
-  // Someone leaves the living room now → "0m".
+  // Someone leaves the living room now → "0 min".
   card.hass = hass();
   await tick(10);
   card.hass = hass({ "binary_sensor.lr_occ": ["off", {}, new Date().toISOString()] });
-  eq(pres(0).textContent, "0m");
+  eq(pres(0).textContent, "0 min");
+  assert.strictEqual(pres(0).title, "Last seen 0 min ago");
   card.hass = hass();
 
   // Window badge.
@@ -266,8 +267,14 @@ const cfg = {
   eq(calls.pop(), ["light", "turn_on", { entity_id: "light.front_lr_lamp" }]);
   card.hass = hass({ "light.front_lr_lamp": ["on", { friendly_name: "Front living room lamp" }] });
   assert.strictEqual(sr.querySelectorAll(".lamp")[1].getAttribute("aria-checked"), "true");
-  // "Open Living Room" call to action navigates and closes.
-  assert.strictEqual(sr.querySelector(".open .nm").textContent, "Open Living Room");
+  // The sheet: title only (no clipping), text and buttons below a 1px rule.
+  const sheetCss = sr.querySelector("style").textContent;
+  assert(!/text-overflow:\s*ellipsis/.test(sheetCss), "sheet names wrap, never cut");
+  assert(/\.buttons \{[^}]*border-top: 1px solid/.test(sheetCss), "rule above the buttons");
+  assert(/button \{[^}]*min-height: 56px/.test(sheetCss) && !/button \{[^}]*[^-]height: 56px/.test(sheetCss), "rows grow for a long lamp name");
+  assert(/\.empty \{[^}]*margin-left: 56px[^}]*secondary-text-color/.test(sheetCss), "no-lamps text on the title's line, secondary");
+  // "Open room" call to action (the title already names the room) navigates and closes.
+  assert.strictEqual(sr.querySelector(".open .nm").textContent, "Open room");
   assert.strictEqual(sr.querySelector(".open ha-icon").getAttribute("icon"), "mdi:sofa");
   sr.querySelector(".open").click();
   await tick();
@@ -299,6 +306,83 @@ const cfg = {
   assert(one, "sheet for a single light too");
   eq([...one.shadowRoot.querySelectorAll(".lamp")].map((b) => b.dataset.id), ["light.kitchen"]);
   document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
+
+  // The room icon is its own button when it opens a room: role, tabindex, Enter / Space.
+  const shape0 = rooms()[0].querySelector(".shape");
+  assert.strictEqual(shape0.getAttribute("role"), "button");
+  assert.strictEqual(shape0.getAttribute("tabindex"), "0");
+  assert.strictEqual(shape0.getAttribute("aria-label"), "Open Living Room");
+  assert(!rooms()[2].querySelector(".shape").hasAttribute("role"), "no room view → the icon is part of the tile");
+  calls.length = 0;
+  navs.length = 0;
+  shape0.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  shape0.dispatchEvent(new window.KeyboardEvent("keydown", { key: " ", bubbles: true }));
+  await tick();
+  eq(navs.splice(0), ["/lovelace/living-room", "/lovelace/living-room"]);
+  assert.strictEqual(calls.length, 0, "Enter on the icon opens the room, it doesn't switch it");
+  rooms()[0].dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await tick();
+  eq(calls.pop(), ["light", "turn_off", { entity_id: "light.living" }], "Enter on the tile switches it");
+
+  // A failed switch: Home Assistant's message, else "Couldn't …" with the room's name (never an id).
+  const toasts = [];
+  card.addEventListener("hass-notification", (e) => toasts.push(e.detail.message));
+  rooms()[1].click(); // the kitchen was last held (sheet test): this is the click that follows a hold
+  await tick();
+  calls.length = 0;
+  card.hass = { ...hass(), callService: async () => { throw new Error("Kitchen is unavailable"); } };
+  rooms()[1].click();
+  await tick();
+  card.hass = { ...hass(), callService: async () => { throw {}; } };
+  rooms()[1].click();
+  r.querySelector(".all").click();
+  await tick();
+  eq(toasts, ["Kitchen is unavailable", "Couldn't turn on Kitchen.", "Couldn't turn off all lights."]);
+  card.hass = hass();
+
+  // Colours and text rules (design tokens): someone here green, lights left on amber (not the
+  // theme's warning colour), the light-level icon a quiet reading grey; nothing is ever cut off
+  // and there's no off-scale shrink on narrow tiles.
+  const css = r.querySelector("style").textContent;
+  assert(/\.pres\.here \{ color: var\(--green-color/.test(css), "someone here = green");
+  assert(/\.pres\.warn \{ color: color-mix\(in srgb, var\(--amber-color, #ffc107\) 70%, var\(--primary-text-color\)\)/.test(css), "lights left on = amber text");
+  assert(!/warning-color|teal-color/.test(css));
+  assert(/\.v\.l ha-icon \{ color: color-mix\(in srgb, var\(--secondary-text-color\) 55%, transparent\)/.test(css), "light level icon = reading grey");
+  assert(/\.all:active, \.room:active \{ filter: brightness\(\.92\)/.test(css), "press feedback .92");
+  const all = [css, er.querySelector("style").textContent].join("");
+  assert(!/text-overflow:\s*ellipsis|line-clamp/.test(all), "no clipped text (card, editor)");
+  assert(!/11\.5px|@container/.test(css), "no narrow-tile shrink: fitting replaces it");
+  assert(/\.v \{[^}]*white-space: nowrap/.test(css) && /\.m \{[^}]*flex-wrap: wrap/.test(css), "readings wrap between parts");
+
+  // Room names are fitted, never cut: the grid takes as many columns (≤ columns) as the widest
+  // name allows (presence isn't counted – it drops under the name in a narrow tile), then two
+  // uneven columns, then one. jsdom has no layout, so the measurements are given here.
+  const def = (el, k, v) => Object.defineProperty(el, k, { value: v, configurable: true });
+  const NM = { "Living Room": 80, Kitchen: 50, Corridor: 60 };
+  const fitAt = (W, c = card) => {
+    const cr = c.shadowRoot;
+    def(cr.querySelector(".rooms"), "clientWidth", W);
+    cr.querySelectorAll(".room").forEach((el) => {
+      def(el.querySelector(".nm"), "scrollWidth", NM[el.querySelector(".nm").textContent]);
+      const p = el.querySelector(".pres");
+      def(p, "scrollWidth", p.textContent ? 40 : 16);
+      el.querySelectorAll(".v").forEach((v) => def(v, "scrollWidth", 50));
+    });
+    c._fitRooms();
+    return cr.querySelector(".rooms").style.gridTemplateColumns;
+  };
+  // Tiles need max(name, widest reading 50) + 66: 146, 116 and 126px – presence doesn't count.
+  eq(fitAt(400), "repeat(2, minmax(0, 1fr))", "two even columns while the widest fits");
+  eq(fitAt(280), "minmax(146px, 1fr) minmax(116px, 1fr)", "else two columns, each as wide as its own widest");
+  eq(fitAt(260), "minmax(0, 1fr)", "else one column");
+  assert(!r.querySelector("ha-card").classList.contains("measure"), "measuring leaves no trace");
+  card.setConfig({ ...cfg, columns: 3 });
+  card.hass = hass();
+  await tick(10);
+  eq(fitAt(540), "repeat(3, minmax(0, 1fr))", "columns: 3 → three when they fit");
+  eq(fitAt(400), "repeat(2, minmax(0, 1fr))", "… two when three don't");
+  card.setConfig(cfg);
+  card.hass = hass();
 
   // Missing room entity: no crash, shown dimmed.
   card.setConfig({ rooms: [{ name: "Ghost", entity: "light.nope" }] });

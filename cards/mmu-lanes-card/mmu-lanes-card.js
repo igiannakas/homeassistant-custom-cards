@@ -2,19 +2,19 @@
  * MMU lanes card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * Every lane of a Happy Hare MMU (e.g. an EMU) at a glance: whether filament is
- * loaded, the lane's humidity (coloured: dry / OK / humid) and temperature, and a
- * fan icon while the lane is drying. The label row counts the loaded lanes. Tap a
- * reading for its own more-info. Sensors are found from the Moonraker prefix;
- * lanes are counted automatically.
+ * loaded (green: good, ready), the lane's humidity (coloured: dry / medium / wet) and
+ * temperature, and a fan icon while the lane is drying. The summary under the title counts
+ * the loaded lanes. Lane names are never cut: the grid takes as many columns as the measured
+ * names allow (fewer on a phone). Tap a reading for its own more-info. Sensors are found
+ * from the Moonraker prefix; lanes are counted automatically.
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.1.7";
+const MLC_VERSION = "1.2.0";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
-  teal: "var(--teal-color, #009688)",
   green: "var(--green-color, #4caf50)",
   amber: "var(--amber-color, #ffc107)",
   orange: "var(--orange-color, #ff9800)",
@@ -80,30 +80,41 @@ const CSS = `
   :host { display: block; }
   ha-card { padding: 10px; container-type: inline-size; }
   /* Spacing follows Mushroom: everything inside the card starts 10px from its edge (card padding).
-     Label row: 40px high (room for the 24px switch). The icon is Mushroom-sized (24px) and sits where
-     the glyph of a 36px Mushroom icon would, so it lines up with the icons of Mushroom, Tado and
-     All lights cards and the title starts where theirs do. Only a tappable icon gets the filled circle. */
-  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; } /* 10px gap: titles at edge + 46, like Mushroom */
-  .label > ha-icon:first-child { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; --mdc-icon-size: 24px; color: ${C.teal}; }
-  /* Card label row: same on every card – 18px icon, 14px / 500 title (like Mushroom names), 12px status. */
-  /* top: 1px – optical centring: the line box sits ~1px high against an icon of the same height. */
-  .title { position: relative; top: 1px; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
-  .sum { margin-left: auto; min-width: 0; font-size: 12px; line-height: 20px; font-weight: 500; letter-spacing: .4px;
-    color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+     Two-line label row, the same on every card: a 24px icon in a 36px slot (where the glyph of a
+     Mushroom icon sits), the 14px / 500 title at edge + 46 and the 12px summary under it on the
+     same vertical line (ink-aligned, free to wrap). The icon is decorative: grey, no circle. */
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; }
+  .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+  .slot ha-icon { --mdc-icon-size: 24px; color: ${C.grey}; }
+  .lt { flex: 1; min-width: 0; }
+  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
+  .lt.one .t { position: relative; top: 1px; } /* alone, a 20px line reads ~1px high next to the icon */
+  .s { display: block; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .s:empty { display: none; }
+  /* Lanes: the columns are fitted to the measured names (_fitLanes) – as many as the columns option while
+     every name fits on one line, fewer on a phone. Before that (and without a browser to measure
+     in), four columns, two on a narrow card. */
   .lanes { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
   @container (max-width: 300px) { .lanes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .lane { box-sizing: border-box; min-width: 0; padding: 10px 8px; border-radius: 10px; cursor: pointer;
+  .lane { box-sizing: border-box; min-width: 0; padding: 11px 10px; border-radius: 10px; cursor: pointer;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
-  .lt { display: flex; align-items: center; gap: 4px; }
-  .ln { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lh { display: flex; align-items: center; gap: 4px; }
+  /* The name keeps its natural width (so it can be measured) and pushes the icons to the end. */
+  .ln { flex: 0 1 auto; min-width: 0; margin-right: auto; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px;
+    color: var(--primary-text-color); white-space: nowrap; }
+  /* Only a name wider than the whole card wraps. */
+  .lanes.wrap .ln { white-space: normal; overflow-wrap: break-word; }
   .lane.empty .ln { color: var(--secondary-text-color); }
-  .lt ha-icon { --mdc-icon-size: 18px; color: ${C.teal}; }
-  .lane.empty .lt ha-icon.sp { color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
-  .lt ha-icon.dry { --mdc-icon-size: 16px; color: ${C.orange}; }
+  .lh ha-icon { flex: none; --mdc-icon-size: 18px; }
+  /* Loaded = good, ready: green. Empty: quiet. Unknown: grey. */
+  .lh ha-icon.sp { color: ${C.green}; }
+  .lane.empty .lh ha-icon.sp { color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
+  .lane.unknown .lh ha-icon.sp { color: ${C.grey}; }
+  /* Drying: heat, so orange. */
+  .lh ha-icon.dry { --mdc-icon-size: 16px; color: ${C.orange}; }
   .lv { display: grid; gap: 1px; margin-top: 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .v { all: unset; box-sizing: border-box; justify-self: start; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
-    cursor: pointer; border-radius: 6px; -webkit-tap-highlight-color: transparent; }
+    cursor: pointer; border-radius: 4px; -webkit-tap-highlight-color: transparent; }
   .v:active { filter: brightness(.85); }
   .v:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
@@ -111,8 +122,8 @@ const CSS = `
     color: var(--secondary-text-color); }
   .legend span { display: inline-flex; align-items: center; gap: 4px; }
   .legend em { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  .legend ha-icon { --mdc-icon-size: 14px; color: ${C.teal}; }
-  .lane:active { filter: brightness(.94); }
+  .legend ha-icon { --mdc-icon-size: 14px; color: ${C.green}; }
+  .lane:active { filter: brightness(.92); }
   .lane:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
@@ -250,14 +261,28 @@ class MmuLanesCard extends HTMLElement {
     return { columns: "full", rows: "auto" };
   }
 
+  connectedCallback() {
+    if (this._built && this._ro && this._lanesEl) this._ro.observe(this._lanesEl);
+  }
+
+  disconnectedCallback() {
+    this._ro?.disconnect();
+  }
+
+  /* The most lanes per row: the columns option (1–8), default 4. */
+  _maxCols() {
+    return Math.max(1, Math.min(8, Number(this._config.columns) || 4));
+  }
+
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const ls = lanes(this._hass, this._config);
     const [dry, humid] = this._config.humidity_thresholds || [20, 40];
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      <div class="label"><ha-icon icon="mdi:tray-full"></ha-icon><span class="title">${esc(this._config.title ?? "MMU lanes")}</span><span class="sum"></span></div>
-      <div class="lanes" style="--cols:${Math.max(1, Math.min(8, Number(this._config.columns) || 4))}">
-        ${ls.map((l) => `<div class="lane" role="button" tabindex="0" data-n="${l.n}"><div class="lt"><span class="ln">${esc(l.name)}</span>
+      <div class="label"><div class="slot"><ha-icon icon="mdi:tray-full"></ha-icon></div>
+        <div class="lt"><div class="t">${esc(this._config.title ?? "MMU lanes")}</div><span class="s"></span></div></div>
+      <div class="lanes" style="--cols:${this._maxCols()}">
+        ${ls.map((l) => `<div class="lane" role="button" tabindex="0" data-n="${l.n}"><div class="lh"><span class="ln">${esc(l.name)}</span>
           <ha-icon class="dry" icon="mdi:fan" style="display:none"></ha-icon><ha-icon class="sp"></ha-icon></div><div class="lv"></div></div>`).join("")}
       </div>
       ${this._config.legend ? `<div class="legend"><span><ha-icon icon="mdi:circle-slice-8"></ha-icon>loaded</span>
@@ -280,11 +305,55 @@ class MmuLanesCard extends HTMLElement {
         open(e);
       }
     });
+    // Fit the columns to the names now, whenever the card resizes, and once the fonts have loaded.
+    this._lanesEl = root.querySelector(".lanes");
+    this._ro?.disconnect();
+    if (typeof ResizeObserver !== "undefined") {
+      this._ro = new ResizeObserver(() => this._fitLanes());
+      this._ro.observe(this._lanesEl);
+    }
+    document.fonts?.ready?.then(() => this._fitLanes());
     this._built = true;
   }
 
+  /* The lane grid's columns, so that every name stays whole on one line. A lane needs its name
+     + 4px gap + 16px drying fan (reserved, so a fan starting never re-flows the grid) + 4px gap +
+     18px status icon + 20px padding, or its widest reading + 20px. Even columns as wide as the
+     widest lane: the columns option if they fit, else the most that fit (preferring a count that
+     fills every row); if not even two fit, two columns each as wide as its own widest lane;
+     else one, where only a name wider than the card wraps. Without layout (tests, a hidden tab)
+     there is nothing to measure and the CSS default stands. */
+  _fitLanes() {
+    const box = this._lanesEl;
+    if (!box || !box.isConnected) return;
+    const W = box.clientWidth;
+    const els = [...box.querySelectorAll(".lane")];
+    if (!W || !els.length) return;
+    box.classList.remove("wrap");
+    const ws = els.map((el) => {
+      const name = Math.ceil(el.querySelector(".ln").scrollWidth) + 62;
+      const vals = Math.max(0, ...[...el.querySelectorAll(".lv .v")].map((v) => Math.ceil(v.scrollWidth))) + 20;
+      return Math.max(name, vals);
+    });
+    const max = Math.max(...ws);
+    const n = els.length;
+    const most = this._maxCols();
+    const fits = (c) => c * max + (c - 1) * 8 <= W;
+    let c = fits(most) ? most : 0;
+    for (let k = most - 1; !c && k >= 2; k--) if (fits(k) && n % k === 0) c = k;
+    for (let k = most - 1; !c && k >= 2; k--) if (fits(k)) c = k;
+    let cols;
+    if (c >= 2) cols = `repeat(${c}, minmax(0, 1fr))`;
+    else {
+      const col = (k) => Math.max(0, ...ws.filter((_, i) => i % 2 === k));
+      cols = n > 1 && most >= 2 && col(0) + col(1) + 8 <= W ? "repeat(2, minmax(max-content, 1fr))" : "minmax(0, 1fr)";
+      box.classList.toggle("wrap", cols === "minmax(0, 1fr)" && max > W);
+    }
+    if (box.style.gridTemplateColumns !== cols) box.style.gridTemplateColumns = cols;
+  }
+
   _render() {
-    inkSchedule(this, ".lane");
+    inkSchedule(this, ".lane, .lt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -294,6 +363,7 @@ class MmuLanesCard extends HTMLElement {
       const el = root.querySelectorAll(".lane")[i];
       if (!el) return;
       el.classList.toggle("empty", l.loaded === false);
+      el.classList.toggle("unknown", l.loaded === null);
       const sp = el.querySelector(".sp");
       const icon = l.loaded === null ? "mdi:help-circle-outline" : l.loaded ? "mdi:circle-slice-8" : "mdi:circle-outline";
       if (sp.getAttribute("icon") !== icon) sp.setAttribute("icon", icon);
@@ -309,8 +379,9 @@ class MmuLanesCard extends HTMLElement {
     });
     const loaded = ls.filter((l) => l.loaded).length;
     const sum = `${loaded} of ${ls.length} loaded`;
-    const s = root.querySelector(".sum");
+    const s = root.querySelector(".s");
     if (s.textContent !== sum) s.textContent = sum;
+    root.querySelector(".lt").classList.toggle("one", !sum);
   }
 }
 

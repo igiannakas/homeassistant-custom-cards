@@ -49,11 +49,11 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
   Home Assistant area icons – an area of the same name, or one whose name is inside the
   room's ("Corridor" in "Upstairs Corridor"), else a guess from the name; set your own
   under `rooms:`. Every name stays whole on one line: the columns are as wide as the longest
-  name needs (fewer columns rather than a cut or wrapped name). Tap rooms to build a clean: the button becomes **Clean 2 rooms** and
+  name needs (fewer columns rather than a cut or wrapped name). Tap rooms to build a clean (picked rooms turn teal): the button becomes **Clean 2 rooms** and
   sends `app_segment_clean` for those segments. During a job the room the robot is in is
   ringed and rooms can't be picked.
 - **Cleaning mode tile**: what the next clean will use ("Vac & mop · Turbo · Intense mop",
-  "· ×2" for two passes) under a blue tune icon, with a chevron – a taller tile, so it never
+  "· ×2" for two passes) under a teal tune icon (teal = tap me), with a chevron – a taller tile, so it never
   reads as one more room. A tap opens the Cleaning mode sheet (below).
 - **Buttons** for the state – the card's main controls, so 44px pills, the one that sets the robot
   going (Clean, Resume) filled blue: Clean entire floor (or Clean N rooms) when idle, Pause and Dock while

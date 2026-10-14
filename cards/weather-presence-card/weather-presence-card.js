@@ -5,19 +5,22 @@
  * outdoor sensor and the forecast service's temperature) with two pills on the
  * right – who is home (tap for e.g. the security dashboard) and a link pill (tap
  * for e.g. the climate dashboard). Either pill can be left out, e.g. the link pill
- * on the very dashboard it would link to.
+ * on the very dashboard it would link to. Tap the weather for the forecast, your own
+ * temperature for its sensor (or long-press anywhere on the weather).
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.3.2";
+const WPC_VERSION = "1.4.0";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
 
+// One meaning per colour (design-tokens → Colours): green = someone home, teal = you can tap
+// this (the link pill's icon), grey = off / neutral. Weather icons keep their literal colours.
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
   teal: "var(--teal-color, #009688)",
-  orange: "var(--orange-color, #ff9800)",
+  green: "var(--green-color, #4caf50)",
   blue: "var(--blue-color, #2196f3)",
 };
 const WEATHER = {
@@ -39,16 +42,21 @@ const WEATHER = {
 };
 
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
+// Readable coloured text: mixed toward the text colour, never the raw colour on white.
+const tx = (c, p = 70) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-color))`;
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Number(v)) ? null : Number(v));
-const temp = (v) => (num(v) === null ? "–" : `${num(v).toFixed(1)}°C`);
+const fmt = (n, d = 0) => (n === null ? "–" : n.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d }));
+// 14.23 → "14.2°": the entity's own value, whatever its unit (no hard-coded C).
+const temp = (v) => (num(v) === null ? "–" : `${fmt(num(v), 1)}°`);
 
+// "45 min", "3 h", "2 d" – a space and short units, like every card.
 function ago(ms) {
   const m = Math.max(0, Math.round(ms / 60000));
-  if (m < 60) return `${m}m`;
-  if (m < 1440) return `${Math.floor(m / 60)}h`;
-  return `${Math.floor(m / 1440)}d`;
+  if (m < 60) return `${m} min`;
+  if (m < 1440) return `${Math.floor(m / 60)} h`;
+  return `${Math.floor(m / 1440)} d`;
 }
 
 const CSS = `
@@ -65,37 +73,47 @@ const CSS = `
   .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .shape ha-icon { --mdc-icon-size: 24px; }
   .txt { min-width: 0; }
+  /* Text is never cut: a condition too long for its row wraps instead. */
   .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    overflow-wrap: break-word; }
   .sc { display: flex; flex-wrap: wrap; column-gap: 9px; font-size: 12px; line-height: 16px; letter-spacing: .4px;
     color: var(--secondary-text-color); }
-  .v { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+  /* Each reading is its own tap target (more-info of its own sensor) and stays whole. */
+  .v { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
+    cursor: pointer; border-radius: 4px; -webkit-tap-highlight-color: transparent; }
+  .v[hidden] { display: none; }
   .v ha-icon, .pill ha-icon { flex: none; width: var(--mdc-icon-size); height: var(--mdc-icon-size); }
-  .v ha-icon { --mdc-icon-size: 14px; }
-  .v.real ha-icon { color: color-mix(in srgb, ${C.orange} 55%, ${C.grey}); }
-  .v.fc ha-icon { color: color-mix(in srgb, ${C.blue} 55%, ${C.grey}); }
+  /* Small reading icons are quiet secondary information, the same on every card. */
+  .v ha-icon { --mdc-icon-size: 14px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .pills { flex: none; display: flex; gap: 8px; align-items: center; }
   /* Primary pills: 36px – the height of the icon circle – on every screen, so circle, text block
      and pills share one centre line and the pills' edges line up with the circle. */
   .pill { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     height: 36px; padding: 0 14px 0 10px; border-radius: 18px; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: .2px;
     white-space: nowrap;
-    background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color);
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color);
     -webkit-tap-highlight-color: transparent; }
   .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; }
   /* The pills stay beside the weather whenever they fit there (the readings may wrap onto two
      lines). Only when they don't – measured in _fit() – do they move to a row of wide buttons
-     below it, e.g. two pills on a 375px phone. */
+     below it, e.g. two pills on a 375px phone: equal widths while both labels fit, a longer
+     label takes what it needs, and they wrap only as a last resort (the button-row pattern). */
   .wrap.stacked { flex-wrap: wrap; row-gap: 8px; }
   .wrap.stacked .wx { flex: 1 1 100%; }
-  .wrap.stacked .pills { flex: 1 1 100%; display: grid; grid-template-columns: repeat(var(--np, 2), minmax(0, 1fr)); }
-  .pill.home { background: ${tint(C.teal, 20)}; color: ${C.teal}; }
-  .pill.home ha-icon { color: ${C.teal}; }
-  .pill.link { color: var(--primary-text-color); padding-right: 4px; }
+  .wrap.stacked .pills { flex: 1 1 100%; flex-wrap: wrap; }
+  .wrap.stacked .pill { flex: 1 1 0; min-width: max-content; }
+  /* Someone home: green (Home Assistant's colour for a person at home), as an "on" pill. Away stays grey. */
+  .pill.home { background: ${tint(C.green, 18)}; color: ${tx(C.green, 70)}; }
+  .pill.home ha-icon { color: ${C.green}; }
+  .pill.link { padding-right: 4px; }
   .pill.link ha-icon { color: ${C.teal}; }
+  /* The chevron is a trailing glyph, not the pill's icon: 16px, grey. */
   .pill.link ha-icon.ch { --mdc-icon-size: 16px; color: ${C.grey}; margin-left: -3px; }
-  .pill:active, .wx:active { filter: brightness(.92); }
+  .pill:active, .wx:active, .v:active { filter: brightness(.92); }
+  /* Pressing a reading darkens the reading, not the whole weather block. */
+  .wx:has(.v:active) { filter: none; }
   .pill:focus-visible, .wx:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+  .v:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
 /* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
@@ -232,7 +250,7 @@ class WeatherPresenceCard extends HTMLElement {
         })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
-          weather: "Tap the weather for the forecast; long-press for your own sensor.",
+          weather: "Tap the weather for the forecast; tap your own temperature (or long-press) for its sensor.",
           hide: "E.g. on the dashboard it links to. Its settings below are kept.",
         })[s.name],
     };
@@ -297,7 +315,12 @@ class WeatherPresenceCard extends HTMLElement {
     const contentW = (node) => (range.selectNodeContents(node), range.getBoundingClientRect().width);
     const px = (el, prop) => parseFloat(getComputedStyle(el)[prop]) || 0;
     const wx = root.querySelector(".wx");
-    const text = Math.max(contentW(root.querySelector(".nm")), ...[...root.querySelectorAll(".sc .v")].map((v) => v.getBoundingClientRect().width));
+    // The condition's natural width: measured on one line, whether or not it is wrapping now.
+    const nm = root.querySelector(".nm");
+    nm.style.whiteSpace = "nowrap";
+    const cond = contentW(nm);
+    nm.style.whiteSpace = "";
+    const text = Math.max(cond, ...[...root.querySelectorAll(".sc .v:not([hidden])")].map((v) => v.getBoundingClientRect().width));
     const weather = root.querySelector(".shape").offsetWidth + px(wx, "columnGap") + text;
     const pillsW =
       pills.reduce((s, p) => s + contentW(p) + px(p, "paddingLeft") + px(p, "paddingRight"), 0) +
@@ -361,11 +384,16 @@ class WeatherPresenceCard extends HTMLElement {
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     const link = this._link();
+    const c = this._config;
     const np = (this._presenceId() ? 1 : 0) + (link ? 1 : 0);
+    // The readings are built once and updated in place, so a focused one keeps its focus.
+    // Your own temperature is a button of its own (its sensor); the forecast belongs to the weather.
     root.innerHTML = `<style>${CSS}</style><ha-card><div class="wrap">
       <div class="wx" role="button" tabindex="0"><div class="shape"><ha-icon></ha-icon></div>
-        <div class="txt"><div class="nm"></div><div class="sc"></div></div></div>
-      <div class="pills" style="--np:${np || 1}${np ? "" : ";display:none"}">
+        <div class="txt"><div class="nm"></div><div class="sc">${
+          c.temperature ? `<button class="v real" data-e="${esc(c.temperature)}"><ha-icon icon="mdi:thermometer"></ha-icon><span></span></button>` : ""
+        }<span class="v fc" data-e="${esc(c.weather)}"><ha-icon icon="mdi:weather-partly-cloudy"></ha-icon><span></span></span></div></div></div>
+      <div class="pills"${np ? "" : ` style="display:none"`}>
         ${this._presenceId() ? `<button class="pill pres"><ha-icon></ha-icon><span></span></button>` : ""}
         ${link ? `<button class="pill link"><ha-icon></ha-icon><span></span><ha-icon class="ch" icon="mdi:chevron-right"></ha-icon></button>` : ""}
       </div></div></ha-card>`;
@@ -385,8 +413,15 @@ class WeatherPresenceCard extends HTMLElement {
     wx.addEventListener("contextmenu", (e) => e.preventDefault());
     // After a hold, the finger lifting must not "click" the dialog that just opened under it.
     wx.addEventListener("touchend", (e) => held && e.cancelable && e.preventDefault(), { passive: false });
-    wx.addEventListener("click", () => {
+    // A tap on a reading opens its own sensor; anywhere else on the weather, the forecast.
+    wx.addEventListener("click", (e) => {
       if (held) return (held = false);
+      const v = e.target.closest?.("[data-e]");
+      this._more(v ? v.dataset.e : this._config.weather);
+    });
+    wx.addEventListener("keydown", (e) => {
+      if (e.target !== wx || (e.key !== "Enter" && e.key !== " ")) return; // the reading button handles its own keys
+      e.preventDefault();
       this._more(this._config.weather);
     });
     root.querySelector(".pres")?.addEventListener("click", () => {
@@ -423,19 +458,22 @@ class WeatherPresenceCard extends HTMLElement {
     shape.querySelector("ha-icon").style.color = color;
     const cond = !w ? "Weather unavailable" : hass.formatEntityState ? hass.formatEntityState(w) : w.state.charAt(0).toUpperCase() + w.state.slice(1);
     set(root.querySelector(".nm"), cond);
-    const parts = [];
-    if (this._config.temperature)
-      parts.push(`<span class="v real"><ha-icon icon="mdi:thermometer"></ha-icon>${esc(this._config.temperature_name || "Real")} ${esc(temp(hass.states[this._config.temperature]?.state))}</span>`);
-    if (w)
-      parts.push(`<span class="v fc"><ha-icon icon="mdi:weather-partly-cloudy"></ha-icon>${esc(this._config.weather_name || "Forecast")} ${esc(temp(w.attributes?.temperature))}</span>`);
-    set(root.querySelector(".sc"), parts.join(""), true);
+    const real = root.querySelector(".v.real");
+    if (real) set(real.querySelector("span"), `${this._config.temperature_name || "Real"} ${temp(hass.states[this._config.temperature]?.state)}`);
+    const fc = root.querySelector(".v.fc");
+    if (fc.hidden !== !w) {
+      fc.hidden = !w;
+      changed = true;
+    }
+    if (w) set(fc.querySelector("span"), `${this._config.weather_name || "Forecast"} ${temp(w.attributes?.temperature)}`);
 
     const pres = root.querySelector(".pres");
     if (pres) {
       const home = this._home(hass.states[this._presenceId()]);
       pres.classList.toggle("home", home === true);
       pres.querySelector("ha-icon").setAttribute("icon", home ? "mdi:home-account" : "mdi:home-export-outline");
-      const label = home === null ? "Presence ?" : home ? "Home" : this._since ? `Away · ${Date.now() - this._since > HISTORY_DAYS * 86400000 ? `${HISTORY_DAYS}d+` : ago(Date.now() - this._since)}` : "Away";
+      const away = this._since ? (Date.now() - this._since > HISTORY_DAYS * 86400000 ? `${HISTORY_DAYS} d+` : ago(Date.now() - this._since)) : "";
+      const label = home === null ? "Presence –" : home ? "Home" : away ? `Away · ${away}` : "Away";
       set(pres.querySelector("span"), label);
     }
     const link = root.querySelector(".link");
@@ -444,7 +482,7 @@ class WeatherPresenceCard extends HTMLElement {
       link.querySelector("ha-icon").setAttribute("icon", lc.icon || "mdi:arrow-right");
       set(link.querySelector("span"), lc.name || "Open");
     }
-    // New text ("Away · 3h", a longer condition) can change what fits; check once per frame.
+    // New text ("Away · 3 h", a longer condition) can change what fits; check once per frame.
     if (changed && this._ro && !this._fitQueued) {
       this._fitQueued = true;
       requestAnimationFrame(() => {
