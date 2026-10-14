@@ -3844,7 +3844,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 2.0.0 ===== */
+/* ===== robot-vacuum-card 2.1.0 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3852,12 +3852,14 @@ registerPrinterTempsCard();
  * A Roborock (or similar) robot vacuum. The default layout: state and battery, what needs you
  * (dock tanks, errors), the job while it runs, a floor switch and the floor map (cropped to
  * the rooms, live while cleaning; a switch shows at once), the rooms in an even grid to build
- * a clean, and the buttons for the state – Clean all / Clean N rooms, Pause, Resume, Dock –
- * plus an optional Auto clean pill. Every button asks first except Pause.
+ * a clean, a Cleaning mode tile, and the buttons for the state – Clean all / Clean N rooms,
+ * Pause, Resume, Dock – plus an optional Auto clean pill. Every button asks first except Pause.
  *
- * `layout: mode` is the cleaning mode, laid out like the Roborock app: Vac & mop / Mop /
- * Vacuum tabs, then suction power, scrub intensity & water flow, cleaning count and route as
- * select buttons, offering only what applies in that mode. The count is sent with the clean.
+ * The Cleaning mode tile shows the current mode ("Vac & mop · Turbo · Intense mop") and opens
+ * a sheet laid out like the Roborock app: Vac & mop / Mop / Vacuum tabs, then suction power,
+ * scrub intensity & water flow, cleaning count and route as select buttons, offering only what
+ * applies in that mode. The count is sent with the clean. `layout: mode` shows the same panel
+ * as a card of its own.
  *
  * Everything is found from the vacuum entity's device (and its dock device), so the config
  * is one entity id. Rooms and their segment ids come from roborock.get_maps; a room clean is
@@ -3866,7 +3868,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.0.0";
+const RVC_VERSION = "2.1.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -4280,6 +4282,56 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
   });
 }
 
+/* Segmented selector (32px segments in a 38px track) and the mode rows' label + value line. */
+const SEG_CSS = `
+  .seg { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
+  .seg button { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: 0; height: 32px; border-radius: 9px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: var(--secondary-text-color);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
+  .seg button[aria-pressed="true"] { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+  .seg button[disabled] { opacity: .45; cursor: default; }
+  .seg button:active { filter: brightness(.92); }
+  .seg button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  .seg button ha-icon { --mdc-icon-size: 20px; }
+  .seg button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .seg[hidden] { display: none; }
+  .set { display: grid; gap: 6px; }
+  .k { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .k b { font-weight: 500; margin-left: 6px; color: ${tx(C.blue, 75)}; }
+`;
+
+/* The Cleaning mode sheet (Bubble look), holding the same panel as layout: mode. */
+const MODE_SHEET_CSS = `
+  ha-icon { display: inline-flex; align-items: center; justify-content: center; }
+  :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
+    font-family: var(--ha-font-family-body, Roboto, sans-serif); }
+  .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px); animation: fade 160ms ease-out; }
+  .dialog { position: relative; box-sizing: border-box; width: min(400px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
+    padding: 25px 18px 18px; border-radius: 32px; color: var(--primary-text-color);
+    background: color-mix(in srgb, var(--card-background-color, #fff) 94%, transparent);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 12px 40px rgba(0,0,0,.25);
+    animation: pop 180ms cubic-bezier(.2,.9,.3,1.2); }
+  .row { display: flex; align-items: center; gap: 6px; padding-left: 8px; }
+  .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+  .glyph ha-icon { --mdc-icon-size: 24px; }
+  .title { font-size: 20px; line-height: 26px; font-weight: 600; }
+  .tabs { margin-top: 18px; }
+  .sets { margin-top: 14px; display: grid; gap: 12px; }
+  .seg button { font-size: 13px; }
+  .actions { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
+  .done { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; width: 100%; padding-left: 10px;
+    border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
+  .done .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
+  .done .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
+  .done:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+  .done:active { filter: brightness(.92); }
+  ${SEG_CSS}
+  @keyframes fade { from { opacity: 0; } }
+  @keyframes pop { from { opacity: 0; transform: scale(.94); } }
+`;
+
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
@@ -4328,15 +4380,7 @@ const CSS = `
   .pct .when { font-size: 12px; font-weight: 400; letter-spacing: .4px; color: var(--secondary-text-color); margin-left: 8px; }
   .pbar { height: 8px; border-radius: 4px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); margin-top: 4px; overflow: hidden; }
   .pbar i { display: block; height: 100%; border-radius: 4px; transition: width 400ms; }
-  /* Segmented selector: 32px segments in a 38px track. */
-  .seg { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
-  .seg button { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: 0; height: 32px; border-radius: 9px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
-  .seg button[aria-pressed="true"] { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
-  .seg button[disabled] { opacity: .45; cursor: default; }
-  .seg button ha-icon { --mdc-icon-size: 20px; }
-  .seg button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  ${SEG_CSS}
   .map { position: relative; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); height: clamp(200px, 64cqw, 340px);
     display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; }
   .map canvas { display: block; }
@@ -4363,10 +4407,18 @@ const CSS = `
   .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
   .slot ha-icon { --mdc-icon-size: 24px; color: ${C.grey}; }
   .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); position: relative; top: 1px; }
-  .set { display: grid; gap: 6px; }
-  .k { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); }
-  .k b { font-weight: 500; margin-left: 6px; color: ${tx(C.blue, 75)}; }
-  .pill:active, .chip:active, .seg button:active, .shape:active { filter: brightness(.92); }
+  /* Cleaning mode tile: taller than the room pills, a tappable blue circle, two lines and a
+     chevron – so it reads as "settings" and never as one more room. */
+  .modetile { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 11px 10px; border-radius: 10px;
+    cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
+  .modetile .shape { background: ${tint(C.blue, 20)}; }
+  .modetile .shape ha-icon { color: ${C.blue}; }
+  .modetile .sc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .modetile .chev { --mdc-icon-size: 20px; color: ${C.grey}; flex: none; }
+  .modetile[disabled] { opacity: .45; cursor: default; }
+  .modetile:active { filter: brightness(.92); }
+  .modetile:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  .pill:active, .chip:active, .shape:active { filter: brightness(.92); }
   .pill:focus-visible, .chip:focus-visible, .seg button:focus-visible, .shape:focus-visible, [data-e]:focus-visible, .msg:focus-visible, .map:focus-visible {
     outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
@@ -4481,6 +4533,7 @@ class RobotVacuumCard extends HTMLElement {
         { type: "grid", name: "", schema: [
           { name: "hide_map", selector: { boolean: {} } },
           { name: "hide_rooms", selector: { boolean: {} } },
+          { name: "hide_mode", selector: { boolean: {} } },
         ] },
         { name: "rooms", selector: { object: {} } },
       ],
@@ -4492,11 +4545,12 @@ class RobotVacuumCard extends HTMLElement {
           auto_clean: "Auto clean (automation or switch)",
           hide_map: "Hide the map",
           hide_rooms: "Hide the rooms",
+          hide_mode: "Hide the Cleaning mode tile",
           rooms: "Rooms (YAML)",
         })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
-          layout: "Put a second card with layout Cleaning mode next to the vacuum card for the mode, suction, scrub, count and route buttons.",
+          layout: "Cleaning mode shows the mode panel (also in the vacuum card's Cleaning mode sheet) as a card of its own.",
           auto_clean: "Shows an Auto clean pill that turns this on and off, glowing while it is on.",
           rooms: "Per room, by the robot's room name: icon, name and hide. E.g. En-suite Bathroom: { icon: mdi:shower }",
         })[s.name],
@@ -4534,6 +4588,7 @@ class RobotVacuumCard extends HTMLElement {
   disconnectedCallback() {
     COUNT_CARDS.delete(this);
     this._ro?.disconnect();
+    this._closeMode();
   }
 
   _more(id) {
@@ -4574,6 +4629,8 @@ class RobotVacuumCard extends HTMLElement {
       <div class="seg floors" hidden></div>
       <div class="map" role="button" tabindex="0" aria-label="Map" hidden><canvas></canvas><span class="loading" hidden>Loading map…</span></div>
       <div class="rooms"></div>
+      <button class="modetile" hidden aria-haspopup="dialog"><div class="shape"><ha-icon icon="mdi:tune-variant"></ha-icon></div>
+        <div class="txt"><div class="nm">Cleaning mode</div><div class="sc mode-line"></div></div><ha-icon class="chev" icon="mdi:chevron-right"></ha-icon></button>
       <div class="acts"></div></div></ha-card>`;
     const card = root.querySelector("ha-card");
     card.addEventListener("click", (e) => this._click(e));
@@ -4597,6 +4654,11 @@ class RobotVacuumCard extends HTMLElement {
 
   _click(e) {
     const t = e.target;
+    const tile = t.closest(".modetile");
+    if (tile) {
+      if (!tile.disabled) this._openMode();
+      return;
+    }
     if (t.closest(".shape")) return this._more(this._config.entity);
     const room = t.closest("[data-room]");
     if (room) {
@@ -4655,7 +4717,7 @@ class RobotVacuumCard extends HTMLElement {
       this._found = discover(hass, this._config);
       this._regRef = hass.entities;
     }
-    if (this._config.layout === "mode") return this._renderMode();
+    if (this._config.layout === "mode") return this._paintMode(this.shadowRoot, this._keys);
     inkSchedule(this, ".txt");
     this._loadMaps();
     const selected = this._found.map_select ? hass.states[this._found.map_select]?.state : null;
@@ -4769,6 +4831,15 @@ class RobotVacuumCard extends HTMLElement {
       });
     }
 
+    // Cleaning mode tile: what the next clean will use; a tap opens the app-style sheet.
+    const tileEl = root.querySelector(".modetile");
+    tileEl.hidden = !!this._config.hide_mode || (!this._found.mode && !hass.states[this._config.entity]?.attributes?.fan_speed_list);
+    if (!tileEl.hidden) {
+      set(".mode-line", this._modeSummary());
+      tileEl.disabled = offline;
+    }
+    if (this._sheet) this._paintMode(this._sheet.root, this._sheet.keys);
+
     // Buttons for the state, rebuilt only when the set changes (taps are never lost).
     const n = this._sel.size;
     const acts = [];
@@ -4832,8 +4903,7 @@ class RobotVacuumCard extends HTMLElement {
     return { mode, rows };
   }
 
-  _renderMode() {
-    const root = this.shadowRoot;
+  _paintMode(root, keys) {
     const hass = this._hass;
     const f = this._found;
     const v = hass.states[this._config.entity];
@@ -4845,9 +4915,9 @@ class RobotVacuumCard extends HTMLElement {
     const modes = MODES.filter((x) => (modeEnt?.attributes?.options || []).includes(x));
     tabs.hidden = !modes.length;
     const tk = modes.join();
-    if (tk !== this._keys.tabs) {
+    if (tk !== keys.tabs) {
       tabs.innerHTML = modes.map((x) => `<button data-set="mode" data-v="${x}">${esc(optLabel(x))}</button>`).join("");
-      this._keys.tabs = tk;
+      keys.tabs = tk;
     }
     tabs.querySelectorAll("button").forEach((b) => {
       b.setAttribute("aria-pressed", String(b.dataset.v === mode));
@@ -4856,7 +4926,7 @@ class RobotVacuumCard extends HTMLElement {
 
     const box = root.querySelector(".sets");
     const rk = rows.map((r) => `${r.k}:${r.opts.join(",")}`).join("|");
-    if (rk !== this._keys.rows) {
+    if (rk !== keys.rows) {
       box.innerHTML = rows
         .map((r) => `<div class="set" data-k="${r.k}"><div class="k">${esc(r.label)}<b></b></div><div class="seg">${r.opts
           .map((o) => {
@@ -4865,7 +4935,7 @@ class RobotVacuumCard extends HTMLElement {
             return `<button data-set="${r.k}" data-v="${esc(o)}" title="${esc(label)}" aria-label="${esc(label)}">${inner}</button>`;
           }).join("")}</div></div>`)
         .join("");
-      this._keys.rows = rk;
+      keys.rows = rk;
     }
     for (const r of rows) {
       const sect = box.querySelector(`[data-k="${r.k}"]`);
@@ -4877,6 +4947,54 @@ class RobotVacuumCard extends HTMLElement {
         x.disabled = offline && r.k !== "count";
       });
     }
+  }
+
+  /* "Vac & mop · Turbo · Intense mop", plus "· ×2" – what the tile says. */
+  _modeSummary() {
+    const { mode, rows } = this._modeRows();
+    const cur = (k) => rows.find((r) => r.k === k)?.cur;
+    const fan = cur("fan");
+    const water = cur("water");
+    return [
+      mode ? optLabel(mode) : "",
+      fan && !["off"].includes(fan) ? optLabel(fan) : "",
+      water && water !== "off" ? `${optLabel(water)} mop` : "",
+      getCount(this._config.entity) === 2 ? "×2" : "",
+    ].filter(Boolean).join(" · ") || "Set the mode";
+  }
+
+  _openMode() {
+    if (this._sheet) return;
+    const host = document.createElement("rvc-mode-sheet");
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>${MODE_SHEET_CSS}</style><div class="backdrop"></div>
+      <div class="dialog" role="dialog" aria-modal="true" aria-label="Cleaning mode">
+        <div class="row"><div class="glyph" style="background:${tint(C.blue, 20)}"><ha-icon icon="mdi:tune-variant" style="color:${C.blue}"></ha-icon></div>
+          <div class="title">Cleaning mode</div></div>
+        <div class="seg tabs"></div><div class="sets"></div>
+        <div class="actions"><button class="done"><span class="glyph"><ha-icon icon="mdi:check"></ha-icon></span>Done</button></div></div>`;
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        this._closeMode();
+      }
+    };
+    root.querySelector(".backdrop").addEventListener("click", () => this._closeMode());
+    root.querySelector(".done").addEventListener("click", () => this._closeMode());
+    root.querySelector(".dialog").addEventListener("click", (e) => this._clickMode(e));
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(host);
+    this._sheet = { host, root, onKey, keys: {} };
+    this._paintMode(root, this._sheet.keys);
+    root.querySelector(".done").focus();
+  }
+
+  _closeMode() {
+    const sh = this._sheet;
+    if (!sh) return;
+    document.removeEventListener("keydown", sh.onKey, true);
+    sh.host.remove();
+    this._sheet = null;
   }
 
   _clickMode(e) {
@@ -5015,8 +5133,7 @@ class RobotVacuumCard extends HTMLElement {
   }
 
   async _switchFloor(name) {
-    const ok = await this._ask(`Switch to ${name}`, "mdi:layers-outline", C.blue,
-      `Only once the robot is on that floor: it loads the ${name} map and its rooms.`, "Switch");
+    const ok = await this._ask(`Switch to ${name}`, "mdi:layers-outline", C.blue, `Place the robot on the ${name}, then confirm.`, "Confirm");
     if (!ok) return;
     this._sel.clear();
     this._pend("floor", name);

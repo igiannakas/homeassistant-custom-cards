@@ -120,7 +120,7 @@ const cfg = {
   assert.throws(() => new Card().setConfig({}));
   assert.throws(() => new Card().setConfig({ entity: "sensor.x" }));
   const names = JSON.stringify(Card.getConfigForm().schema);
-  for (const k of ["entity", "layout", "auto_clean", "hide_map", "hide_rooms", "rooms"]) assert(names.includes(`"${k}"`), k);
+  for (const k of ["entity", "layout", "auto_clean", "hide_map", "hide_rooms", "hide_mode", "rooms"]) assert(names.includes(`"${k}"`), k);
 
   const card = document.createElement("robot-vacuum-card");
   document.body.appendChild(card);
@@ -178,7 +178,13 @@ const cfg = {
   eq(acts(), ["Clean all", "Auto clean"]);
   assert(q('[data-k="auto"]').classList.contains("on"));
   assert.strictEqual(q(".acts").style.getPropertyValue("--n"), "2");
-  assert(!q(".sets") && !q(".dock"), "settings and dock jobs live on other cards");
+  assert(!q(".sets") && !q(".dock"), "no settings rows or dock jobs on the card itself");
+  // The Cleaning mode tile: two lines, a blue circle and a chevron – not one more room pill.
+  assert(!q(".modetile").hidden);
+  assert.strictEqual(q(".modetile .nm").textContent, "Cleaning mode");
+  assert.strictEqual(q(".modetile .mode-line").textContent, "Vac & mop · Turbo · Standard mop");
+  assert.strictEqual(q(".modetile .chev").getAttribute("icon"), "mdi:chevron-right");
+  assert.strictEqual(q(".modetile").nextElementSibling, q(".acts"), "between the rooms and the buttons");
 
   // Pick two rooms → "Clean 2 rooms" → asks (naming rooms and settings) → one segment clean.
   const cleanBtn = q('[data-k="clean"]');
@@ -213,7 +219,7 @@ const cfg = {
   // "Loading map…" until the robot confirms.
   room("Study").click();
   all(".floors button")[1].click();
-  await yes("Switch to Ground floor");
+  assert.strictEqual(await yes("Switch to Ground floor"), "Place the robot on the Ground floor, then confirm.");
   eq(calls.pop(), ["select", "select_option", { entity_id: "select.vacuum_cleaner_selected_map", option: "Ground floor" }]);
   eq(roomNames(), ["Kitchen", "Downstairs Corridor", "Downstairs Bathroom", "Living room"], "rooms switch before the robot answers");
   eq(all(".floors button").map((b) => b.getAttribute("aria-pressed")), ["false", "true"]);
@@ -238,7 +244,41 @@ const cfg = {
   q(".map").click();
   eq(events.pop(), ["more-info", "image.study_vacuum_cleaner_first_floor"]);
 
-  /* ---- Cleaning mode panel (layout: mode), like the Roborock app ---- */
+  /* ---- Cleaning mode sheet, opened from the tile, like the Roborock app ---- */
+  q(".modetile").click();
+  const sheet = () => document.querySelector("rvc-mode-sheet");
+  assert(sheet(), "the tile opens the sheet");
+  const sr = sheet().shadowRoot;
+  assert.strictEqual(sr.querySelector(".title").textContent, "Cleaning mode");
+  eq([...sr.querySelectorAll(".tabs button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : "")), ["Vac & mop*", "Mop", "Vacuum"]);
+  eq([...sr.querySelectorAll(".set")].map((s) => s.dataset.k), ["fan", "water", "count", "route"]);
+  sr.querySelector('.set[data-k="water"] [data-v="intense"]').click();
+  await tick();
+  eq(calls.pop(), ["select", "select_option", { entity_id: "select.vacuum_cleaner_mop_intensity", option: "intense" }]);
+  assert.strictEqual(sr.querySelector('.set[data-k="water"] .k b').textContent, "Intense", "shows at once");
+  assert.strictEqual(q(".modetile .mode-line").textContent, "Vac & mop · Turbo · Intense mop", "the tile follows");
+  sr.querySelectorAll(".tabs button")[1].click();
+  await tick();
+  eq(calls.pop(), ["select", "select_option", { entity_id: "select.study_vacuum_cleaner_cleaning_mode", option: "mop" }]);
+  eq([...sr.querySelectorAll(".set")].map((s) => s.dataset.k), ["water", "count", "route"], "no suction in Mop");
+  card.hass = full(states({
+    "select.study_vacuum_cleaner_cleaning_mode": st("mop", { options: ["vacuum", "vac_and_mop", "mop", "custom"] }),
+    "select.vacuum_cleaner_mop_intensity": st("intense", { options: ["off", "mild", "standard", "intense", "custom"] }),
+  }));
+  assert.strictEqual(q(".modetile .mode-line").textContent, "Mop · Intense mop");
+  sr.querySelector(".done").click();
+  assert(!sheet(), "Done closes");
+  card.hass = full(states());
+  assert.strictEqual(q(".modetile .mode-line").textContent, "Vac & mop · Turbo · Standard mop");
+  q(".modetile").click();
+  sheet().shadowRoot.querySelector(".backdrop").click();
+  assert(!sheet(), "backdrop closes");
+  q(".modetile").click();
+  document.dispatchEvent(new t.window.KeyboardEvent("keydown", { key: "Escape" }));
+  assert(!sheet(), "Escape closes");
+  assert.strictEqual(events.length, 0 + events.length, "tile tap is not a more-info");
+
+  /* ---- The same panel as a card of its own (layout: mode) ---- */
   const mc = document.createElement("robot-vacuum-card");
   document.body.appendChild(mc);
   mc.setConfig({ entity: "vacuum.vacuum_cleaner", layout: "mode" });
@@ -306,6 +346,7 @@ const cfg = {
   rowOf("count").querySelector('[data-v="2"]').click();
   await tick();
   eq(opts("count"), ["1", "2*"]);
+  assert.strictEqual(q(".modetile .mode-line").textContent, "Vac & mop · Turbo · Standard mop · ×2", "the count shows on the tile");
   assert.strictEqual(value("count"), "2 times");
   assert.strictEqual(t.window.localStorage.getItem("robot-vacuum-card:count:vacuum.vacuum_cleaner"), "2");
   q('[data-k="clean"]').click();
@@ -397,6 +438,7 @@ const cfg = {
   assert.strictEqual(text(".nm"), "Vacuum cleaner · Offline");
   assert.strictEqual(text(".line"), "Can't reach the vacuum");
   assert(all(".acts .pill").filter((b) => b.dataset.k !== "auto").every((b) => b.disabled));
+  assert(q(".modetile").disabled, "the mode tile is greyed out too");
   const n0 = calls.length;
   q('[data-k="clean"]').click();
   await tick();
@@ -406,7 +448,7 @@ const cfg = {
   // Options: hide the map and rooms; low battery glows red.
   const card2 = document.createElement("robot-vacuum-card");
   document.body.appendChild(card2);
-  card2.setConfig({ entity: "vacuum.vacuum_cleaner", hide_map: true, hide_rooms: true });
+  card2.setConfig({ entity: "vacuum.vacuum_cleaner", hide_map: true, hide_rooms: true, hide_mode: true });
   card2.hass = full(states({
     "vacuum.vacuum_cleaner": st("idle", { friendly_name: "Vacuum cleaner", fan_speed: "turbo", fan_speed_list: ["turbo"] }),
     "sensor.vacuum_cleaner_battery": st(12, { device_class: "battery" }),
@@ -415,7 +457,7 @@ const cfg = {
   }));
   await tick();
   const r2 = card2.shadowRoot;
-  assert(r2.querySelector(".map").hidden && r2.querySelector(".rooms").hidden);
+  assert(r2.querySelector(".map").hidden && r2.querySelector(".rooms").hidden && r2.querySelector(".modetile").hidden);
   assert(r2.querySelector(".batt").classList.contains("low"));
   eq([...r2.querySelectorAll(".acts .pill")].map((b) => b.textContent.trim()), ["Clean all", "Dock"]);
 
