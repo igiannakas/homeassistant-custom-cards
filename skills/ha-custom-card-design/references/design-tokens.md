@@ -15,7 +15,7 @@ decorate it (decided 14 Oct 2026):
 | Blue | **Something running**, and the button that starts it | Cleaning / Returning, printing, Clean + Resume (filled), a dock job while it runs, the room the robot is cleaning; cooling (literally cold) |
 | Green | **Good, and someone home** (Home Assistant colours a person at home green) | Battery above 30%, VOC under 150, dry filament, a room or the house occupied, the Home pill |
 | Amber | **Early warning** – needs attention soon | Paused, a part due soon, battery ≤ 30%, VOC 150+, mop not attached |
-| Orange | **Lights, heat and power – and the step before red on a scale** | A lit room, heating, a plug / watts, the printer's power; Poor air, VOC 250+, wet filament, presence lost within the hour |
+| Orange | **Lights, heat and power – and the step before red on a scale** | A lit room, heating, a plug / watts, the printer's power, an appliance that is on; Poor air, VOC 250+, wet filament, presence lost within the hour |
 | Red | **A call for attention** | An error, a tank to empty, a part due now, battery ≤ 15%, door open, alarm armed, house empty for over an hour, heating on while away |
 | Grey | **Off, idle or neutral** – and every purely decorative icon | Docked, Idle, a part that's fine, a header icon that isn't tappable and shows no state |
 
@@ -26,8 +26,9 @@ decorate it (decided 14 Oct 2026):
 - **Literal colours** are the exception: clean water blue, dirty water brown, weather icons.
 - Tinted circle = tap target: `tint(colour, 20)` behind a full-colour icon. **A tap target is
   never grey**: a circle whose state colour would be grey (cloudy weather, heating idle or
-  locked) is teal. A device that is off (a room with its lights off, a docked robot) keeps its
-  grey – that grey is its state. A plain (untinted) icon is decoration and stays grey unless it
+  locked) is teal. A device that is off (a room with its lights off, a docked robot, an appliance
+  switched off) keeps its grey – that grey is its state. An appliance that is on (dehumidifier,
+  purifier, dryer) is orange – power – like a lit room. A plain (untinted) icon is decoration and stays grey unless it
   shows a state.
 - Room tiles keep the compact presence time beside the name ("12m", "3h", "2d"); everywhere
   else durations use the spaced form.

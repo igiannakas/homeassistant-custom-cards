@@ -111,6 +111,15 @@ Most of these generalise to any dashboard.
 | "This is not visually distinct to the clean and auto clean actions" (Empty / Wash mop / Dry mop as a second row of the same pills) → a tile of icon-over-label buttons: "again doesn't work visually. The primary objective of the card is to select the rooms, view/change cleaning mode and get going… Empty/wash/dry should be … secondary actions" | Rank a card's controls by its purpose before styling them. Secondary actions are quieter, not just different: text buttons (grey 12px, 16px icon, no fill, 30px) in one row under the primary pills. A bigger or tinted container makes them compete. Same pill + same size = same rank, to the eye. |
 | "dry is dry mop" | A short label still names its object when the verb alone is ambiguous next to its neighbours ("Dry mop", like "Wash mop"). |
 
+## Appliances (Oct 2026)
+
+| Feedback | Rule |
+|---|---|
+| "Design custom cards here … Power is nice to be shown as the printer one. Maybe with an on off pill combo." → options A/B/C → "Option B is the best" | One card per appliance: circle + "Name · Running" + the rule line, the printer's split power pill ("On \| 252 W" while on, "Off" while off), and a strip of today's numbers (reading, On for / Off since, Today, Today's cost) with straight dividers. |
+| "shouldn't the device color be teal??" then "on and running – orange yes?" | An appliance's circle shows its state: orange while on (power, like a lit room and the pill), grey while off. Teal is for a tap target with no state colour of its own; blue for a job in progress (print, clean). |
+| "air purifier is not auto from 17:30 but on" | Say what the automation does in its own words: "On at 17:30", "Off at 09:00", "On above 62%" – never a vague "Auto". |
+| "Create options and preference for how to make sure the card times and conditions match what the automation does" → "Helpers drive both" | Times and thresholds live in helpers (input_datetime time-only, input_number) used by the automation's triggers and conditions; the card reads the same helpers. No copied numbers in the card config. A window that crosses midnight needs from/until time helpers, not a schedule helper (its blocks stop at midnight and it can't be read by non-admins). |
+
 ## Process
 
 | Feedback | Rule |
