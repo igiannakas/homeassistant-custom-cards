@@ -20,7 +20,7 @@ first in a confirmation dialog.
 | [Printer temperatures](cards/printer-temps-card/README.md) | Heaters with target and power (glowing while heating), other temperatures and fans. |
 | [MMU lanes](cards/mmu-lanes-card/README.md) | Happy Hare MMU lanes: loaded or empty, humidity and temperature per lane, drying fans, buffer state. |
 | [Enclosure filter](cards/enclosure-filter-card/README.md) | Enclosure filter / vent: vent position selector, intake vs exhaust temperature, humidity and VOC. |
-| [Robot vacuum](cards/robot-vacuum-card/README.md) | A robot vacuum (Roborock): state, battery, what needs you, the floor map with a floor switch, room chips for a room clean, cleaning settings in a sheet, and an Auto clean pill. |
+| [Robot vacuum](cards/robot-vacuum-card/README.md) | A robot vacuum (Roborock): state, battery, what needs you, the floor map with a floor switch, room chips for a room clean, cleaning settings in a sheet, an Auto clean pill, and the dock's Empty / Wash mop / Dry. |
 | [Vacuum maintenance](cards/vacuum-maintenance-card/README.md) | Consumables as % of life left (or hours), what's due next, dock tanks; Reset after replacing asks first. |
 
 Related: the Tado X room card (`custom:tadox-room-card`) ships with the

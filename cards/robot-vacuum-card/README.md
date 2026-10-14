@@ -13,6 +13,7 @@
 │ (Second Bedroom) (Master Bedroom) (Bathroom) (Study)  │
 │ (Vac & mop) (Turbo) (Standard mop)                    │
 │ (  ▶ Clean all  )  (  Auto clean  )                   │
+│ (Empty) (Wash mop) (Dry)                              │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -40,13 +41,17 @@
   ringed and rooms can't be picked.
 - **Cleaning settings**: chips for the mode, suction and mop water. Tapping one opens a
   sheet with Mode (Vacuum / Vac & mop / Mop), Suction, Mop water and Mop route as
-  segmented selectors; a choice applies at once. Mop rows hide in Vacuum mode, suction in
-  Mop mode; `off` and `custom` only show when they are the current setting.
+  segmented selectors; a choice applies at once. Suction shows for Vacuum and Vac & mop,
+  mop water and route for Vac & mop and Mop, and the Deep / Deep+ routes only for Mop;
+  `off` and `custom` only show when they are the current setting.
 - **Buttons** for the state: Clean all (or Clean N rooms) when idle, Pause and Dock while
   cleaning, Resume and Dock when paused, Pause while returning. Dock only shows when the
   robot is away from the dock. Nothing asks first.
 - **Auto clean** (optional, `auto_clean`): a pill that glows teal while your automation
   (or switch) is on; a tap turns it off or on, a hold opens its more-info.
+- **Dock jobs** (while the robot is on the dock): **Empty**, **Wash mop** and **Dry** chips
+  for the dock's own switches – handy after stopping a clean early with Dock. Each glows
+  blue while it runs ("Drying · 2 h 10 min"); a tap starts or stops it at once.
 
 ## Configuration
 
@@ -66,9 +71,9 @@ rooms:
 | `auto_clean` | – | An automation, `input_boolean` or switch for the Auto clean pill. |
 | `auto_clean_name` | Auto clean | The pill's label. |
 | `rooms` | – | Per room (by the robot's room name): `icon`, `name`, `hide: true`. |
-| `hide_map`, `hide_rooms`, `hide_settings` | false | Leave a part out. |
+| `hide_map`, `hide_rooms`, `hide_settings`, `hide_dock_actions` | false | Leave a part out. |
 | `maps` | from `roborock.get_maps` | Your own rooms per map: `- name: First floor`, `rooms: {16: Bedroom, 17: Study}`. |
-| `entities` | found | Override any entity the card finds: `battery`, `charging`, `status`, `error`, `dock_error`, `dirty_box`, `clean_box`, `water_shortage`, `mop_attached`, `area`, `time`, `progress`, `room`, `last_start`, `map_select`, `mode`, `mop_water`, `mop_route`, `drying`. |
+| `entities` | found | Override any entity the card finds: `battery`, `charging`, `status`, `error`, `dock_error`, `dirty_box`, `clean_box`, `water_shortage`, `mop_attached`, `area`, `time`, `progress`, `room`, `last_start`, `map_select`, `mode`, `mop_water`, `mop_route`, `drying`, `empty_sw`, `wash_sw`, `dry_sw`. |
 
 Rooms need `roborock.get_maps` to answer over the websocket (it does for any user). A room
 clean runs on the map loaded on the robot, which is why the floor switch is the robot's

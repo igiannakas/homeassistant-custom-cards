@@ -3844,7 +3844,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 1.0.0 ===== */
+/* ===== robot-vacuum-card 1.1.0 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3853,8 +3853,9 @@ registerPrinterTempsCard();
  * (dock tanks, errors), the job while it runs, the floor map (cropped to the rooms, live
  * while cleaning) with a floor switch, room chips to build a clean, the cleaning settings
  * (mode, suction, mop water and route – shown as chips, changed in a sheet) and the
- * buttons for the state: Clean all / Clean N rooms, Pause, Resume, Dock, and an optional
- * Auto clean pill for the automation that runs it.
+ * buttons for the state: Clean all / Clean N rooms, Pause, Resume, Dock, an optional
+ * Auto clean pill for the automation that runs it, and – while docked – the dock's own jobs
+ * (Empty, Wash mop, Dry) as chips that glow while they run.
  *
  * Everything is found from the vacuum entity's device (and its dock device), so the
  * config is one entity id. Rooms and their segment ids come from roborock.get_maps; a
@@ -3863,7 +3864,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "1.0.0";
+const RVC_VERSION = "1.1.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -3938,6 +3939,10 @@ const KEYS = {
   mop_water: { domain: "select", tk: ["mop_intensity"], sfx: ["_mop_intensity"] },
   mop_route: { domain: "select", tk: ["mop_mode"], sfx: ["_mop_mode"] },
   drying: { domain: "sensor", tk: ["mop_drying_remaining_time"], sfx: ["_mop_drying_remaining_time"] },
+  // The dock's own jobs, as switches that are on while each runs.
+  empty_sw: { domain: "switch", tk: ["dust_emptying", "dock_dust_emptying"], sfx: ["_dust_emptying"] },
+  wash_sw: { domain: "switch", tk: ["mop_washing", "dock_mop_washing"], sfx: ["_mop_washing"] },
+  dry_sw: { domain: "switch", tk: ["mop_drying", "dock_mop_drying"], sfx: ["_mop_drying"] },
 };
 
 function deviceEntityIds(hass, vacuumId) {
@@ -4262,6 +4267,8 @@ const CSS = `
   .chip.sel { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
   .chip.sel ha-icon { color: ${C.blue}; }
   .chip.now { box-shadow: inset 0 0 0 1.5px ${tint(C.blue, 60)}; }
+  .chip.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
+  .chip.run ha-icon { color: ${C.blue}; }
   .chip[aria-disabled="true"] { cursor: default; }
   .chip[disabled] { opacity: .45; cursor: default; }
   .acts { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -4378,6 +4385,7 @@ class RobotVacuumCard extends HTMLElement {
           { name: "hide_map", selector: { boolean: {} } },
           { name: "hide_rooms", selector: { boolean: {} } },
           { name: "hide_settings", selector: { boolean: {} } },
+          { name: "hide_dock_actions", selector: { boolean: {} } },
         ] },
         { name: "rooms", selector: { object: {} } },
       ],
@@ -4389,6 +4397,7 @@ class RobotVacuumCard extends HTMLElement {
           hide_map: "Hide the map",
           hide_rooms: "Hide the rooms",
           hide_settings: "Hide the cleaning settings",
+          hide_dock_actions: "Hide Empty / Wash mop / Dry",
           rooms: "Rooms (YAML)",
         })[s.name] ?? s.name,
       computeHelper: (s) =>
@@ -4443,7 +4452,8 @@ class RobotVacuumCard extends HTMLElement {
       <div class="map" role="button" tabindex="0" aria-label="Map" hidden><canvas></canvas></div>
       <div class="chips rooms"></div>
       <div class="chips sets"></div>
-      <div class="acts"></div></div></ha-card>`;
+      <div class="acts"></div>
+      <div class="chips dock"></div></div></ha-card>`;
     const card = root.querySelector("ha-card");
     card.addEventListener("click", (e) => this._click(e));
     card.addEventListener("keydown", (e) => {
@@ -4485,6 +4495,12 @@ class RobotVacuumCard extends HTMLElement {
       return this._call("select", "select_option", { entity_id: this._found.map_select, option: floor.dataset.floor });
     }
     if (t.closest(".sets .chip")) return this._openSheet();
+    const job = t.closest("[data-dock]");
+    if (job) {
+      if (job.disabled) return;
+      const id = this._found[job.dataset.dock];
+      return this._call("switch", this._hass.states[id]?.state === "on" ? "turn_off" : "turn_on", { entity_id: id });
+    }
     const act = t.closest(".acts .pill");
     if (act) {
       if (act.disabled || this._held) {
@@ -4688,6 +4704,33 @@ class RobotVacuumCard extends HTMLElement {
         b.disabled = !m.auto || DEAD.includes(m.auto.state);
       }
     }
+
+    // The dock's jobs, run by hand (e.g. after an early Dock): only while the robot is on the
+    // dock. Each glows while it runs; a tap starts or stops it at once.
+    const dockBox = root.querySelector(".dock");
+    const docked = this._hass.states[this._config.entity]?.state === "docked" || offline;
+    const dry = seconds(hass.states[this._found.drying]);
+    const jobs = [
+      ["empty_sw", "mdi:delete-empty-outline", "Empty", "Emptying"],
+      ["wash_sw", "mdi:water-sync", "Wash mop", "Washing"],
+      ["dry_sw", "mdi:fan", "Dry", dry ? `Drying · ${mins(dry)}` : "Drying"],
+    ].filter(([k]) => this._found[k] && !this._config.hide_dock_actions);
+    const shown = docked ? jobs : [];
+    const jk = shown.map((j) => j[0]).join();
+    if (jk !== this._keys.dock) {
+      dockBox.innerHTML = shown.map(([k, icon]) => `<button class="chip" data-dock="${k}"><ha-icon icon="${icon}"></ha-icon><span></span></button>`).join("");
+      this._keys.dock = jk;
+    }
+    for (const [k, , idle, running] of shown) {
+      const b = dockBox.querySelector(`[data-dock="${k}"]`);
+      const on = hass.states[this._found[k]]?.state === "on";
+      const label = on ? running : idle;
+      const sp = b.querySelector("span");
+      if (sp.textContent !== label) sp.textContent = label;
+      b.classList.toggle("run", on);
+      b.setAttribute("aria-pressed", String(on));
+      b.disabled = offline || DEAD.includes(hass.states[this._found[k]]?.state);
+    }
   }
 
   /* Rooms and segment ids per map, from roborock.get_maps (or the maps: option). */
@@ -4794,7 +4837,12 @@ class RobotVacuumCard extends HTMLElement {
     if (f.mode && st(f.mode)) rows.push({ k: "mode", label: "Mode", cur: mode, opts: offer(st(f.mode).attributes?.options, mode, ORDER.mode) });
     if (v?.attributes?.fan_speed_list) rows.push({ k: "fan", label: "Suction", cur: m.fan, opts: offer(v.attributes.fan_speed_list, m.fan, ORDER.fan), hide: mode === "mop" });
     if (f.mop_water && st(f.mop_water)) rows.push({ k: "water", label: "Mop water", cur: m.water, opts: offer(st(f.mop_water).attributes?.options, m.water, ORDER.water), hide: mode === "vacuum" });
-    if (f.mop_route && st(f.mop_route)) rows.push({ k: "route", label: "Mop route", cur: m.route, opts: offer(st(f.mop_route).attributes?.options, m.route, ORDER.route), hide: mode === "vacuum" });
+    // Deep and Deep+ routes only apply when mopping alone; suction only when vacuuming.
+    if (f.mop_route && st(f.mop_route)) {
+      const all = offer(st(f.mop_route).attributes?.options, m.route, ORDER.route);
+      const opts = mode === "mop" ? all : all.filter((o) => !["deep", "deep_plus"].includes(o) || o === m.route);
+      rows.push({ k: "route", label: "Mop route", cur: m.route, opts, hide: mode === "vacuum" });
+    }
     return rows;
   }
 

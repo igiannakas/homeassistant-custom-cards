@@ -30,6 +30,10 @@ const REG = {
   "binary_sensor.vacuum_cleaner_dock_dirty_water_box": [DOCK, null],
   "binary_sensor.vacuum_cleaner_dock_clean_water_box": [DOCK, null],
   "sensor.vacuum_cleaner_mop_drying_remaining_time": [DOCK, null],
+  "switch.vacuum_cleaner_dock_dust_emptying": [DOCK, null],
+  "switch.vacuum_cleaner_dock_mop_washing": [DOCK, null],
+  "switch.vacuum_cleaner_dock_mop_drying": [DOCK, null],
+  "switch.vacuum_cleaner_child_lock": [DOCK, "child_lock"],
   "sensor.nancy_status": ["dev_other", "status"],
 };
 const ago = (days) => new Date(Date.now() - days * 86400000).toISOString();
@@ -60,6 +64,10 @@ function states(over = {}) {
     "binary_sensor.vacuum_cleaner_dock_dirty_water_box": st("off", { device_class: "problem" }),
     "binary_sensor.vacuum_cleaner_dock_clean_water_box": st("off", { device_class: "problem" }),
     "sensor.vacuum_cleaner_mop_drying_remaining_time": st(0, { unit_of_measurement: "s" }),
+    "switch.vacuum_cleaner_dock_dust_emptying": st("off"),
+    "switch.vacuum_cleaner_dock_mop_washing": st("off"),
+    "switch.vacuum_cleaner_dock_mop_drying": st("off"),
+    "switch.vacuum_cleaner_child_lock": st("on"),
     "automation.vacuum_when_away": st("on", { friendly_name: "Vacuum when everyone has left" }),
     "sensor.nancy_status": st("charging"),
     ...over,
@@ -111,7 +119,7 @@ const cfg = {
   assert.throws(() => new Card().setConfig({}));
   assert.throws(() => new Card().setConfig({ entity: "sensor.x" }));
   const names = JSON.stringify(Card.getConfigForm().schema);
-  for (const k of ["entity", "auto_clean", "hide_map", "hide_rooms", "hide_settings", "rooms"]) assert(names.includes(`"${k}"`), k);
+  for (const k of ["entity", "auto_clean", "hide_map", "hide_rooms", "hide_settings", "hide_dock_actions", "rooms"]) assert(names.includes(`"${k}"`), k);
 
   const card = document.createElement("robot-vacuum-card");
   document.body.appendChild(card);
@@ -154,6 +162,19 @@ const cfg = {
   eq(acts(), ["Clean all", "Auto clean"]);
   assert(q('[data-k="auto"]').classList.contains("on"));
   assert.strictEqual(q('[data-k="auto"]').getAttribute("aria-pressed"), "true");
+
+  // The dock's jobs while docked: Empty, Wash mop, Dry – a tap starts one at once.
+  const dock = () => all(".dock .chip").map((b) => b.textContent.trim() + (b.classList.contains("run") ? "*" : ""));
+  eq(dock(), ["Empty", "Wash mop", "Dry"]);
+  all(".dock .chip")[1].click();
+  await tick();
+  eq(calls.pop(), ["switch", "turn_on", { entity_id: "switch.vacuum_cleaner_dock_mop_washing" }]);
+  card.hass = full(states({ "switch.vacuum_cleaner_dock_mop_drying": st("on"), "sensor.vacuum_cleaner_mop_drying_remaining_time": st(7800, { unit_of_measurement: "s" }) }));
+  eq(dock(), ["Empty", "Wash mop", "Drying · 2 h 10 min*"]);
+  all(".dock .chip")[2].click();
+  await tick();
+  eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.vacuum_cleaner_dock_mop_drying" }]);
+  card.hass = full(states());
 
   // Settings as chips.
   eq(all(".sets .chip").map((b) => b.textContent.trim()), ["Vac & mop", "Turbo", "Standard mop"]);
@@ -213,7 +234,7 @@ const cfg = {
   eq(seg("mode"), ["Vacuum", "Vac & mop*", "Mop"]);
   eq(seg("fan"), ["Quiet", "Balanced", "Turbo*", "Max", "Max+"]);
   eq(seg("water"), ["Mild", "Standard*", "Intense"]);
-  eq(seg("route"), ["Fast", "Standard*", "Deep", "Deep+"]);
+  eq(seg("route"), ["Fast", "Standard*"], "Deep routes only when mopping alone");
   [...sr.querySelectorAll('[data-k="fan"] button')].find((b) => b.textContent === "Max").click();
   await tick();
   eq(calls.pop(), ["vacuum", "set_fan_speed", { entity_id: "vacuum.vacuum_cleaner", fan_speed: "max" }]);
@@ -230,6 +251,7 @@ const cfg = {
   // Mop only: suction hides.
   card.hass = full(states({ "select.study_vacuum_cleaner_cleaning_mode": st("mop", { options: ["vacuum", "vac_and_mop", "mop", "custom"] }) }));
   assert(sr.querySelector('[data-k="fan"]').hidden && !sr.querySelector('[data-k="water"]').hidden);
+  eq(seg("route"), ["Fast", "Standard*", "Deep", "Deep+"]);
   document.dispatchEvent(new t.window.KeyboardEvent("keydown", { key: "Escape" }));
   assert(!sheet(), "Escape closes the sheet");
   card.hass = full(states());
@@ -258,6 +280,7 @@ const cfg = {
   assert.strictEqual(text(".pct"), "45%18 min · 12.4 m²");
   eq(acts(), ["Pause", "Dock", "Auto clean"]);
   assert(q(".floors").hidden);
+  eq(dock(), [], "dock jobs only while docked");
   assert(room("Study").classList.contains("now"));
   room("Master Bedroom").click();
   assert(!room("Master Bedroom").classList.contains("sel"), "no picking rooms mid-clean");
@@ -318,7 +341,7 @@ const cfg = {
   // Options: hide the map, rooms and settings; low battery glows red.
   const card2 = document.createElement("robot-vacuum-card");
   document.body.appendChild(card2);
-  card2.setConfig({ entity: "vacuum.vacuum_cleaner", hide_map: true, hide_rooms: true, hide_settings: true });
+  card2.setConfig({ entity: "vacuum.vacuum_cleaner", hide_map: true, hide_rooms: true, hide_settings: true, hide_dock_actions: true });
   card2.hass = full(states({
     "vacuum.vacuum_cleaner": st("idle", { friendly_name: "Vacuum cleaner", fan_speed: "turbo", fan_speed_list: ["turbo"] }),
     "sensor.vacuum_cleaner_battery": st(12, { device_class: "battery" }),
@@ -328,6 +351,7 @@ const cfg = {
   await tick();
   const r2 = card2.shadowRoot;
   assert(r2.querySelector(".map").hidden && r2.querySelector(".rooms").hidden && !r2.querySelector(".sets").children.length);
+  assert.strictEqual(r2.querySelectorAll(".dock .chip").length, 0);
   assert(r2.querySelector(".batt").classList.contains("low"));
   eq([...r2.querySelectorAll(".acts .pill")].map((b) => b.textContent.trim()), ["Clean all", "Dock"]);
 
