@@ -18,8 +18,8 @@ Reference files (read when you reach that step):
 - `references/testing.md` – jsdom harness and the gotchas that bite.
 - `references/ship-and-verify.md` – bundle, HACS, saving a view safely, live checks,
   README screenshots.
-- `references/lessons.md` – the feedback log: what the user rejected or asked for, and
-  the rule each one became. Skim it before proposing a design.
+- `references/lessons.md` – the rules learned from the user's feedback, by topic. Skim it
+  before proposing a design, and add a rule (just the rule) whenever feedback teaches one.
 
 If those files are not next to this SKILL.md, they live in the GitHub repo
 `igiannakas/homeassistant-custom-cards` under `skills/ha-custom-card-design/`.
