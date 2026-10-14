@@ -193,21 +193,34 @@ const cfg = {
   dlg().shadowRoot.querySelector(".confirm").click();
   await tick();
   eq(calls.pop(), ["switch", "turn_on", { entity_id: "switch.vacuum_cleaner_dock_dust_emptying" }]);
-  // Dry starts at once.
+  // Dry asks too.
   all(".dock .chip")[2].click();
   await tick();
-  assert(!dlg(), "Dry doesn't ask");
+  assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, "Dry the mop");
+  dlg().shadowRoot.querySelector(".confirm").click();
+  await tick();
   eq(calls.pop(), ["switch", "turn_on", { entity_id: "switch.vacuum_cleaner_dock_mop_drying" }]);
-  // Stopping a running job is immediate.
+  // Stopping a running job asks as well.
   card.hass = full(states({ "switch.vacuum_cleaner_dock_mop_washing": st("on") }));
   eq(dock(), ["Empty", "Washing*", "Dry"]);
+  const n2 = calls.length;
   all(".dock .chip")[1].click();
   await tick();
-  assert(!dlg());
+  assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, "Stop washing");
+  dlg().shadowRoot.querySelector(".cancel").click();
+  await tick();
+  assert.strictEqual(calls.length, n2, "Cancel keeps it running");
+  all(".dock .chip")[1].click();
+  await tick();
+  dlg().shadowRoot.querySelector(".confirm").click();
+  await tick();
   eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.vacuum_cleaner_dock_mop_washing" }]);
   card.hass = full(states({ "switch.vacuum_cleaner_dock_mop_drying": st("on"), "sensor.vacuum_cleaner_mop_drying_remaining_time": st(7800, { unit_of_measurement: "s" }) }));
   eq(dock(), ["Empty", "Wash mop", "Drying · 2 h 10 min*"]);
   all(".dock .chip")[2].click();
+  await tick();
+  assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, "Stop drying");
+  dlg().shadowRoot.querySelector(".confirm").click();
   await tick();
   eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.vacuum_cleaner_dock_mop_drying" }]);
   card.hass = full(states());

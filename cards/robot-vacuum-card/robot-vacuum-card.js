@@ -16,7 +16,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "1.2.0";
+const RVC_VERSION = "1.2.1";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -399,13 +399,23 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
   });
 }
 
-/* Dock jobs that ask before they start (the user's choice): emptying is loud, washing uses
-   clean water and fills the dirty tank. Drying starts at once; stopping any job is immediate. */
+/* The dock's jobs ask before they start and before they stop (the user's choice). */
 const DOCK_CONFIRM = {
-  empty_sw: { title: "Empty the bin", icon: "mdi:delete-empty-outline", label: "Empty",
-    text: "The dock empties the robot's dust bin into its bag now. It's loud for about half a minute." },
-  wash_sw: { title: "Wash the mop", icon: "mdi:water-sync", label: "Wash mop",
-    text: "The dock washes the mop now, with clean water from its tank. The dirty water goes to the dirty tank." },
+  empty_sw: {
+    start: { title: "Empty the bin", icon: "mdi:delete-empty-outline", label: "Empty",
+      text: "The dock empties the robot's dust bin into its bag now. It's loud for about half a minute." },
+    stop: { title: "Stop emptying", label: "Stop emptying", text: "The dock stops emptying the bin now." },
+  },
+  wash_sw: {
+    start: { title: "Wash the mop", icon: "mdi:water-sync", label: "Wash mop",
+      text: "The dock washes the mop now, with clean water from its tank. The dirty water goes to the dirty tank." },
+    stop: { title: "Stop washing", label: "Stop washing", text: "The dock stops washing the mop now." },
+  },
+  dry_sw: {
+    start: { title: "Dry the mop", icon: "mdi:fan", label: "Dry",
+      text: "The dock dries the mop now, for the drying time set in the Roborock app." },
+    stop: { title: "Stop drying", label: "Stop drying", text: "The dock stops drying the mop now, so it may stay damp." },
+  },
 };
 
 /* ------------------------------------------------------------------------ */
@@ -1016,11 +1026,16 @@ class RobotVacuumCard extends HTMLElement {
 
   async _dockJob(k) {
     const id = this._found[k];
-    if (this._hass.states[id]?.state === "on") return this._call("switch", "turn_off", { entity_id: id });
-    const c = DOCK_CONFIRM[k];
-    if (c && !(await confirmDialog({ title: c.title, icon: c.icon, color: C.blue, primary: this._m?.name || "Vacuum", secondary: c.text, confirmLabel: c.label })))
-      return;
-    return this._call("switch", "turn_on", { entity_id: id });
+    const on = this._hass.states[id]?.state === "on";
+    const c = DOCK_CONFIRM[k]?.[on ? "stop" : "start"];
+    if (c) {
+      const ok = await confirmDialog({
+        title: c.title, icon: on ? "mdi:stop-circle-outline" : c.icon, color: on ? C.orange : C.blue,
+        primary: this._m?.name || "Vacuum", secondary: c.text, confirmLabel: c.label,
+      });
+      if (!ok) return;
+    }
+    return this._call("switch", on ? "turn_off" : "turn_on", { entity_id: id });
   }
 
   async _action(k) {

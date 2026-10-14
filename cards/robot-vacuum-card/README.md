@@ -51,8 +51,8 @@
   (or switch) is on; a tap turns it off or on, a hold opens its more-info.
 - **Dock jobs** (while the robot is on the dock): **Empty**, **Wash mop** and **Dry** chips
   for the dock's own switches – handy after stopping a clean early with Dock. Each glows
-  blue while it runs ("Drying · 2 h 10 min"). Empty and Wash mop ask first; Dry starts at
-  once, and a tap on a running job stops it at once.
+  blue while it runs ("Drying · 2 h 10 min"). Each asks before it starts, and a tap on a
+  running job asks before it stops it.
 
 ## Configuration
 
