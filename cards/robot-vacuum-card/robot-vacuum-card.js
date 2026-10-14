@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.3.0";
+const RVC_VERSION = "2.3.1";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -532,7 +532,8 @@ const CSS = `
   .txt { flex: 1; min-width: 0; cursor: pointer; }
   /* Text is never clipped: a line too long for its box wraps (between its parts) instead. */
   .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
-  .nm .st { font-weight: 400; color: var(--secondary-text-color); white-space: nowrap; }
+  .nm .st { font-weight: 400; color: var(--secondary-text-color); }
+  .nm .w { white-space: nowrap; }
   /* The line under the name may wrap, but only between its parts ("28 min" stays whole). */
   .sc { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .sc:empty { display: none; }
@@ -948,7 +949,8 @@ class RobotVacuumCard extends HTMLElement {
     const ic = shape.querySelector("ha-icon");
     if (ic.getAttribute("icon") !== m.state.icon) ic.setAttribute("icon", m.state.icon);
     ic.style.color = m.state.color;
-    set(".nm", `${esc(m.name)} <span class="st">· ${esc(m.state.word)}</span>`, true);
+    // Name · state; on a narrow card the state wraps whole, the dot staying with the name.
+    set(".nm", `${esc(m.name)}<span class="st">&nbsp;· <span class="w">${esc(m.state.word)}</span></span>`, true);
     // Each part stays whole ("28 min" never splits); the line breaks only between parts.
     set(".line", m.line.map((p) => `<span class="p"${p.e ? ` data-e="${esc(p.e)}"` : ""}>${esc(p.t)}</span>`).join("&nbsp;· "), true);
     const batt = root.querySelector(".batt");
