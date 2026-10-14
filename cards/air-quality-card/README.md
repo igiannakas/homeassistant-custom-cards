@@ -15,7 +15,8 @@
   shows the house's level in its colour.
 - **Room tile**: status in its colour (Excellent / Elevated / Poor / Ventilate),
   CO₂ (ppm) and VOC, and below them every particle size – PM1, PM2.5, PM4 and
-  PM10, each labelled (always µg/m³, so the values go without the unit). NOx
+  PM10, each labelled (always µg/m³, so the values go without the unit), four
+  across, 2×2 or one per line – whichever fits the tile. NOx
   appears only while it is the cause. Out-of-range readings take their level's
   colour.
 - The words differ by level, not just the colour: leaf green "Excellent", info
@@ -25,9 +26,8 @@
 - **Tap a room** (anywhere on its tile) for its own air quality dashboard
   (`navigation_path`), which has every detail; without one, its CO₂ sensor.
 - Two columns (`columns`), on a phone too. Nothing is cut off: a long room name
-  wraps, readings wrap between each other, never inside one. The particle sizes
-  sit 2×2, four across on a wide tile, one per line on a very narrow one. Tiles
-  all have the same height.
+  wraps, readings wrap between each other, never inside one. Tiles all have the
+  same height.
 
 ## Configuration
 

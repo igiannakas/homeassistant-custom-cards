@@ -4,7 +4,7 @@
  * air-quality-card, climate-modes-card, enclosure-filter-card, energy-summary-card, home-status-card, mmu-lanes-card, printer-status-card, printer-temps-card, robot-vacuum-card, room-lights-card, vacuum-maintenance-card, weather-presence-card
  */
 
-/* ===== air-quality-card 1.3.0 ===== */
+/* ===== air-quality-card 1.3.1 ===== */
 (() => {
 /*
  * Air quality card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -18,7 +18,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.3.0";
+const AQC_VERSION = "1.3.1";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -131,12 +131,10 @@ const CSS = `
   .m { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   /* Status, CO₂ and VOC: wrap between readings, never inside one. */
   .row { display: flex; flex-wrap: wrap; column-gap: 7px; }
-  /* Particle sizes as a tidy 2×2 (PM1 PM2.5 / PM4 PM10); four across when the tile is wide, one
-     per line when it's very narrow. PM is always µg/m³, so the values go without the unit. */
-  .row.pm { display: grid; grid-template-columns: repeat(2, max-content); justify-items: start; column-gap: 10px; }
-  @container (min-width: 300px) { .row.pm { grid-template-columns: repeat(4, max-content); } }
-  @container (max-width: 175px) { .row, .row.pm { column-gap: 6px; } }
-  @container (max-width: 152px) { .row.pm { grid-template-columns: max-content; } }
+  /* Particle sizes as a tidy grid: four across when they fit, else 2×2 (PM1 PM2.5 / PM4 PM10),
+     else one per line – chosen from the measured readings (_fitPm), so nothing ever runs past the
+     tile. PM is always µg/m³, so the values go without the unit. */
+  .row.pm { display: grid; grid-template-columns: max-content; justify-items: start; column-gap: 10px; }
   /* Particle size class as a small label in front of each PM value. */
   /* Labels and units are the same size as the values, only lighter. Every reading keeps its unit. */
   .k { margin-right: 3px; color: color-mix(in srgb, var(--secondary-text-color) 70%, transparent); }
@@ -338,11 +336,44 @@ class AirQualityCard extends HTMLElement {
       }),
     );
     this._built = true;
+    if (typeof ResizeObserver !== "undefined") {
+      this._ro = new ResizeObserver(() => this._fitPm());
+      this._ro.observe(root.querySelector(".rooms"));
+    }
+    this.ownerDocument.fonts?.ready?.then(() => this._fitPm());
+  }
+
+  /* The particle grid per tile: 4 across, else 2×2 (never 3 + 1), else one per line – from the
+     readings' natural widths against the space the tile has. Without a layout nothing changes. */
+  _fitPm() {
+    for (const pm of this.shadowRoot?.querySelectorAll(".row.pm") || []) {
+      const avail = pm.parentElement?.clientWidth;
+      if (!avail) continue;
+      const ws = [...pm.children].map((c) => c.getBoundingClientRect().width);
+      const gap = parseFloat(getComputedStyle(pm).columnGap) || 0;
+      const across = (k) => (k - 1) * gap + Array.from({ length: k }, (_, j) => Math.max(0, ...ws.filter((_, i) => i % k === j))).reduce((a, b) => a + b, 0);
+      const tries = ws.length === 4 ? [4, 2] : Array.from({ length: Math.max(0, ws.length - 1) }, (_, i) => ws.length - i);
+      const k = tries.find((x) => across(x) <= avail + 0.5) || 1;
+      const v = k > 1 ? `repeat(${k}, max-content)` : "";
+      if (pm.style.gridTemplateColumns !== v) pm.style.gridTemplateColumns = v;
+    }
+  }
+
+  connectedCallback() {
+    if (this._ro) this._ro.observe(this.shadowRoot.querySelector(".rooms"));
+  }
+
+  disconnectedCallback() {
+    this._ro?.disconnect();
   }
 
   _render() {
-    // Ink-align the tiles and the label row.
-    inkSchedule(this, ".txt, .lt");
+    // Ink-align the tiles and the label row; re-fit the particle grids when a reading changed.
+    inkSchedule(this, ".txt, .lt", () => {
+      if (!this._pmDirty) return;
+      this._pmDirty = false;
+      this._fitPm();
+    });
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const root = this.shadowRoot;
@@ -376,6 +407,7 @@ class AirQualityCard extends HTMLElement {
       if (mEl.dataset.h !== html) {
         mEl.innerHTML = html;
         mEl.dataset.h = html;
+        this._pmDirty = true;
       }
     });
 

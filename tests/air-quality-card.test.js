@@ -172,7 +172,17 @@ const cfg = {
   assert(/@container rooms \(max-width: 400px\) \{ \.room \{ padding: 11px 8px; \} \}/.test(css), "narrow tiles keep the 10px gap");
   assert(/\.room:active \{ filter: brightness\(\.92\); \}/.test(css));
   assert(/\.rooms \{ display: grid; grid-template-columns: repeat\(var\(--cols, 2\), minmax\(0, 1fr\)\)/.test(css), "columns even, two by default");
-  assert(/@container \(min-width: 300px\) \{ \.row\.pm \{ grid-template-columns: repeat\(4, max-content\); \} \}/.test(css), "PM four across on wide tiles");
+  // The particle grid is fitted to the readings (stubbed widths: jsdom has no layout).
+  const pm0 = tiles()[0].querySelector(".row.pm");
+  const sizes = (avail) => {
+    Object.defineProperty(pm0.parentElement, "clientWidth", { configurable: true, value: avail });
+    [...pm0.children].forEach((c, i) => (c.getBoundingClientRect = () => ({ width: [44, 58, 44, 58][i] })));
+    card._fitPm();
+    return pm0.style.gridTemplateColumns;
+  };
+  eq(sizes(240), "repeat(4, max-content)", "four across when they fit (44+58+44+58+30 = 234)");
+  eq(sizes(120), "repeat(2, max-content)", "2×2 (44+10+58 = 112)");
+  eq(sizes(100), "", "one per line");
   assert(/\.s \.p \{ white-space: nowrap; \}/.test(css));
   assert(!/18px icon/.test(src), "comment fixed");
 
