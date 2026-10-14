@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.2.4";
+const RVC_VERSION = "2.3.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -584,8 +584,24 @@ const CSS = `
      (the others share the rest), and only if a row can't hold them all does one wrap. */
   .acts { display: flex; flex-wrap: wrap; gap: 8px; }
   .acts .pill { flex: 1 1 0; min-width: max-content; padding: 0 10px; }
-  /* On a 320px phone the dock's three jobs tighten to stay on one row. */
-  @container (width < 300px) { .acts.jobs .pill { padding: 0 8px; gap: 4px; font-size: 12px; } }
+  /* The dock's jobs: one tile of icon-over-label buttons, split by short dividers (like the
+     maintenance numbers) – a different shape from the action pills, so they read as the dock's
+     own controls, not more robot actions. The one that runs is tinted blue. */
+  .jobs { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 10px;
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); }
+  .jobs:empty { display: none; }
+  .jobs button { all: unset; box-sizing: border-box; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; min-width: 0; min-height: 50px; padding: 6px 4px; border-radius: 8px; cursor: pointer; text-align: center; overflow-wrap: break-word;
+    font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .2px; color: var(--primary-text-color); -webkit-tap-highlight-color: transparent; }
+  .jobs button + button::before { content: ""; position: absolute; left: -2.5px; top: 12px; bottom: 12px; width: 1px;
+    background: var(--divider-color, rgba(0,0,0,.12)); }
+  .jobs ha-icon { --mdc-icon-size: 20px; color: ${C.grey}; }
+  .jobs button.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
+  .jobs button.run ha-icon { color: ${C.blue}; }
+  .jobs button.run::before, .jobs button.run + button::before { display: none; }
+  .jobs button[disabled] { opacity: .45; cursor: default; }
+  .jobs button:active { filter: brightness(.92); }
+  .jobs button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .acts:empty { display: none; }
   .pill.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
   .pill.run ha-icon { color: ${C.blue}; }
@@ -820,7 +836,7 @@ class RobotVacuumCard extends HTMLElement {
       <button class="modetile" hidden aria-haspopup="dialog"><div class="shape"><ha-icon icon="mdi:tune-variant"></ha-icon></div>
         <div class="txt"><div class="nm">Cleaning mode</div><div class="sc mode-line"></div></div><ha-icon class="chev" icon="mdi:chevron-right"></ha-icon></button>
       <div class="acts"></div>
-      <div class="acts jobs"></div></div></ha-card>`;
+      <div class="jobs"></div></div></ha-card>`;
     const card = root.querySelector("ha-card");
     card.addEventListener("click", (e) => this._click(e));
     card.addEventListener("keydown", (e) => {
@@ -1047,7 +1063,7 @@ class RobotVacuumCard extends HTMLElement {
     }
     if (this._config.auto_clean) acts.push(["auto", this._config.auto_clean_name || "Auto clean", "mdi:account-arrow-right", null]);
     const ak = acts.map((a) => a[0]).join();
-    const box = root.querySelector(".acts:not(.jobs)");
+    const box = root.querySelector(".acts");
     if (ak !== this._keys.acts) {
       box.style.setProperty("--n", String(acts.length));
       box.innerHTML = acts
@@ -1076,7 +1092,7 @@ class RobotVacuumCard extends HTMLElement {
     const jk = jobs.map((j) => j[0]).join();
     if (jk !== this._keys.jobs) {
       jobsBox.style.setProperty("--n", String(jobs.length || 1));
-      jobsBox.innerHTML = jobs.map(([k, icon]) => `<button class="pill" data-job="${k}"><ha-icon icon="${icon}"></ha-icon><span></span></button>`).join("");
+      jobsBox.innerHTML = jobs.map(([k, icon]) => `<button data-job="${k}"><ha-icon icon="${icon}"></ha-icon><span></span></button>`).join("");
       this._keys.jobs = jk;
     }
     for (const [k, , idle, running] of jobs) {

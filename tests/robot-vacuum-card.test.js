@@ -132,7 +132,7 @@ const cfg = {
   const r = card.shadowRoot;
   const q = (s) => r.querySelector(s);
   const all = (s) => [...r.querySelectorAll(s)];
-  const acts = () => all(".acts:not(.jobs) .pill").map((b) => b.textContent.trim());
+  const acts = () => all(".acts .pill").map((b) => b.textContent.trim());
   const text = (s) => q(s).textContent.replace(/\s+/g, " ").trim();
   const dlg = () => document.querySelector("rvc-confirm-dialog");
   const yes = async (title) => {
@@ -180,25 +180,26 @@ const cfg = {
   assert.strictEqual(q(".acts").style.getPropertyValue("--n"), "2");
   assert(!q(".sets"), "no settings rows on the card itself");
   // The dock's jobs, under the buttons, while docked: each asks before it starts and stops.
-  const jobs = () => all(".jobs .pill").map((b) => b.textContent.trim() + (b.classList.contains("run") ? "*" : ""));
+  const jobs = () => all(".jobs button").map((b) => b.textContent.trim() + (b.classList.contains("run") ? "*" : ""));
   eq(jobs(), ["Empty", "Wash mop", "Dry mop"]);
   assert.strictEqual(q(".jobs").style.getPropertyValue("--n"), "3");
+  assert(all(".jobs button").every((b) => !b.classList.contains("pill")) && !q(".jobs").classList.contains("acts"), "dock jobs are a tile of their own, not more action pills");
   {
     const n1 = calls.length;
-    all(".jobs .pill")[1].click();
+    all(".jobs button")[1].click();
     await tick();
     assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, "Wash the mop");
     dlg().shadowRoot.querySelector(".cancel").click();
     await tick();
     assert(!dlg() && calls.length === n1, "Cancel: nothing happens");
     for (const [i, title, id] of [[0, "Empty the bin", "dust_emptying"], [1, "Wash the mop", "mop_washing"], [2, "Dry the mop", "mop_drying"]]) {
-      all(".jobs .pill")[i].click();
+      all(".jobs button")[i].click();
       await yes(title);
       eq(calls.pop(), ["switch", "turn_on", { entity_id: `switch.vacuum_cleaner_dock_${id}` }]);
     }
     card.hass = full(states({ "switch.vacuum_cleaner_dock_mop_drying": st("on") }));
     eq(jobs(), ["Empty", "Wash mop", "Drying*"]);
-    all(".jobs .pill")[2].click();
+    all(".jobs button")[2].click();
     await yes("Stop drying");
     eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.vacuum_cleaner_dock_mop_drying" }]);
     card.hass = full(states());
@@ -462,7 +463,7 @@ const cfg = {
   card.hass = full(states({ "vacuum.vacuum_cleaner": st("unavailable", { friendly_name: "Vacuum cleaner" }) }));
   assert.strictEqual(text(".nm"), "Vacuum cleaner · Offline");
   assert.strictEqual(text(".line"), "Can't reach the vacuum");
-  assert(all(".acts:not(.jobs) .pill").filter((b) => b.dataset.k !== "auto").every((b) => b.disabled));
+  assert(all(".acts .pill").filter((b) => b.dataset.k !== "auto").every((b) => b.disabled));
   eq(jobs(), [], "no dock jobs while offline");
   assert(q(".modetile").disabled, "the mode tile is greyed out too");
   const n0 = calls.length;
@@ -485,8 +486,8 @@ const cfg = {
   const r2 = card2.shadowRoot;
   assert(r2.querySelector(".map").hidden && r2.querySelector(".rooms").hidden && r2.querySelector(".modetile").hidden);
   assert(r2.querySelector(".batt").classList.contains("low"));
-  eq([...r2.querySelectorAll(".acts:not(.jobs) .pill")].map((b) => b.textContent.trim()), ["Clean entire floor", "Dock"]);
-  assert.strictEqual(r2.querySelectorAll(".jobs .pill").length, 0);
+  eq([...r2.querySelectorAll(".acts .pill")].map((b) => b.textContent.trim()), ["Clean entire floor", "Dock"]);
+  assert.strictEqual(r2.querySelectorAll(".jobs button").length, 0);
 
   // Without the entity registry (old frontend): found by object id.
   const card3 = document.createElement("robot-vacuum-card");
