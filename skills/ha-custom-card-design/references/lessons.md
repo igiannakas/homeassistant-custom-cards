@@ -1,7 +1,7 @@
 # Lessons – what the user said, and the rule it became
 
 This is a log from building the `homeassistant-custom-cards` set: home status, room
-lights, energy summary, weather & presence, climate modes, air quality, printer status,
+lights, energy summary, weather & presence, climate modes, air quality, printer status, robot vacuum,
 printer temperatures, MMU lanes and enclosure filter. Read it before proposing a design.
 Most of these generalise to any dashboard.
 
@@ -70,6 +70,20 @@ Most of these generalise to any dashboard.
 | "I am not sure about the climate placement. It will visually break up the design and flow" → "maybe the climate needs to be another pill" | Think about the scroll order (context → shortcuts → per-room controls → later sections). Link deeper dashboards from a pill rather than embedding them. |
 | "I would like summer mode as a toggle on the header of the heating tab" | Global switches go in the section header, not in the tile grid. |
 | "Don't include it yet but consider the flow" (cooling) | Design for what's coming next, but build only what was asked. |
+
+## Robot vacuum (Oct 2026)
+
+| Feedback | Rule |
+|---|---|
+| "Needs you doesn't stop us from cleaning? Only if the vacuum is offline?" | An attention state informs; it never disables an action. Only an unreachable device greys the controls out. If the machine refuses a job, its own error shows in the message row. |
+| "Auto clean should be a 'button pill' instead of an on/off button" | An automation's on/off on a control card is a primary pill among the actions that glows while on (like the chamber light), not a switch row or a card of its own. |
+| "Do not disturb remove it" | Leave out device settings the user doesn't change from the dashboard, even when the integration exposes them. |
+| "I need a selection for the cleaning modes" → "keep the settings sheet, it's good" | A handful of multi-option settings: chips that show the current values, opening a Bubble sheet of segmented selectors that apply at once. The card itself stays short. |
+| "Mop mode deep and deep plus applies only when mopping… Suction power applies only to vac + mop and vac" | Offer only what applies in the current mode: hide whole rows the device ignores and filter options within a row. The user knows the device's rules better than the entity's option list – ask. |
+| "Dock → does it also empty the vacuum and clean the mop?" → "yes, add Empty / Wash mop / Dry" | Answer from the device's history (what it actually did last time), not from assumptions; then offer the manual control. Benign machine jobs run at once and glow while they run. |
+| "The maintenance bit should be the one from option C" (a row of numbers, over tiles with bars) | Consumables read best as a compact row of numbers with "Next: … in 13 h"; details, history and Reset are one tap away. Reset is the one action that asks first. |
+| Status line rendered "… 22.6 m² · 28 / min" at 375px | Units stay with their numbers: each part of a status line is an unbreakable span and the line breaks only at the separators. |
+| Picked option B "but" with five changes | A pick with tweaks is a go: redraw the mock-up with the changes so they can redirect, and build in parallel instead of waiting for a second approval. |
 
 ## Process
 
