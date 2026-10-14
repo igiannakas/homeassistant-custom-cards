@@ -1131,7 +1131,7 @@ async function registerClimateModesCard() {
 registerClimateModesCard();
 })();
 
-/* ===== enclosure-filter-card 1.2.0 ===== */
+/* ===== enclosure-filter-card 1.2.1 ===== */
 (() => {
 /*
  * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1144,7 +1144,7 @@ registerClimateModesCard();
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.2.0";
+const EFC_VERSION = "1.2.1";
 const EFC_TAG = "enclosure-filter-card";
 const PENDING_MS = 45000; // how long a vent move shows before Home Assistant confirms it
 
@@ -1443,9 +1443,10 @@ class EnclosureFilterCard extends HTMLElement {
       `<button class="v" data-e="${esc(id)}"${style ? ` style="${style}"` : ""}><ha-icon icon="${icon}"${iconStyle ? ` style="${iconStyle}"` : ""}></ha-icon>${text}</button>`;
     if (t !== undefined) parts.push(btn(cfg.temperature, "", "mdi:thermometer", "", t === null ? "–" : `${t.toFixed(1)}°`));
     if (h !== undefined) parts.push(btn(cfg.humidity, "", "mdi:water-percent", "", h === null ? "–" : `${Math.round(h)}%`));
+    // A VOC tier colours a known reading only; an unknown one stays the quiet reading grey.
     const voc = (id, val, label) => {
-      const [c, tc] = VOC[vocLevel(val)];
-      parts.push(btn(id, `color:${tc}`, "mdi:spray", `color:${c}`, `${label} ${fmt(val)}`));
+      const [c, tc] = val === null ? ["", ""] : VOC[vocLevel(val)];
+      parts.push(btn(id, tc ? `color:${tc}` : "", "mdi:spray", c ? `color:${c}` : "", `${label} ${fmt(val)}`));
     };
     if (v !== undefined) voc(cfg.voc, v, "VOC");
     if (vm !== undefined) voc(cfg.voc_manual, vm, "VOC (manual)");
