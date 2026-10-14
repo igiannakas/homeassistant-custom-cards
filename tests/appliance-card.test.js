@@ -27,7 +27,7 @@ function states(over = {}) {
     "sensor.dehumidifier_power": st("0", { unit_of_measurement: "W", device_class: "power" }),
     "sensor.dehumidifier_energy_today": st("0.126", { unit_of_measurement: "kWh", device_class: "energy" }),
     "sensor.bedroom_air_quality_humidity": st("52.3699989318848", { unit_of_measurement: "%", device_class: "humidity" }),
-    "sensor.bedroom_air_quality_pm2_5": st("3.40000009536743", { unit_of_measurement: "µg/m³", device_class: "pm25" }),
+    "sensor.bedroom_air_quality_pm2_5": st("3.40000009536743", { unit_of_measurement: "\u03bcg/m³", device_class: "pm25" }),
     "input_number.dehumidifier_on_above": st("62.0", { unit_of_measurement: "%" }),
     "input_datetime.dehumidifier_on_from": st("21:15:00"),
     "input_datetime.dehumidifier_on_until": st("06:50:00"),
@@ -47,6 +47,7 @@ function states(over = {}) {
 function hass(over = {}, extra = {}) {
   return {
     config: { currency: "GBP", time_zone: "Europe/London" },
+    entities: { "sensor.bedroom_air_quality_humidity": { display_precision: 2 }, "sensor.bedroom_air_quality_pm2_5": { display_precision: 2 } },
     locale: { language: "en-GB", time_zone: "server" },
     states: states(over),
     callService: async (d, s, data) => {
@@ -134,9 +135,17 @@ const view = (card) => {
 
   // 1. Dehumidifier off at 17:20 (BST): off since 07:00 – a restart at 17:13 made it unavailable
   //    for a moment, which doesn't count as switching.
+  //    Flicks – on and straight off again within seconds, as the live history has – don't count.
   history["switch.dehumidifier"] = [
     { s: "on", lu: sec("2026-10-04T16:20:00Z") },
     { s: "off", lu: sec("2026-10-14T06:00:00Z") },
+    { s: "on", lu: 1791984294.179657 }, // 14:24:54 for half a second
+    { s: "off", lu: 1791984294.7208154 },
+    { s: "unavailable", lu: 1791991801.670473 },
+    { s: "unknown", lu: 1791991803.0052853 },
+    { s: "off", lu: 1791991803.8562815 },
+    { s: "on", lu: 1791993877.1689448 }, // 17:04:37 for 3 seconds
+    { s: "off", lu: 1791993880.1126177 },
     { s: "unavailable", lu: sec("2026-10-14T16:13:39Z") },
     { s: "off", lu: sec("2026-10-14T16:13:41Z") },
   ];
@@ -291,6 +300,9 @@ const view = (card) => {
   assert.strictEqual(cd.shadowRoot.querySelector(".shape ha-icon").getAttribute("icon"), "mdi:tumble-dryer");
   assert.strictEqual(v.sc, "", "no schedule, no line");
   assert.deepStrictEqual(v.stats, ["10 d+/Off for", "1.20 kWh/Today", "£0.36/Today's cost"]);
+  cd.hass = hass({ "switch.clothes_dryer": st("off", { friendly_name: "Clothes Dryer" }), "sensor.cd_today": st("0", { unit_of_measurement: "kWh" }) });
+  await tick(10);
+  assert.deepStrictEqual(view(cd).stats.slice(1), ["0 kWh/Today", "£0.00/Today's cost"], "nothing today: 0 kWh, not 0.00");
   // No navigation_path: the card opens the plug.
   cd.shadowRoot.querySelector(".open").click();
   eq(cd.ev, [["more-info", "switch.clothes_dryer"]]);

@@ -24,7 +24,7 @@
  * split by straight dividers. Anywhere but the pill opens the appliance's own dashboard.
  */
 
-const AC_VERSION = "1.0.0";
+const AC_VERSION = "1.0.1";
 const AC_TAG = "appliance-card";
 
 const C = {
@@ -76,18 +76,21 @@ function timeOf(hass, v) {
   return { min: Number(m[1]) * 60 + Number(m[2]), hm: `${m[1].padStart(2, "0")}:${m[2]}` };
 }
 
-/* A value with its unit: "62%", "21.4°", "612 ppm"; µg/m³ is left out (the label says PM2.5). */
+/* A value with its unit: "62%", "21.4°", "612 ppm"; µg/m³ is left out (the label says PM2.5).
+   Home Assistant spells it with a Greek mu (μg/m³); some integrations use the micro sign. */
+const PER_M3 = (unit) => unit === "μg/m³" || unit === "µg/m³";
 function withUnit(v, unit) {
-  if (!unit || unit === "µg/m³") return v;
+  if (!unit || PER_M3(unit)) return v;
   return unit === "%" || unit.startsWith("°") ? `${v}${unit}` : `${v} ${unit}`;
 }
 
-/* Decimals for a reading: the entity's display precision when set, else whole numbers for
-   %, ppm, µg/m³ and W, one decimal for anything else. */
+/* Decimals for a reading, by the house formats first – whole numbers for %, ppm, µg/m³ and W
+   ("52%", not the sensor's 52.43), one for degrees – else the entity's display precision, else 1. */
 function decimals(hass, id, unit) {
+  if (unit === "%" || unit === "ppm" || unit === "W" || PER_M3(unit)) return 0;
+  if (unit && unit.startsWith("°")) return 1;
   const p = hass.entities?.[id]?.display_precision;
-  if (typeof p === "number") return p;
-  return ["%", "ppm", "µg/m³", "W"].includes(unit) || !unit ? 0 : 1;
+  return typeof p === "number" ? p : unit ? 1 : 0;
 }
 
 /* A threshold: an input_number / number / sensor entity, or a plain number; unit from the entity,
@@ -146,26 +149,33 @@ async function findPrice(hass, cfg) {
 }
 
 /*
- * When the current on (or off) run began, from the history: unavailable and unknown don't break a
+ * When the current on (or off) run began, from the history. Unavailable and unknown don't break a
  * run (a restart makes the plug unavailable for a moment, and its last_changed would claim it has
- * only just switched). The first row is the oldest we have – the state at the window's start, or
- * the oldest the recorder kept – so a run that begins there started at least that long ago (`open`).
+ * only just switched), and neither does a flick shorter than a minute (on and straight off again):
+ * "Off since 07:00", not "since the 3 seconds at 17:04". The first row is the oldest we have – the
+ * state at the window's start, or the oldest the recorder kept – so a run that begins there
+ * started at least that long ago (`open`).
  */
+const FLICK_MS = 60000;
 function runStart(rows, current) {
-  let start = null;
-  let prev = null;
-  let open = false;
-  let first = true;
+  // On/off segments, oldest first, with neighbours of the same state merged.
+  const seg = [];
   for (const r of rows || []) {
     if (r.s !== "on" && r.s !== "off") continue;
-    if (r.s !== prev) {
-      start = (r.lc ?? r.lu) * 1000;
-      open = first;
-      prev = r.s;
-    }
-    first = false;
+    const t = (r.lc ?? r.lu) * 1000;
+    if (!seg.length || seg[seg.length - 1].s !== r.s) seg.push({ s: r.s, t });
   }
-  return prev === current && start !== null ? { t: start, open } : null;
+  // Drop flicks (any but the current run), then merge again.
+  const kept = [];
+  seg.forEach((g, i) => {
+    const next = seg[i + 1];
+    if (next && next.t - g.t < FLICK_MS && i > 0) return;
+    if (kept.length && kept[kept.length - 1].s === g.s) return;
+    kept.push(g);
+  });
+  const last = kept[kept.length - 1];
+  if (!last || last.s !== current) return null;
+  return { t: last.t, open: kept.length === 1 && last === seg[0] };
 }
 
 /*
@@ -235,7 +245,7 @@ function model(hass, cfg, now, run, price) {
   }
   if (cfg.energy) {
     const k = kwh(S[cfg.energy]);
-    stats.push({ v: k === null ? "–" : `${fmt(k, k < 10 ? 2 : k < 100 ? 1 : 0)} kWh`, l: "Today" });
+    stats.push({ v: k === null ? "–" : `${k === 0 ? "0" : fmt(k, k < 10 ? 2 : k < 100 ? 1 : 0)} kWh`, l: "Today" });
     const p = price ? (price.entity ? num(S[price.entity]?.state) : price.value) : null;
     const cost = k !== null && p !== null && p !== undefined ? money(k * p, hass.config?.currency) : null;
     if (cost) stats.push({ v: cost, l: "Today's cost" });
