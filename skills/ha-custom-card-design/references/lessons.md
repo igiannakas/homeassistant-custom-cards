@@ -63,6 +63,7 @@ Most of them generalise to any dashboard.
 - Think about the scroll order (context → shortcuts → per-room controls → later sections). Link deeper dashboards from a pill rather than embedding them.
 - Global switches go in the section header, not in the tile grid.
 - Design for what's coming next, but build only what was asked.
+- A wrapped name makes every tile taller (equal rows). Before wrapping, win the space back: tighten the tile spacing (to the phone 6px) when that keeps every name on one line. Never shrink the font, never cut the name.
 
 ## Robot vacuum (Oct 2026)
 

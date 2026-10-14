@@ -18,9 +18,11 @@
   (with `navigation_path`, the icon is its own button) opens the room.
 - Icon orange when the room's lights are on, grey when off. A red badge shows
   an open window.
-- **Room names are never cut off.** A name too long for its tile wraps onto a
-  second line; the presence stays beside its first line. `columns` even columns
-  (two by default).
+- **Room names stay on one line, never cut off or shrunk.** When a name and its
+  presence don't fit, every tile takes a little less side padding (6px) so they
+  do – "Second Bedroom · 18m" on a 440px phone – and the tiles keep their height.
+  Only a name too long even then wraps onto a second line, the presence beside
+  its first line. `columns` even columns (two by default).
 - **Presence** (with `occupancy`), on the same line as the room name: a green
   motion-sensor icon while someone is there (green means someone home, as in
   Home Assistant), otherwise how long since someone was (`12m`, `6h`,

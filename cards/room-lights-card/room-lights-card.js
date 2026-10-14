@@ -10,7 +10,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.5.0";
+const RLC_VERSION = "1.5.1";
 const RLC_TAG = "room-lights-card";
 
 // One meaning per colour (design tokens → Colours): orange = lights, green = someone here,
@@ -398,15 +398,20 @@ const CSS = `
   /* While the card measures (one frame, never painted): names, presence and readings on one line
      at their natural width. */
   .measure .m, .measure .g { flex-wrap: nowrap; }
+  .measure .room .nm { white-space: nowrap; }
   /* When any room's readings do not fit on one line (the card measures this), every tile
      switches together: temperature on one line, humidity + light level on the next. All tiles
      keep the same height (grid-auto-rows: 1fr) even if one room has more sensors. */
   .stack .m { flex-direction: column; }
   .stack .g { column-gap: 7px; }
   .stack .tile { padding: 11px 8px; gap: 8px; }
+  /* When a room's name and its presence don't fit on one line (measured), every tile takes the
+     phone spacing – 6px sides and a 6px gap – so the name stays on one line and the tiles keep
+     their height ("Second Bedroom · 18m" on a 440px phone). Text sizes never change. */
+  .tight .tile { padding: 11px 6px; gap: 6px; }
   /* A phone-width tile (~170px) keeps more room for the name and its presence: 6px sides and a
-     6px gap, as before. Text sizes don't change. */
-  @container (max-width: 175px) { .tile { padding: 11px 6px; gap: 6px; } }
+     6px gap, as before, two-line readings or not. Text sizes don't change. */
+  @container (max-width: 175px) { .tile, .stack .tile { padding: 11px 6px; gap: 6px; } }
 `;
 
 class RoomLightsCard extends HTMLElement {
@@ -605,9 +610,11 @@ class RoomLightsCard extends HTMLElement {
   }
 
   /* Once per frame after a change: one line of readings per tile if every room's fit, otherwise
-     two lines for all of them. Measured in one
-     go (never painted in between). Without layout (tests) nothing is measured and the CSS
-     default stays: \`columns\` even columns, readings wrapping between their parts. */
+     two lines for all of them; then, if a room's name and presence still don't fit on one line,
+     the tighter phone spacing for every tile, so the name stays on one line. Measured in one go
+     (never painted in between). Without layout (tests) nothing is measured and the CSS default
+     stays: \`columns\` even columns, readings wrapping between their parts. A name that doesn't fit
+     even then wraps – it is never cut and never shrunk. */
   _fit() {
     if (this._fitQueued) return;
     this._fitQueued = true;
@@ -615,11 +622,14 @@ class RoomLightsCard extends HTMLElement {
       this._fitQueued = false;
       const card = this.shadowRoot?.querySelector("ha-card");
       if (!card || !card.isConnected) return;
-      card.classList.remove("stack");
+      const over = (el) => el.scrollWidth > el.clientWidth + 1;
+      card.classList.remove("stack", "tight");
       card.classList.add("measure");
-      const overflow = [...card.querySelectorAll(".m, .g")].some((m) => m.scrollWidth > m.clientWidth + 1);
+      const stack = [...card.querySelectorAll(".m, .g")].some(over);
+      card.classList.toggle("stack", stack);
+      const tight = [...card.querySelectorAll(".room .nm")].some(over);
       card.classList.remove("measure");
-      card.classList.toggle("stack", overflow);
+      card.classList.toggle("tight", tight);
     });
   }
 
