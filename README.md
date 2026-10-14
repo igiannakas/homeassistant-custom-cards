@@ -20,8 +20,8 @@ first in a confirmation dialog.
 | [Printer temperatures](cards/printer-temps-card/README.md) | Heaters with target and power (glowing while heating), other temperatures and fans. |
 | [MMU lanes](cards/mmu-lanes-card/README.md) | Happy Hare MMU lanes: loaded or empty, humidity and temperature per lane, drying fans, buffer state. |
 | [Enclosure filter](cards/enclosure-filter-card/README.md) | Enclosure filter / vent: vent position selector, intake vs exhaust temperature, humidity and VOC. |
-| [Robot vacuum](cards/robot-vacuum-card/README.md) | A robot vacuum (Roborock): state, battery, what needs you, the floor map with an instant floor switch, rooms for a room clean, a Cleaning mode tile that opens the mode laid out like the Roborock app, Clean / Auto clean. |
-| [Vacuum maintenance](cards/vacuum-maintenance-card/README.md) | Consumables as % of life left (or hours), what's due next, the dock's tanks and its Empty / Wash mop / Dry; Reset after replacing asks first. |
+| [Robot vacuum](cards/robot-vacuum-card/README.md) | A robot vacuum (Roborock): state, battery, what needs you, the floor map with an instant floor switch, rooms for a room clean, a Cleaning mode tile that opens the mode laid out like the Roborock app, Clean / Auto clean, and the dock's Empty / Wash mop / Dry while docked. |
+| [Vacuum maintenance](cards/vacuum-maintenance-card/README.md) | The dock's clean and dirty water tanks up front (red when one needs you), then consumables as % of life left (or hours) and what's due next; Reset after replacing asks first. |
 
 Related: the Tado X room card (`custom:tadox-room-card`) ships with the
 [Tado X Proxy integration](https://github.com/igiannakas/ha-tadox-proxy), because it reads

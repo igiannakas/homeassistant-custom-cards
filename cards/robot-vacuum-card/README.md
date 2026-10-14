@@ -19,6 +19,7 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 │ │        Vac & mop · Turbo · Intense mop            │ │
 │ └──────────────────────────────────────────────────┘ │
 │ (    ▶ Clean all     ) (     Auto clean     )         │
+│ (   Empty   ) (  Wash mop  ) (    Dry    )   docked   │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -60,6 +61,10 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
   ends a clean.
 - **Auto clean** (optional, `auto_clean`): a pill that glows teal while your automation
   (or switch) is on; a tap asks, then turns it off or on; a hold opens its more-info.
+- **Dock jobs** (only while the robot is docked): **Empty**, **Wash mop** and **Dry**, a row
+  of three under the buttons, for the dock's own switches – handy after stopping a clean
+  early with Dock. Each glows blue while it runs ("Drying") and asks before it starts, and
+  before it stops.
 
 ## Cleaning mode (the sheet, or `layout: mode`)
 
@@ -99,11 +104,11 @@ rooms:
 | `auto_clean` | – | An automation, `input_boolean` or switch for the Auto clean pill. |
 | `auto_clean_name` | Auto clean | The pill's label. |
 | `rooms` | – | Per room (by the robot's room name): `icon`, `name`, `hide: true`. |
-| `hide_map`, `hide_rooms`, `hide_mode` | false | Leave a part out (`hide_mode`: the Cleaning mode tile). |
+| `hide_map`, `hide_rooms`, `hide_mode`, `hide_dock_actions` | false | Leave a part out (`hide_mode`: the Cleaning mode tile; `hide_dock_actions`: Empty / Wash mop / Dry). |
 | `maps` | from `roborock.get_maps` | Your own rooms per map: `- name: First floor`, `rooms: {16: Bedroom, 17: Study}`. |
-| `entities` | found | Override any entity the card finds: `battery`, `charging`, `status`, `error`, `dock_error`, `dirty_box`, `clean_box`, `water_shortage`, `mop_attached`, `area`, `time`, `progress`, `room`, `last_start`, `map_select`, `mode`, `mop_water`, `mop_route`, `drying`. |
+| `entities` | found | Override any entity the card finds: `battery`, `charging`, `status`, `error`, `dock_error`, `dirty_box`, `clean_box`, `water_shortage`, `mop_attached`, `area`, `time`, `progress`, `room`, `last_start`, `map_select`, `mode`, `mop_water`, `mop_route`, `drying`, `empty_sw`, `wash_sw`, `dry_sw`. |
 
 Rooms need `roborock.get_maps` to answer over the websocket (it does for any user). A room
 clean runs on the map loaded on the robot, which is why the floor switch is the robot's
-selected map rather than a view filter. The dock's own jobs (Empty, Wash mop, Dry) are on
-the [Vacuum maintenance](../vacuum-maintenance-card/README.md) card, next to its tanks.
+selected map rather than a view filter. The dock's water tanks are on the
+[Vacuum maintenance](../vacuum-maintenance-card/README.md) card.

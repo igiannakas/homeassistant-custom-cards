@@ -68,7 +68,7 @@ const devices = {
   const full = (x) => ({ states: x, entities, devices, callService: async (d, sv, data) => calls.push([d, sv, data]) });
   assert.throws(() => new Card().setConfig({}));
   const names = JSON.stringify(Card.getConfigForm().schema);
-  for (const k of ["entity", "title", "due_soon", "hide_dock", "hide_dock_actions", "lives"]) assert(names.includes(`"${k}"`), k);
+  for (const k of ["entity", "title", "due_soon", "hide_dock", "lives"]) assert(names.includes(`"${k}"`), k);
 
   const card = document.createElement("vacuum-maintenance-card");
   document.body.appendChild(card);
@@ -81,13 +81,22 @@ const devices = {
   const cells = () => all(".stats button").map((b) => `${b.querySelector("b").textContent} ${b.querySelector("span").textContent}`);
 
   // Live values: % of life where it's known, hours for the dock's parts; what's next.
-  assert.strictEqual(q(".t").textContent, "Maintenance");
+  assert.strictEqual(q(".t").textContent, "Dock & maintenance");
+  // The water tanks first: two tiles with a tank glyph, blue and brown while all is well.
+  const tanks = () => all(".tank").map((b) => [b.querySelector(".nm").textContent, b.querySelector(".st").textContent, b.classList.contains("bad")]);
+  eq(tanks(), [["Clean water", "OK", false], ["Dirty water", "OK", false]]);
+  assert(q(".tanks").compareDocumentPosition(q(".stats")) & 4, "tanks come before the numbers");
+  assert.strictEqual(all(".tank svg").length, 2);
+  assert(q('.tank[data-tank="clean"] .shape').style.color.includes("blue"));
+  assert(q('.tank[data-tank="dirty"] .shape').style.color.includes("brown"));
+  q('.tank[data-tank="dirty"]').click();
+  eq(events.pop(), ["more-info", "binary_sensor.vacuum_cleaner_dock_dirty_water_box"]);
   eq(cells(), ["97% Main brush", "96% Side brush", "94% Filter", "71% Sensors", "13 h Dock brush", "27 h Dock strainer"]);
   assert.strictEqual(q(".s").textContent, "Next: dock brush in 13 h");
   assert(!all(".stats b").some((b) => b.classList.contains("soon") || b.classList.contains("due")));
   // The dock: one quiet line, each part opens its entity.
-  assert.strictEqual(q(".dock").textContent, "Dock · Clean water OK · Dirty water OK · Auto-empty Max");
-  all(".dock [data-e]")[2].click();
+  assert.strictEqual(q(".dock").textContent, "Auto-empty Max");
+  q(".dock [data-e]").click();
   eq(events.pop(), ["more-info", "select.vacuum_cleaner_dock_empty_mode"]);
 
   // Details sheet: hours, cleans at your average, life; Reset asks first, then presses.
@@ -138,46 +147,12 @@ const devices = {
 
   // Dock tanks that need you glow red.
   card.hass = full(states({ "binary_sensor.vacuum_cleaner_dock_dirty_water_box": st("on"), "binary_sensor.vacuum_cleaner_dock_clean_water_box": st("on") }));
-  eq(all(".dock .p").map((c) => [c.textContent.trim(), c.classList.contains("bad")]), [["Clean water empty", true], ["Dirty water full", true], ["Auto-empty Max", false]]);
+  eq(tanks(), [["Clean water", "Empty – refill it", true], ["Dirty water", "Full – empty it", true]], "a tank that needs you glows red and says what to do");
+  assert(q('.tank[data-tank="dirty"] .shape').style.color.includes("red"));
   card.hass = full(states());
+  assert.strictEqual(all(".jobs, .pill").length, 0, "the dock's jobs live on the vacuum card");
 
-  // The dock's jobs while the robot is docked: Empty, Wash mop, Dry – each asks before it
-  // starts and before it stops.
-  const jobs = () => all(".jobs .pill").map((b) => b.textContent.trim() + (b.classList.contains("run") ? "*" : ""));
-  const dlg = () => document.querySelector("vmc-confirm-dialog");
-  eq(jobs(), ["Empty", "Wash mop", "Dry"]);
-  const n1 = calls.length;
-  all(".jobs .pill")[1].click();
-  await tick();
-  assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, "Wash the mop");
-  dlg().shadowRoot.querySelector(".cancel").click();
-  await tick();
-  assert(!dlg() && calls.length === n1, "Cancel: nothing happens");
-  for (const [i, title, id] of [[0, "Empty the bin", "dust_emptying"], [1, "Wash the mop", "mop_washing"], [2, "Dry the mop", "mop_drying"]]) {
-    all(".jobs .pill")[i].click();
-    await tick();
-    assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, title);
-    dlg().shadowRoot.querySelector(".confirm").click();
-    await tick();
-    eq(calls.pop(), ["switch", "turn_on", { entity_id: `switch.vacuum_cleaner_dock_${id}` }]);
-  }
-  document.dispatchEvent(new t.window.KeyboardEvent("keydown", { key: "Escape" }));
-  card.hass = full(states({ "switch.vacuum_cleaner_dock_mop_drying": st("on") }));
-  eq(jobs(), ["Empty", "Wash mop", "Drying*"]);
-  all(".jobs .pill")[2].click();
-  await tick();
-  assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, "Stop drying");
-  dlg().shadowRoot.querySelector(".confirm").click();
-  await tick();
-  eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.vacuum_cleaner_dock_mop_drying" }]);
-  // Only while the robot is on the dock.
-  card.hass = full(states({ "vacuum.vacuum_cleaner": st("cleaning", { friendly_name: "Vacuum cleaner" }) }));
-  eq(jobs(), []);
-  card.hass = full(states({ "vacuum.vacuum_cleaner": st("unavailable", { friendly_name: "Vacuum cleaner" }) }));
-  assert(all(".jobs .pill").every((b) => b.disabled), "greyed out while offline");
-  card.hass = full(states());
-
-  // Options: lives for the dock parts, a title, no dock line or jobs, a threshold.
+  // Options: lives for the dock parts, a title, no tanks or auto-empty line, a threshold.
   const card2 = document.createElement("vacuum-maintenance-card");
   document.body.appendChild(card2);
   card2.setConfig({ entity: "vacuum.vacuum_cleaner", title: "Care", hide_dock: true, due_soon: 30, lives: { dock_brush: 300 } });
@@ -185,13 +160,12 @@ const devices = {
   const r2 = card2.shadowRoot;
   assert.strictEqual(r2.querySelector(".t").textContent, "Care");
   assert.strictEqual(r2.querySelector(".dock").textContent, "");
-  assert.strictEqual(r2.querySelectorAll(".jobs .pill").length, 0);
+  assert.strictEqual(r2.querySelectorAll(".tank").length, 0);
   const card3 = document.createElement("vacuum-maintenance-card");
   document.body.appendChild(card3);
-  card3.setConfig({ entity: "vacuum.vacuum_cleaner", hide_dock_actions: true });
+  card3.setConfig({ entity: "vacuum.vacuum_cleaner", hide_dock: true });
   card3.hass = full(states());
-  assert(card3.shadowRoot.querySelector(".dock").textContent.startsWith("Dock ·"));
-  assert.strictEqual(card3.shadowRoot.querySelectorAll(".jobs .pill").length, 0);
+  assert.strictEqual(card3.shadowRoot.querySelector(".t").textContent, "Maintenance");
   eq([...r2.querySelectorAll(".stats b")].map((b) => b.textContent), ["97%", "96%", "94%", "71%", "4%", "27 h"]);
   eq([...r2.querySelectorAll(".stats b")].map((b) => b.classList.contains("soon")), [false, false, false, true, true, true]);
 
