@@ -94,6 +94,7 @@ its own with `layout: mode`:
 type: custom:robot-vacuum-card
 entity: vacuum.vacuum_cleaner
 auto_clean: automation.vacuum_when_everyone_has_left
+auto_clean_name: Auto clean when away
 rooms:
   En-suite Bathroom: { icon: mdi:shower }
   Downstairs Bathroom: { icon: mdi:toilet }
