@@ -3,13 +3,15 @@
  *
  * A robot vacuum's consumables in one row of numbers: main brush, side brush, filter and
  * sensors as the share of life left (hours when the life isn't known, e.g. the dock's brush
- * and strainer), what is due next, and the dock's water tanks and auto-empty mode as chips.
- * Tap a number for the details (hours left, about how many cleans that is at your average)
- * and Reset after replacing, which asks first. Entities are found from the vacuum's device
- * and its dock device. See cards/vacuum-maintenance-card/README.md for every option.
+ * and strainer), what is due next, a quiet line for the dock (water tanks, auto-empty mode)
+ * and – while the robot is on the dock – the dock's own jobs: Empty, Wash mop and Dry, each
+ * glowing while it runs and asking before it starts or stops. Tap a number for the details
+ * (hours left, about how many cleans that is at your average) and Reset after replacing,
+ * which asks first. Entities are found from the vacuum's device and its dock device.
+ * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "1.0.0";
+const VMC_VERSION = "2.0.0";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -17,6 +19,7 @@ const C = {
   amber: "var(--amber-color, #ffc107)",
   red: "var(--red-color, #f44336)",
   orange: "var(--orange-color, #ff9800)",
+  blue: "var(--blue-color, #2196f3)",
 };
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 const tx = (c, p = 70) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-color))`;
@@ -53,6 +56,30 @@ const OTHER = {
   clean_box: { domain: "binary_sensor", tk: ["clean_box_empty", "dock_clean_water_box"], sfx: ["_clean_water_box"] },
   dirty_box: { domain: "binary_sensor", tk: ["dirty_box_full", "dock_dirty_water_box"], sfx: ["_dirty_water_box"] },
   empty_mode: { domain: "select", tk: ["dust_collection_mode", "dock_empty_mode"], sfx: ["_empty_mode", "_dust_collection_mode"] },
+  // The dock's own jobs, as switches that are on while each runs.
+  empty_sw: { domain: "switch", tk: ["dust_emptying", "dock_dust_emptying"], sfx: ["_dust_emptying"] },
+  wash_sw: { domain: "switch", tk: ["mop_washing", "dock_mop_washing"], sfx: ["_mop_washing"] },
+  dry_sw: { domain: "switch", tk: ["mop_drying", "dock_mop_drying"], sfx: ["_mop_drying"] },
+};
+const JOBS = [
+  ["empty_sw", "mdi:delete-empty-outline", "Empty", "Emptying"],
+  ["wash_sw", "mdi:water-sync", "Wash mop", "Washing"],
+  ["dry_sw", "mdi:fan", "Dry", "Drying"],
+];
+/* The dock's jobs ask before they start and before they stop (the user's choice). */
+const DOCK_CONFIRM = {
+  empty_sw: {
+    start: { title: "Empty the bin", label: "Empty", text: "The dock empties the robot's dust bin into its bag now. It's loud for about half a minute." },
+    stop: { title: "Stop emptying", label: "Stop emptying", text: "The dock stops emptying the bin now." },
+  },
+  wash_sw: {
+    start: { title: "Wash the mop", label: "Wash mop", text: "The dock washes the mop now, with clean water from its tank. The dirty water goes to the dirty tank." },
+    stop: { title: "Stop washing", label: "Stop washing", text: "The dock stops washing the mop now." },
+  },
+  dry_sw: {
+    start: { title: "Dry the mop", label: "Dry", text: "The dock dries the mop now, for the drying time set in the Roborock app." },
+    stop: { title: "Stop drying", label: "Stop drying", text: "The dock stops drying the mop now, so it may stay damp." },
+  },
 };
 
 function deviceEntityIds(hass, vacuumId) {
@@ -115,6 +142,9 @@ function model(hass, cfg, found) {
     clean: found.clean_box ? { e: found.clean_box, bad: box(found.clean_box) === "on" } : null,
     dirty: found.dirty_box ? { e: found.dirty_box, bad: box(found.dirty_box) === "on" } : null,
     empty: found.empty_mode && !DEAD.includes(box(found.empty_mode)) ? { e: found.empty_mode, mode: box(found.empty_mode) } : null,
+    vacuum: hass.states[cfg.entity]?.state,
+    jobs: JOBS.filter(([k]) => found[k] && hass.states[found[k]]).map(([k, icon, idle, running]) => ({
+      k, icon, idle, running, e: found[k], on: box(found[k]) === "on", dead: DEAD.includes(box(found[k])) })),
   };
 }
 
@@ -153,6 +183,48 @@ const SHEET_CSS = `
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
 
+function confirmDialog({ title, icon, color, primary, secondary, confirmLabel }) {
+  return new Promise((resolve) => {
+    const host = document.createElement("vmc-confirm-dialog");
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>${SHEET_CSS}
+      .body { margin-top: 20px; }
+      .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
+      .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; color: var(--secondary-text-color); }
+      .buttons { margin-top: 20px; padding-top: 0; border-top: none; }
+      button.confirm { color: #fff; }
+      button.confirm .glyph { background: rgba(255,255,255,.2); }
+      button.confirm .glyph ha-icon { color: #fff; }</style>
+      <div class="backdrop"></div>
+      <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+        <div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(icon)}" style="color:${color}"></ha-icon></div>
+          <div class="title">${esc(title)}</div></div>
+        <div class="row body"><div class="glyph"><ha-icon icon="mdi:robot-vacuum" style="color:${color}"></ha-icon></div>
+          <div><div class="primary">${esc(primary)}</div><div class="secondary">${esc(secondary)}</div></div></div>
+        <div class="buttons">
+          <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
+          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+        </div></div>`;
+    const done = (ok) => {
+      document.removeEventListener("keydown", onKey, true);
+      host.remove();
+      resolve(ok);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        done(false);
+      }
+    };
+    root.querySelector(".backdrop").addEventListener("click", () => done(false));
+    root.querySelector(".cancel").addEventListener("click", () => done(false));
+    root.querySelector(".confirm").addEventListener("click", () => done(true));
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(host);
+    root.querySelector(".confirm").focus();
+  });
+}
+
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
@@ -176,16 +248,24 @@ const CSS = `
   .stats b.soon { color: ${tx(C.amber, 70)}; }
   .stats b.due { color: ${tx(C.red, 85)}; }
   .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  .chips:empty { display: none; }
-  .chip { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; height: 30px; border-radius: 15px; padding: 0 12px 0 8px;
-    font-size: 12px; font-weight: 500; letter-spacing: .2px; white-space: nowrap; cursor: pointer;
-    background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color); -webkit-tap-highlight-color: transparent; }
-  .chip ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; }
-  .chip.bad { background: ${tint(C.red, 18)}; color: ${tx(C.red, 85)}; }
-  .chip.bad ha-icon { color: ${C.red}; }
-  .stats > button:active, .chip:active { filter: brightness(.92); }
-  .stats > button:focus-visible, .chip:focus-visible, .s:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  /* The dock: one quiet line (a tank that needs you turns red), then its jobs as primary pills. */
+  .dock { margin-top: 10px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .dock:empty { display: none; }
+  .dock .p { white-space: nowrap; }
+  .dock [data-e] { cursor: pointer; border-radius: 4px; }
+  .dock .bad { color: ${tx(C.red, 85)}; }
+  .jobs { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+  .jobs:empty { display: none; }
+  .pill { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; border-radius: 18px;
+    padding: 0 10px; min-width: 0; font-size: 13px; font-weight: 600; letter-spacing: .2px; white-space: nowrap; cursor: pointer;
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color); -webkit-tap-highlight-color: transparent; }
+  .pill span { overflow: hidden; text-overflow: ellipsis; }
+  .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; flex: none; }
+  .pill.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
+  .pill.run ha-icon { color: ${C.blue}; }
+  .pill[disabled] { opacity: .45; cursor: default; }
+  .stats > button:active, .pill:active { filter: brightness(.92); }
+  .stats > button:focus-visible, .pill:focus-visible, .s:focus-visible, .dock [data-e]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
 class VacuumMaintenanceCard extends HTMLElement {
@@ -202,11 +282,14 @@ class VacuumMaintenanceCard extends HTMLElement {
           { name: "title", selector: { text: {} } },
           { name: "due_soon", selector: { number: { min: 0, max: 100, mode: "box", unit_of_measurement: "h" } } },
         ] },
-        { name: "hide_dock", selector: { boolean: {} } },
+        { type: "grid", name: "", schema: [
+          { name: "hide_dock", selector: { boolean: {} } },
+          { name: "hide_dock_actions", selector: { boolean: {} } },
+        ] },
         { name: "lives", selector: { object: {} } },
       ],
       computeLabel: (s) =>
-        ({ entity: "Vacuum", title: "Title", due_soon: "Due soon below", hide_dock: "Hide the dock chips", lives: "Lives in hours (YAML)" })[s.name] ?? s.name,
+        ({ entity: "Vacuum", title: "Title", due_soon: "Due soon below", hide_dock: "Hide the dock line and jobs", hide_dock_actions: "Hide Empty / Wash mop / Dry", lives: "Lives in hours (YAML)" })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
           due_soon: "A part with fewer hours left than this shows in amber. Default 10.",
@@ -245,9 +328,14 @@ class VacuumMaintenanceCard extends HTMLElement {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${CSS}</style><ha-card>
       <div class="label"><div class="slot"><ha-icon icon="mdi:wrench-clock"></ha-icon></div><span class="t"></span><span class="s" role="button" tabindex="0"></span></div>
-      <div class="stats"></div><div class="chips"></div></ha-card>`;
+      <div class="stats"></div><div class="dock"></div><div class="jobs"></div></ha-card>`;
     const card = root.querySelector("ha-card");
     card.addEventListener("click", (e) => {
+      const job = e.target.closest("[data-job]");
+      if (job) {
+        if (!job.disabled) this._job(job.dataset.job);
+        return;
+      }
       const b = e.target.closest("[data-k]");
       if (b) return this._openSheet(b.dataset.k);
       if (e.target.closest(".s") && this._m?.next) return this._openSheet(this._m.next.k);
@@ -303,15 +391,50 @@ class VacuumMaintenanceCard extends HTMLElement {
       b.classList.toggle("soon", i.soon);
     }
 
-    const chips = [];
+    // The dock: a quiet line, red where a tank needs you.
+    const parts = [];
     if (!this._config.hide_dock) {
-      if (m.clean) chips.push([m.clean.e, m.clean.bad, m.clean.bad ? "mdi:cup-off-outline" : "mdi:cup-water", m.clean.bad ? "Clean water empty" : "Clean water OK"]);
-      if (m.dirty) chips.push([m.dirty.e, m.dirty.bad, m.dirty.bad ? "mdi:water-off" : "mdi:water-check", m.dirty.bad ? "Dirty water full" : "Dirty water OK"]);
-      if (m.empty) chips.push([m.empty.e, false, "mdi:delete-empty-outline", `Auto-empty: ${human(m.empty.mode)}`]);
+      if (m.clean) parts.push([m.clean.e, m.clean.bad, m.clean.bad ? "Clean water empty" : "Clean water OK"]);
+      if (m.dirty) parts.push([m.dirty.e, m.dirty.bad, m.dirty.bad ? "Dirty water full" : "Dirty water OK"]);
+      if (m.empty) parts.push([m.empty.e, false, `Auto-empty ${human(m.empty.mode)}`]);
     }
-    set(".chips", chips
-      .map(([e, bad, icon, label]) => `<button class="chip${bad ? " bad" : ""}" data-e="${esc(e)}"><ha-icon icon="${icon}"></ha-icon>${esc(label)}</button>`)
-      .join(""), true);
+    set(".dock", parts.length
+      ? ["Dock", ...parts.map(([e, bad, label]) => `<span class="p${bad ? " bad" : ""}" data-e="${esc(e)}" role="button" tabindex="0">${esc(label)}</span>`)].join(" · ")
+      : "", true);
+
+    // The dock's jobs, only while the robot is on the dock (greyed out while it's offline).
+    const jobsBox = root.querySelector(".jobs");
+    const offline = !m.vacuum || DEAD.includes(m.vacuum);
+    const jobs = !this._config.hide_dock && !this._config.hide_dock_actions && (m.vacuum === "docked" || offline) ? m.jobs : [];
+    const jk = jobs.map((j) => j.k).join();
+    if (jk !== this._keys.jobs) {
+      jobsBox.style.setProperty("--n", String(jobs.length || 1));
+      jobsBox.innerHTML = jobs.map((j) => `<button class="pill" data-job="${j.k}"><ha-icon icon="${j.icon}"></ha-icon><span></span></button>`).join("");
+      this._keys.jobs = jk;
+    }
+    for (const j of jobs) {
+      const b = jobsBox.querySelector(`[data-job="${j.k}"]`);
+      const label = j.on ? j.running : j.idle;
+      const sp = b.querySelector("span");
+      if (sp.textContent !== label) sp.textContent = label;
+      b.classList.toggle("run", j.on);
+      b.setAttribute("aria-pressed", String(j.on));
+      b.disabled = offline || j.dead;
+    }
+  }
+
+  async _job(k) {
+    const j = this._m?.jobs.find((x) => x.k === k);
+    if (!j) return;
+    const c = DOCK_CONFIRM[k]?.[j.on ? "stop" : "start"];
+    if (c) {
+      const ok = await confirmDialog({
+        title: c.title, icon: j.on ? "mdi:stop-circle-outline" : j.icon, color: j.on ? C.orange : C.blue,
+        primary: this._hass.states[this._config.entity]?.attributes?.friendly_name || "Vacuum", secondary: c.text, confirmLabel: c.label,
+      });
+      if (!ok) return;
+    }
+    return this._call("switch", j.on ? "turn_off" : "turn_on", { entity_id: j.e });
   }
 
   /* ---- Details sheet ---- */

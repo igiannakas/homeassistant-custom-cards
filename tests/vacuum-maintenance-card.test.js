@@ -22,6 +22,10 @@ const REG = {
   "binary_sensor.vacuum_cleaner_dock_dirty_water_box": [DOCK, null],
   "binary_sensor.vacuum_cleaner_dock_clean_water_box": [DOCK, null],
   "select.vacuum_cleaner_dock_empty_mode": [DOCK, null],
+  "switch.vacuum_cleaner_dock_dust_emptying": [DOCK, null],
+  "switch.vacuum_cleaner_dock_mop_washing": [DOCK, null],
+  "switch.vacuum_cleaner_dock_mop_drying": [DOCK, null],
+  "switch.vacuum_cleaner_child_lock": [DOCK, "child_lock"],
 };
 const st = (state, attributes = {}) => ({ state: String(state), attributes });
 const s = (v) => st(v, { unit_of_measurement: "s", device_class: "duration" });
@@ -45,6 +49,10 @@ function states(over = {}) {
     "binary_sensor.vacuum_cleaner_dock_dirty_water_box": st("off", { device_class: "problem" }),
     "binary_sensor.vacuum_cleaner_dock_clean_water_box": st("off", { device_class: "problem" }),
     "select.vacuum_cleaner_dock_empty_mode": st("max", { options: ["smart", "light", "balanced", "max"] }),
+    "switch.vacuum_cleaner_dock_dust_emptying": st("off"),
+    "switch.vacuum_cleaner_dock_mop_washing": st("off"),
+    "switch.vacuum_cleaner_dock_mop_drying": st("off"),
+    "switch.vacuum_cleaner_child_lock": st("on"),
     ...over,
   };
 }
@@ -60,7 +68,7 @@ const devices = {
   const full = (x) => ({ states: x, entities, devices, callService: async (d, sv, data) => calls.push([d, sv, data]) });
   assert.throws(() => new Card().setConfig({}));
   const names = JSON.stringify(Card.getConfigForm().schema);
-  for (const k of ["entity", "title", "due_soon", "hide_dock", "lives"]) assert(names.includes(`"${k}"`), k);
+  for (const k of ["entity", "title", "due_soon", "hide_dock", "hide_dock_actions", "lives"]) assert(names.includes(`"${k}"`), k);
 
   const card = document.createElement("vacuum-maintenance-card");
   document.body.appendChild(card);
@@ -77,8 +85,9 @@ const devices = {
   eq(cells(), ["97% Main brush", "96% Side brush", "94% Filter", "71% Sensors", "13 h Dock brush", "27 h Dock strainer"]);
   assert.strictEqual(q(".s").textContent, "Next: dock brush in 13 h");
   assert(!all(".stats b").some((b) => b.classList.contains("soon") || b.classList.contains("due")));
-  eq(all(".chips .chip").map((c) => c.textContent.trim()), ["Clean water OK", "Dirty water OK", "Auto-empty: Max"]);
-  all(".chips .chip")[2].click();
+  // The dock: one quiet line, each part opens its entity.
+  assert.strictEqual(q(".dock").textContent, "Dock · Clean water OK · Dirty water OK · Auto-empty Max");
+  all(".dock [data-e]")[2].click();
   eq(events.pop(), ["more-info", "select.vacuum_cleaner_dock_empty_mode"]);
 
   // Details sheet: hours, cleans at your average, life; Reset asks first, then presses.
@@ -129,16 +138,60 @@ const devices = {
 
   // Dock tanks that need you glow red.
   card.hass = full(states({ "binary_sensor.vacuum_cleaner_dock_dirty_water_box": st("on"), "binary_sensor.vacuum_cleaner_dock_clean_water_box": st("on") }));
-  eq(all(".chips .chip").map((c) => [c.textContent.trim(), c.classList.contains("bad")]), [["Clean water empty", true], ["Dirty water full", true], ["Auto-empty: Max", false]]);
+  eq(all(".dock .p").map((c) => [c.textContent.trim(), c.classList.contains("bad")]), [["Clean water empty", true], ["Dirty water full", true], ["Auto-empty Max", false]]);
+  card.hass = full(states());
 
-  // Options: lives for the dock parts, a title, no dock chips, a threshold.
+  // The dock's jobs while the robot is docked: Empty, Wash mop, Dry – each asks before it
+  // starts and before it stops.
+  const jobs = () => all(".jobs .pill").map((b) => b.textContent.trim() + (b.classList.contains("run") ? "*" : ""));
+  const dlg = () => document.querySelector("vmc-confirm-dialog");
+  eq(jobs(), ["Empty", "Wash mop", "Dry"]);
+  const n1 = calls.length;
+  all(".jobs .pill")[1].click();
+  await tick();
+  assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, "Wash the mop");
+  dlg().shadowRoot.querySelector(".cancel").click();
+  await tick();
+  assert(!dlg() && calls.length === n1, "Cancel: nothing happens");
+  for (const [i, title, id] of [[0, "Empty the bin", "dust_emptying"], [1, "Wash the mop", "mop_washing"], [2, "Dry the mop", "mop_drying"]]) {
+    all(".jobs .pill")[i].click();
+    await tick();
+    assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, title);
+    dlg().shadowRoot.querySelector(".confirm").click();
+    await tick();
+    eq(calls.pop(), ["switch", "turn_on", { entity_id: `switch.vacuum_cleaner_dock_${id}` }]);
+  }
+  document.dispatchEvent(new t.window.KeyboardEvent("keydown", { key: "Escape" }));
+  card.hass = full(states({ "switch.vacuum_cleaner_dock_mop_drying": st("on") }));
+  eq(jobs(), ["Empty", "Wash mop", "Drying*"]);
+  all(".jobs .pill")[2].click();
+  await tick();
+  assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, "Stop drying");
+  dlg().shadowRoot.querySelector(".confirm").click();
+  await tick();
+  eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.vacuum_cleaner_dock_mop_drying" }]);
+  // Only while the robot is on the dock.
+  card.hass = full(states({ "vacuum.vacuum_cleaner": st("cleaning", { friendly_name: "Vacuum cleaner" }) }));
+  eq(jobs(), []);
+  card.hass = full(states({ "vacuum.vacuum_cleaner": st("unavailable", { friendly_name: "Vacuum cleaner" }) }));
+  assert(all(".jobs .pill").every((b) => b.disabled), "greyed out while offline");
+  card.hass = full(states());
+
+  // Options: lives for the dock parts, a title, no dock line or jobs, a threshold.
   const card2 = document.createElement("vacuum-maintenance-card");
   document.body.appendChild(card2);
   card2.setConfig({ entity: "vacuum.vacuum_cleaner", title: "Care", hide_dock: true, due_soon: 30, lives: { dock_brush: 300 } });
   card2.hass = full(states());
   const r2 = card2.shadowRoot;
   assert.strictEqual(r2.querySelector(".t").textContent, "Care");
-  assert.strictEqual(r2.querySelectorAll(".chips .chip").length, 0);
+  assert.strictEqual(r2.querySelector(".dock").textContent, "");
+  assert.strictEqual(r2.querySelectorAll(".jobs .pill").length, 0);
+  const card3 = document.createElement("vacuum-maintenance-card");
+  document.body.appendChild(card3);
+  card3.setConfig({ entity: "vacuum.vacuum_cleaner", hide_dock_actions: true });
+  card3.hass = full(states());
+  assert(card3.shadowRoot.querySelector(".dock").textContent.startsWith("Dock ·"));
+  assert.strictEqual(card3.shadowRoot.querySelectorAll(".jobs .pill").length, 0);
   eq([...r2.querySelectorAll(".stats b")].map((b) => b.textContent), ["97%", "96%", "94%", "71%", "4%", "27 h"]);
   eq([...r2.querySelectorAll(".stats b")].map((b) => b.classList.contains("soon")), [false, false, false, true, true, true]);
 

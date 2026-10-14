@@ -3844,27 +3844,29 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 1.3.0 ===== */
+/* ===== robot-vacuum-card 2.0.0 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
  *
- * A Roborock (or similar) robot vacuum in one card: state and battery, what needs you
- * (dock tanks, errors), the job while it runs, the floor map (cropped to the rooms, live
- * while cleaning) with a floor switch, room chips to build a clean, the cleaning settings
- * (mode, suction, mop water and route – shown as chips, changed in a sheet) and the
- * buttons for the state: Clean all / Clean N rooms, Pause, Resume, Dock, an optional
- * Auto clean pill for the automation that runs it, and – while docked – the dock's own jobs
- * (Empty, Wash mop, Dry) as chips that glow while they run.
+ * A Roborock (or similar) robot vacuum. The default layout: state and battery, what needs you
+ * (dock tanks, errors), the job while it runs, a floor switch and the floor map (cropped to
+ * the rooms, live while cleaning; a switch shows at once), the rooms in an even grid to build
+ * a clean, and the buttons for the state – Clean all / Clean N rooms, Pause, Resume, Dock –
+ * plus an optional Auto clean pill. Every button asks first except Pause.
  *
- * Everything is found from the vacuum entity's device (and its dock device), so the
- * config is one entity id. Rooms and their segment ids come from roborock.get_maps; a
- * room clean is vacuum.send_command app_segment_clean on the map that is loaded. Nothing
- * blocks a clean except the vacuum being offline. Tap any value for its own more-info.
+ * `layout: mode` is the cleaning mode, laid out like the Roborock app: Vac & mop / Mop /
+ * Vacuum tabs, then suction power, scrub intensity & water flow, cleaning count and route as
+ * select buttons, offering only what applies in that mode. The count is sent with the clean.
+ *
+ * Everything is found from the vacuum entity's device (and its dock device), so the config
+ * is one entity id. Rooms and their segment ids come from roborock.get_maps; a room clean is
+ * vacuum.send_command app_segment_clean on the map that is loaded. Nothing blocks a clean
+ * except the vacuum being offline. Tap any value for its own more-info.
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "1.3.0";
+const RVC_VERSION = "2.0.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -3939,10 +3941,6 @@ const KEYS = {
   mop_water: { domain: "select", tk: ["mop_intensity"], sfx: ["_mop_intensity"] },
   mop_route: { domain: "select", tk: ["mop_mode"], sfx: ["_mop_mode"] },
   drying: { domain: "sensor", tk: ["mop_drying_remaining_time"], sfx: ["_mop_drying_remaining_time"] },
-  // The dock's own jobs, as switches that are on while each runs.
-  empty_sw: { domain: "switch", tk: ["dust_emptying", "dock_dust_emptying"], sfx: ["_dust_emptying"] },
-  wash_sw: { domain: "switch", tk: ["mop_washing", "dock_mop_washing"], sfx: ["_mop_washing"] },
-  dry_sw: { domain: "switch", tk: ["mop_drying", "dock_mop_drying"], sfx: ["_mop_drying"] },
 };
 
 function deviceEntityIds(hass, vacuumId) {
@@ -4063,7 +4061,7 @@ const DOCK_TEXT = {
   maintenance_brush_jammed: "Dock: the maintenance brush is jammed",
 };
 
-function model(hass, cfg, found, maps) {
+function model(hass, cfg, found, maps, shownMap) {
   const v = hass.states[cfg.entity];
   const st = (k) => (found[k] ? hass.states[found[k]] : undefined);
   const s = (k) => st(k)?.state;
@@ -4115,7 +4113,9 @@ function model(hass, cfg, found, maps) {
   }
 
   const mapNames = st("map_select")?.attributes?.options || (maps || []).map((m) => m.name);
-  const mapName = s("map_select") && !DEAD.includes(s("map_select")) ? s("map_select") : maps?.length === 1 ? maps[0].name : "";
+  // The floor shown: the robot's loaded map, or the one just picked until the robot confirms it.
+  const selMap = shownMap ?? s("map_select");
+  const mapName = selMap && !DEAD.includes(selMap) ? selMap : maps?.length === 1 ? maps[0].name : "";
   const map = (maps || []).find((m) => m.name === mapName) || (maps?.length === 1 ? maps[0] : null);
   const img = imageFor(hass, found.images || [], mapName);
   const imgState = img ? hass.states[img] : null;
@@ -4144,34 +4144,83 @@ function model(hass, cfg, found, maps) {
   };
 }
 
-/* Settings: label for an option, which options to offer, and in what order. */
+/* ------------------------------------------------------------------------ */
+/* Cleaning mode: laid out like the Roborock app (without Customize)        */
+/* ------------------------------------------------------------------------ */
+
 const OPT_LABEL = { vac_and_mop: "Vac & mop", max_plus: "Max+", deep_plus: "Deep+", smart_mode: "Smart" };
 const optLabel = (o) => OPT_LABEL[o] || human(o);
+// Tabs in the app's order.
+const MODES = ["vac_and_mop", "mop", "vacuum"];
 const ORDER = {
-  mode: ["vacuum", "vac_and_mop", "mop", "custom"],
   fan: ["off", "quiet", "gentle", "balanced", "standard", "turbo", "strong", "max", "max_plus", "custom"],
   water: ["off", "low", "mild", "moderate", "medium", "standard", "high", "intense", "custom"],
   route: ["fast", "standard", "deep", "deep_plus", "custom"],
 };
+const FAN_ICON = { quiet: "mdi:weather-night", balanced: "mdi:fan-speed-1", turbo: "mdi:fan-speed-2", max: "mdi:fan-speed-3", max_plus: "mdi:weather-tornado" };
+const WATER_ICON = { mild: "mdi:water-outline", standard: "mdi:water", intense: "mdi:water-plus" };
 function offer(options, current, order) {
   const hide = ["custom", "off", "smart_mode"];
   const list = (options || []).filter((o) => !hide.includes(o) || o === current);
   return list.sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
 }
+/* Route glyphs like the app's: a rounded square with the path the robot takes – an S for
+   Fast, then three, four and five passes for Standard, Deep and Deep+. */
+function routeSvg(k) {
+  const passes = { standard: 3, deep: 4, deep_plus: 5 }[k];
+  if (k !== "fast" && !passes) return "";
+  let d;
+  if (k === "fast") d = "M8 8.2h2.4c1.4 0 1.9.9 2.2 2.3l.8 3c.3 1.4.8 2.3 2.2 2.3H16";
+  else {
+    const x0 = 8, s = 8 / (passes - 1), r = s / 2, top = 8, bot = 16;
+    d = `M${x0} ${bot}`;
+    for (let i = 0; i < passes - 1; i++) {
+      const nx = +(x0 + (i + 1) * s).toFixed(2);
+      d += i % 2 === 0 ? ` V${+(top + r).toFixed(2)} A${+r.toFixed(2)} ${+r.toFixed(2)} 0 0 1 ${nx} ${+(top + r).toFixed(2)}` : ` V${+(bot - r).toFixed(2)} A${+r.toFixed(2)} ${+r.toFixed(2)} 0 0 0 ${nx} ${+(bot - r).toFixed(2)}`;
+    }
+    d += (passes - 1) % 2 === 0 ? ` V${bot}` : ` V${top}`;
+  }
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="${d}"/></svg>`;
+}
+
+/* Cleaning count (×1 / ×2) has no entity: the card keeps it per vacuum, shared by the mode
+   panel and the Clean button (and remembered in this browser), and sends it with the clean. */
+const COUNT = new Map();
+const COUNT_CARDS = new Set();
+function getCount(id) {
+  if (!COUNT.has(id)) {
+    let v = 1;
+    try {
+      v = Number(window.localStorage?.getItem(`robot-vacuum-card:count:${id}`)) || 1;
+    } catch (e) {
+      /* storage blocked: start at ×1 */
+    }
+    COUNT.set(id, v === 2 ? 2 : 1);
+  }
+  return COUNT.get(id);
+}
+function setCount(id, v) {
+  COUNT.set(id, v);
+  try {
+    window.localStorage?.setItem(`robot-vacuum-card:count:${id}`, String(v));
+  } catch (e) {
+    /* fine: it still applies for this page */
+  }
+  for (const c of COUNT_CARDS) if (c._config?.entity === id) c._render();
+}
 
 /* ------------------------------------------------------------------------ */
-/* Sheet (Bubble look) for the cleaning settings                            */
+/* Confirmation dialog – same look as the other cards' dialogs              */
 /* ------------------------------------------------------------------------ */
 
-const SHEET_CSS = `
+const DIALOG_CSS = `
   ha-icon { display: inline-flex; align-items: center; justify-content: center; }
-  ha-icon[hidden] { display: none; }
   :host { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
     font-family: var(--ha-font-family-body, Roboto, sans-serif); }
   .backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.32); backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px); animation: fade 160ms ease-out; }
-  .dialog { position: relative; box-sizing: border-box; width: min(400px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
-    padding: 25px 18px 18px; border-radius: 32px; color: var(--primary-text-color);
+  .dialog { position: relative; box-sizing: border-box; width: min(400px, calc(100vw - 32px)); padding: 25px 18px 18px;
+    border-radius: 32px; color: var(--primary-text-color);
     background: color-mix(in srgb, var(--card-background-color, #fff) 94%, transparent);
     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 12px 40px rgba(0,0,0,.25);
     animation: pop 180ms cubic-bezier(.2,.9,.3,1.2); }
@@ -4179,45 +4228,29 @@ const SHEET_CSS = `
   .glyph { flex: 0 0 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
   .glyph ha-icon { --mdc-icon-size: 24px; }
   .title { font-size: 20px; line-height: 26px; font-weight: 600; }
-  .sect { margin-top: 18px; display: grid; gap: 8px; }
-  .sect[hidden] { display: none; }
-  .k { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); padding-left: 8px; }
-  .seg { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
-  .seg button { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: 0; height: 32px; border-radius: 9px; text-align: center; cursor: pointer;
-    font-size: 12px; font-weight: 500; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px;
-    -webkit-tap-highlight-color: transparent; }
-  .seg button[aria-pressed="true"] { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
-  .actions { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); display: grid; gap: 8px; }
-  .done { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
+  .body { margin-top: 20px; }
+  .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
+  .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; color: var(--secondary-text-color); }
+  .buttons { margin-top: 20px; display: grid; gap: 8px; }
+  button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
     border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
-  .done .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
-  .done .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
+  button .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
+  button .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
+  button.confirm { color: #fff; }
+  button.confirm .glyph { background: rgba(255,255,255,.2); }
+  button.confirm .glyph ha-icon { color: #fff; }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
 
-/* Confirmation dialog – same look as the other cards' dialogs. */
 function confirmDialog({ title, icon, color, primary, secondary, confirmLabel }) {
   return new Promise((resolve) => {
     const host = document.createElement("rvc-confirm-dialog");
     const root = host.attachShadow({ mode: "open" });
-    root.innerHTML = `<style>${SHEET_CSS}
-      .body { margin-top: 20px; }
-      .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
-      .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; color: var(--secondary-text-color); }
-      .buttons { margin-top: 20px; display: grid; gap: 8px; }
-      .buttons button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; padding-left: 10px;
-        border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
-        background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
-      .buttons .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
-      .buttons .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
-      .buttons .confirm { color: #fff; }
-      .buttons .confirm .glyph { background: rgba(255,255,255,.2); }
-      .buttons .confirm .glyph ha-icon { color: #fff; }</style>
-      <div class="backdrop"></div>
+    root.innerHTML = `<style>${DIALOG_CSS}</style><div class="backdrop"></div>
       <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
         <div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(icon)}" style="color:${color}"></ha-icon></div>
           <div class="title">${esc(title)}</div></div>
@@ -4247,25 +4280,6 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
   });
 }
 
-/* The dock's jobs ask before they start and before they stop (the user's choice). */
-const DOCK_CONFIRM = {
-  empty_sw: {
-    start: { title: "Empty the bin", icon: "mdi:delete-empty-outline", label: "Empty",
-      text: "The dock empties the robot's dust bin into its bag now. It's loud for about half a minute." },
-    stop: { title: "Stop emptying", label: "Stop emptying", text: "The dock stops emptying the bin now." },
-  },
-  wash_sw: {
-    start: { title: "Wash the mop", icon: "mdi:water-sync", label: "Wash mop",
-      text: "The dock washes the mop now, with clean water from its tank. The dirty water goes to the dirty tank." },
-    stop: { title: "Stop washing", label: "Stop washing", text: "The dock stops washing the mop now." },
-  },
-  dry_sw: {
-    start: { title: "Dry the mop", icon: "mdi:fan", label: "Dry",
-      text: "The dock dries the mop now, for the drying time set in the Roborock app." },
-    stop: { title: "Stop drying", label: "Stop drying", text: "The dock stops drying the mop now, so it may stay damp." },
-  },
-};
-
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
@@ -4287,7 +4301,7 @@ const CSS = `
   .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .nm .st { font-weight: 400; color: var(--secondary-text-color); }
-  /* The line under the name may wrap (numbers are never cut off). */
+  /* The line under the name may wrap, but only between its parts ("28 min" stays whole). */
   .sc { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .sc:empty { display: none; }
   .sc .p { white-space: nowrap; }
@@ -4316,31 +4330,42 @@ const CSS = `
   .pbar i { display: block; height: 100%; border-radius: 4px; transition: width 400ms; }
   /* Segmented selector: 32px segments in a 38px track. */
   .seg { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
-  .seg button { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: 0; height: 32px; border-radius: 9px; text-align: center; cursor: pointer;
-    font-size: 12px; font-weight: 500; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    -webkit-tap-highlight-color: transparent; }
+  .seg button { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: 0; height: 32px; border-radius: 9px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: var(--secondary-text-color);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
   .seg button[aria-pressed="true"] { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
   .seg button[disabled] { opacity: .45; cursor: default; }
+  .seg button ha-icon { --mdc-icon-size: 20px; }
+  .seg button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .map { position: relative; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); height: clamp(200px, 64cqw, 340px);
     display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; }
   .map canvas { display: block; }
-  /* Secondary pills (chips): 30px. */
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chips:empty { display: none; }
-  .chip { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; height: 30px; border-radius: 15px; padding: 0 12px 0 8px;
-    font-size: 12px; font-weight: 500; letter-spacing: .2px; white-space: nowrap; cursor: pointer; max-width: 100%;
+  .map .loading { position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 10px; font-size: 11px; line-height: 14px;
+    letter-spacing: .4px; color: var(--secondary-text-color); background: var(--card-background-color, #fff); }
+  /* Rooms: an even grid of secondary pills (30px), two across on a phone. */
+  .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .rooms:empty { display: none; }
+  .chip { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; height: 30px; border-radius: 15px; padding: 0 12px 0 8px;
+    font-size: 12px; font-weight: 500; letter-spacing: .2px; white-space: nowrap; cursor: pointer; min-width: 0;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color); -webkit-tap-highlight-color: transparent; }
   .chip span { overflow: hidden; text-overflow: ellipsis; }
   .chip ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; flex: none; }
   .chip.sel { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
   .chip.sel ha-icon { color: ${C.blue}; }
   .chip.now { box-shadow: inset 0 0 0 1.5px ${tint(C.blue, 60)}; }
-  .chip.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
-  .chip.run ha-icon { color: ${C.blue}; }
   .chip[aria-disabled="true"] { cursor: default; }
   .chip[disabled] { opacity: .45; cursor: default; }
-  .acts { display: flex; flex-wrap: wrap; gap: 8px; }
-  .acts .pill { flex: 1 1 0; min-width: max-content; }
+  .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; }
+  .acts .pill { padding: 0 10px; min-width: 0; }
+  .acts .pill span { overflow: hidden; text-overflow: ellipsis; }
+  /* Mode panel: label row, tabs, then a label + value line over each selector (as in the app). */
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+  .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+  .slot ha-icon { --mdc-icon-size: 24px; color: ${C.grey}; }
+  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); position: relative; top: 1px; }
+  .set { display: grid; gap: 6px; }
+  .k { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .k b { font-weight: 500; margin-left: 6px; color: ${tx(C.blue, 75)}; }
   .pill:active, .chip:active, .seg button:active, .shape:active { filter: brightness(.92); }
   .pill:focus-visible, .chip:focus-visible, .seg button:focus-visible, .shape:focus-visible, [data-e]:focus-visible, .msg:focus-visible, .map:focus-visible {
     outline: 2px solid var(--primary-color); outline-offset: 1px; }
@@ -4348,7 +4373,7 @@ const CSS = `
 
 /* Ink alignment (design rule): every line of a text block starts on the title's vertical line,
    measured on ink rather than boxes (a leading "1" or an icon has its own side bearing). */
-const INK = { ctx: undefined, units: new Map() };
+const INK = { ctx: undefined };
 const inkCtx = () => {
   if (INK.ctx === undefined)
     INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
@@ -4384,13 +4409,12 @@ function inkAlign(blocks) {
     const t = lines.length > 1 ? inkLead(lines[0]) : null;
     if (!t || !t.text) continue;
     const ref = inkText(t.text);
-    if (ref === null) return true;
+    if (ref === null) return;
     for (const line of lines.slice(1)) {
       const lead = inkLead(line);
       if (lead && lead.text) inkSet(line, ref - inkText(lead.text));
     }
   }
-  return true;
 }
 function inkSchedule(host, selector) {
   if (host._inkQueued) return;
@@ -4402,8 +4426,9 @@ function inkSchedule(host, selector) {
 }
 
 /* The floor map: the image entity's picture, cropped to what is drawn (Roborock maps come
-   with wide transparent margins) and fitted into the box. Repainted on resize; a new
-   picture replaces the old one only once it has loaded, so a live map never flickers. */
+   with wide transparent margins) and fitted into the box. Every floor's picture is loaded
+   ahead, so switching floors repaints at once; a new picture replaces the old one only once
+   it has loaded, so a live map never flickers. */
 function cropBox(img) {
   const full = { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
   try {
@@ -4435,6 +4460,8 @@ function cropBox(img) {
   }
 }
 
+const PENDING_MS = 45000; // how long a floor or setting change shows before the robot confirms it
+
 class RobotVacuumCard extends HTMLElement {
   static getStubConfig(hass) {
     const v = Object.keys(hass?.states || {}).find((id) => id.startsWith("vacuum."));
@@ -4446,32 +4473,32 @@ class RobotVacuumCard extends HTMLElement {
       schema: [
         { name: "entity", required: true, selector: { entity: { domain: "vacuum" } } },
         { type: "grid", name: "", schema: [
+          { name: "layout", selector: { select: { mode: "dropdown", options: [
+            { value: "full", label: "Vacuum (state, map, rooms, buttons)" }, { value: "mode", label: "Cleaning mode (like the Roborock app)" }] } } },
           { name: "name", selector: { text: {} } },
-          { name: "auto_clean", selector: { entity: { domain: ["automation", "input_boolean", "switch"] } } },
         ] },
+        { name: "auto_clean", selector: { entity: { domain: ["automation", "input_boolean", "switch"] } } },
         { type: "grid", name: "", schema: [
           { name: "hide_map", selector: { boolean: {} } },
           { name: "hide_rooms", selector: { boolean: {} } },
-          { name: "hide_settings", selector: { boolean: {} } },
-          { name: "hide_dock_actions", selector: { boolean: {} } },
         ] },
         { name: "rooms", selector: { object: {} } },
       ],
       computeLabel: (s) =>
         ({
           entity: "Vacuum",
+          layout: "Layout",
           name: "Name",
           auto_clean: "Auto clean (automation or switch)",
           hide_map: "Hide the map",
           hide_rooms: "Hide the rooms",
-          hide_settings: "Hide the cleaning settings",
-          hide_dock_actions: "Hide Empty / Wash mop / Dry",
           rooms: "Rooms (YAML)",
         })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
+          layout: "Put a second card with layout Cleaning mode next to the vacuum card for the mode, suction, scrub, count and route buttons.",
           auto_clean: "Shows an Auto clean pill that turns this on and off, glowing while it is on.",
-          rooms: "Per room, by the robot's room name: icon and hide. E.g. En-suite Bathroom: { icon: mdi:shower }",
+          rooms: "Per room, by the robot's room name: icon, name and hide. E.g. En-suite Bathroom: { icon: mdi:shower }",
         })[s.name],
     };
   }
@@ -4482,17 +4509,17 @@ class RobotVacuumCard extends HTMLElement {
     this._built = false;
     this._found = null;
     this._sel = new Set();
+    this._pending = {};
     if (this._hass) this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
     this._render();
-    this._syncSheet();
   }
 
   getCardSize() {
-    return 9;
+    return this._config?.layout === "mode" ? 5 : 9;
   }
 
   getGridOptions() {
@@ -4500,16 +4527,44 @@ class RobotVacuumCard extends HTMLElement {
   }
 
   connectedCallback() {
+    COUNT_CARDS.add(this);
     if (this._built && this._ro && this._mapEl) this._ro.observe(this._mapEl);
   }
 
   disconnectedCallback() {
+    COUNT_CARDS.delete(this);
     this._ro?.disconnect();
-    this._closeSheet();
+  }
+
+  _more(id) {
+    if (id) this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true }));
+  }
+
+  /* A change shown before the robot confirms it: the floor, or a setting. */
+  _pend(k, v) {
+    this._pending[k] = { v, t: Date.now() };
+  }
+  _shown(k, actual) {
+    const p = this._pending[k];
+    if (!p) return actual;
+    if (p.v === actual || Date.now() - p.t > PENDING_MS) {
+      delete this._pending[k];
+      return actual;
+    }
+    return p.v;
   }
 
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
+    if (this._config.layout === "mode") {
+      root.innerHTML = `<style>${CSS}</style><ha-card><div class="body">
+        <div class="label"><div class="slot"><ha-icon icon="mdi:tune-variant"></ha-icon></div><span class="t">${esc(this._config.title || "Cleaning mode")}</span></div>
+        <div class="seg tabs"></div><div class="sets body"></div></div></ha-card>`;
+      root.querySelector("ha-card").addEventListener("click", (e) => this._clickMode(e));
+      this._built = true;
+      this._keys = {};
+      return;
+    }
     root.innerHTML = `<style>${CSS}</style><ha-card><div class="body">
       <div class="head"><div class="shape" role="button" tabindex="0" aria-label="Vacuum details"><ha-icon></ha-icon></div>
         <div class="txt" data-e="${esc(this._config.entity)}" role="button" tabindex="0"><div class="nm"></div><div class="sc line"></div></div>
@@ -4517,11 +4572,9 @@ class RobotVacuumCard extends HTMLElement {
       <div class="msgs"></div>
       <div class="jt" hidden><div class="pct"></div><div class="pbar"><i></i></div></div>
       <div class="seg floors" hidden></div>
-      <div class="map" role="button" tabindex="0" aria-label="Map" hidden><canvas></canvas></div>
-      <div class="chips rooms"></div>
-      <div class="chips sets"></div>
-      <div class="acts"></div>
-      <div class="chips dock"></div></div></ha-card>`;
+      <div class="map" role="button" tabindex="0" aria-label="Map" hidden><canvas></canvas><span class="loading" hidden>Loading map…</span></div>
+      <div class="rooms"></div>
+      <div class="acts"></div></div></ha-card>`;
     const card = root.querySelector("ha-card");
     card.addEventListener("click", (e) => this._click(e));
     card.addEventListener("keydown", (e) => {
@@ -4531,8 +4584,8 @@ class RobotVacuumCard extends HTMLElement {
       }
     });
     this._mapEl = root.querySelector(".map");
-    this._mapUrl = null;
-    this._mapImg = null;
+    this._mapKey = null;
+    this._imgs = {};
     if (typeof ResizeObserver !== "undefined") {
       this._ro = new ResizeObserver(() => this._paintMap());
       this._ro.observe(this._mapEl);
@@ -4540,10 +4593,6 @@ class RobotVacuumCard extends HTMLElement {
     this._bindHold(root.querySelector(".acts"));
     this._built = true;
     this._keys = {};
-  }
-
-  _more(id) {
-    if (id) this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true }));
   }
 
   _click(e) {
@@ -4561,12 +4610,6 @@ class RobotVacuumCard extends HTMLElement {
       if (floor.disabled || floor.getAttribute("aria-pressed") === "true") return;
       return this._switchFloor(floor.dataset.floor);
     }
-    if (t.closest(".sets .chip")) return this._openSheet();
-    const job = t.closest("[data-dock]");
-    if (job) {
-      if (!job.disabled) this._dockJob(job.dataset.dock);
-      return;
-    }
     const act = t.closest(".acts .pill");
     if (act) {
       if (act.disabled || this._held) {
@@ -4581,7 +4624,7 @@ class RobotVacuumCard extends HTMLElement {
     if (v) this._more(v.dataset.e);
   }
 
-  /* Hold the Auto clean pill for its more-info (tap toggles it). */
+  /* Hold the Auto clean pill for its more-info (a tap asks, then toggles it). */
   _bindHold(box) {
     let timer = null;
     const cancel = () => {
@@ -4605,7 +4648,6 @@ class RobotVacuumCard extends HTMLElement {
   }
 
   _render() {
-    inkSchedule(this, ".txt");
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const hass = this._hass;
@@ -4613,8 +4655,12 @@ class RobotVacuumCard extends HTMLElement {
       this._found = discover(hass, this._config);
       this._regRef = hass.entities;
     }
+    if (this._config.layout === "mode") return this._renderMode();
+    inkSchedule(this, ".txt");
     this._loadMaps();
-    const m = model(hass, this._config, this._found, this._maps);
+    const selected = this._found.map_select ? hass.states[this._found.map_select]?.state : null;
+    const shownMap = this._shown("floor", selected);
+    const m = model(hass, this._config, this._found, this._maps, shownMap);
     this._m = m;
     const root = this.shadowRoot;
     const set = (sel, v, html = false) => {
@@ -4641,9 +4687,8 @@ class RobotVacuumCard extends HTMLElement {
       const icon = m.charging ? `mdi:battery-charging-${lvl === 100 ? 100 : lvl}` : lvl === 100 ? "mdi:battery" : `mdi:battery-${lvl}`;
       const bi = batt.querySelector("ha-icon");
       if (bi.getAttribute("icon") !== icon) bi.setAttribute("icon", icon);
-      const low = b <= 15 && !m.charging;
       bi.style.color = b <= 15 ? C.red : b <= 30 ? C.amber : C.green;
-      batt.classList.toggle("low", low);
+      batt.classList.toggle("low", b <= 15 && !m.charging);
       set(".batt span", `${fmt(b)}%`);
     }
 
@@ -4656,7 +4701,7 @@ class RobotVacuumCard extends HTMLElement {
       this._keys.msgs = msgKey;
     }
 
-    // The job: progress, time and area while cleaning, paused or on the way back.
+    // The job: progress, time and area while cleaning or paused.
     const jt = root.querySelector(".jt");
     const showJob = (m.key === "cleaning" || m.key === "paused") && m.progress !== null;
     jt.hidden = !showJob;
@@ -4671,7 +4716,7 @@ class RobotVacuumCard extends HTMLElement {
       bar.style.background = m.state.color;
     }
 
-    // Floors (the robot's loaded map): only while it isn't on a job.
+    // Floors (the robot's loaded map): only while it isn't on a job. A switch shows at once.
     const floors = root.querySelector(".floors");
     floors.hidden = !m.floors.length || busy || !this._found.map_select;
     if (!floors.hidden) {
@@ -4691,10 +4736,12 @@ class RobotVacuumCard extends HTMLElement {
       this._lastMap = m.mapName;
     }
 
-    // Map.
+    // Map, with every floor's picture loaded ahead.
+    this._preload();
     const map = root.querySelector(".map");
     map.hidden = !!this._config.hide_map || !m.image;
-    if (!map.hidden) this._syncMap(m.image.url);
+    if (!map.hidden) this._syncMap(m.image);
+    map.querySelector(".loading").hidden = !this._pending.floor;
 
     // Rooms: tap to add to a clean. While a job runs they show where the robot is.
     const rooms = root.querySelector(".rooms");
@@ -4722,23 +4769,6 @@ class RobotVacuumCard extends HTMLElement {
       });
     }
 
-    // Cleaning settings as chips; a tap opens the sheet.
-    const sets = root.querySelector(".sets");
-    const chips = [];
-    if (!this._config.hide_settings) {
-      const mode = DEAD.includes(m.mode) ? null : m.mode;
-      if (mode) chips.push(["mode", mode === "vacuum" ? "mdi:fan" : "mdi:waves", optLabel(mode)]);
-      if (m.fan && mode !== "mop") chips.push(["fan", "mdi:fan-speed-3", optLabel(m.fan)]);
-      if (m.water && !DEAD.includes(m.water) && mode !== "vacuum" && m.water !== "off") chips.push(["water", "mdi:water", `${optLabel(m.water)} mop`]);
-    }
-    const sk = chips.map((c) => c.join(",")).join("|") + offline;
-    if (sk !== this._keys.sets) {
-      sets.innerHTML = chips
-        .map(([k, icon, label]) => `<button class="chip" data-set="${k}"${offline ? " disabled" : ""} aria-haspopup="dialog"><ha-icon icon="${icon}"></ha-icon><span>${esc(label)}</span></button>`)
-        .join("");
-      this._keys.sets = sk;
-    }
-
     // Buttons for the state, rebuilt only when the set changes (taps are never lost).
     const n = this._sel.size;
     const acts = [];
@@ -4748,12 +4778,13 @@ class RobotVacuumCard extends HTMLElement {
     else {
       acts.push(["clean", n ? `Clean ${n} room${n > 1 ? "s" : ""}` : "Clean all", "mdi:play", C.blue]);
       // One control per job: Dock only while the robot is away from the dock.
-      if (this._hass.states[this._config.entity]?.state !== "docked") acts.push(["dock", "Dock", "mdi:home-import-outline", C.grey]);
+      if (hass.states[this._config.entity]?.state !== "docked") acts.push(["dock", "Dock", "mdi:home-import-outline", C.grey]);
     }
     if (this._config.auto_clean) acts.push(["auto", this._config.auto_clean_name || "Auto clean", "mdi:account-arrow-right", null]);
     const ak = acts.map((a) => a[0]).join();
     const box = root.querySelector(".acts");
     if (ak !== this._keys.acts) {
+      box.style.setProperty("--n", String(acts.length));
       box.innerHTML = acts
         .map(([k, , icon, color]) => `<button class="pill" data-k="${k}"><ha-icon icon="${icon}"${color ? ` style="color:${color}"` : ""}></ha-icon><span></span></button>`)
         .join("");
@@ -4771,33 +4802,97 @@ class RobotVacuumCard extends HTMLElement {
         b.disabled = !m.auto || DEAD.includes(m.auto.state);
       }
     }
+  }
 
-    // The dock's jobs, run by hand (e.g. after an early Dock): only while the robot is on the
-    // dock. Each glows while it runs; a tap starts or stops it at once.
-    const dockBox = root.querySelector(".dock");
-    const docked = this._hass.states[this._config.entity]?.state === "docked" || offline;
-    const dry = seconds(hass.states[this._found.drying]);
-    const jobs = [
-      ["empty_sw", "mdi:delete-empty-outline", "Empty", "Emptying"],
-      ["wash_sw", "mdi:water-sync", "Wash mop", "Washing"],
-      ["dry_sw", "mdi:fan", "Dry", dry ? `Drying · ${mins(dry)}` : "Drying"],
-    ].filter(([k]) => this._found[k] && !this._config.hide_dock_actions);
-    const shown = docked ? jobs : [];
-    const jk = shown.map((j) => j[0]).join();
-    if (jk !== this._keys.dock) {
-      dockBox.innerHTML = shown.map(([k, icon]) => `<button class="chip" data-dock="${k}"><ha-icon icon="${icon}"></ha-icon><span></span></button>`).join("");
-      this._keys.dock = jk;
+  /* ---- Cleaning mode panel (layout: mode) ---- */
+
+  _modeRows() {
+    const hass = this._hass;
+    const f = this._found;
+    const st = (id) => (id ? hass.states[id] : undefined);
+    const v = st(this._config.entity);
+    const live = (k, x) => this._shown(k, DEAD.includes(x) ? null : x ?? null);
+    const mode = live("mode", st(f.mode)?.state);
+    const fan = live("fan", v?.attributes?.fan_speed);
+    const water = live("water", st(f.mop_water)?.state);
+    const route = live("route", st(f.mop_route)?.state);
+    const rows = [];
+    // Suction for Vacuum and Vac & mop (Max+ only in Vacuum); scrub & water for Mop and Vac & mop;
+    // Fast and Standard routes always, Deep and Deep+ only in Mop – as in the Roborock app.
+    if (v?.attributes?.fan_speed_list && mode !== "mop")
+      rows.push({ k: "fan", label: "Suction power", cur: fan, icons: FAN_ICON,
+        opts: offer(v.attributes.fan_speed_list, fan, ORDER.fan).filter((o) => o !== "max_plus" || mode === "vacuum" || o === fan) });
+    if (st(f.mop_water) && mode !== "vacuum")
+      rows.push({ k: "water", label: "Scrub intensity & water flow", cur: water, icons: WATER_ICON, opts: offer(st(f.mop_water).attributes?.options, water, ORDER.water) });
+    rows.push({ k: "count", label: "Cleaning count", cur: String(getCount(this._config.entity)), opts: ["1", "2"], text: (o) => `×${o}`,
+      value: (o) => `${o} time${o === "1" ? "" : "s"}` });
+    if (st(f.mop_route))
+      rows.push({ k: "route", label: "Route", cur: route, svg: true,
+        opts: offer(st(f.mop_route).attributes?.options, route, ORDER.route).filter((o) => !["deep", "deep_plus"].includes(o) || mode === "mop" || o === route) });
+    return { mode, rows };
+  }
+
+  _renderMode() {
+    const root = this.shadowRoot;
+    const hass = this._hass;
+    const f = this._found;
+    const v = hass.states[this._config.entity];
+    const offline = !v || DEAD.includes(v.state);
+    const modeEnt = f.mode ? hass.states[f.mode] : null;
+    const { mode, rows } = this._modeRows();
+
+    const tabs = root.querySelector(".tabs");
+    const modes = MODES.filter((x) => (modeEnt?.attributes?.options || []).includes(x));
+    tabs.hidden = !modes.length;
+    const tk = modes.join();
+    if (tk !== this._keys.tabs) {
+      tabs.innerHTML = modes.map((x) => `<button data-set="mode" data-v="${x}">${esc(optLabel(x))}</button>`).join("");
+      this._keys.tabs = tk;
     }
-    for (const [k, , idle, running] of shown) {
-      const b = dockBox.querySelector(`[data-dock="${k}"]`);
-      const on = hass.states[this._found[k]]?.state === "on";
-      const label = on ? running : idle;
-      const sp = b.querySelector("span");
-      if (sp.textContent !== label) sp.textContent = label;
-      b.classList.toggle("run", on);
-      b.setAttribute("aria-pressed", String(on));
-      b.disabled = offline || DEAD.includes(hass.states[this._found[k]]?.state);
+    tabs.querySelectorAll("button").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.v === mode));
+      b.disabled = offline;
+    });
+
+    const box = root.querySelector(".sets");
+    const rk = rows.map((r) => `${r.k}:${r.opts.join(",")}`).join("|");
+    if (rk !== this._keys.rows) {
+      box.innerHTML = rows
+        .map((r) => `<div class="set" data-k="${r.k}"><div class="k">${esc(r.label)}<b></b></div><div class="seg">${r.opts
+          .map((o) => {
+            const label = r.text ? r.text(o) : optLabel(o);
+            const inner = r.icons?.[o] ? `<ha-icon icon="${r.icons[o]}"></ha-icon>` : r.svg && routeSvg(o) ? routeSvg(o) : esc(label);
+            return `<button data-set="${r.k}" data-v="${esc(o)}" title="${esc(label)}" aria-label="${esc(label)}">${inner}</button>`;
+          }).join("")}</div></div>`)
+        .join("");
+      this._keys.rows = rk;
     }
+    for (const r of rows) {
+      const sect = box.querySelector(`[data-k="${r.k}"]`);
+      const val = r.cur === null || r.cur === undefined ? "" : r.value ? r.value(r.cur) : optLabel(r.cur);
+      const b = sect.querySelector(".k b");
+      if (b.textContent !== val) b.textContent = val;
+      sect.querySelectorAll("button").forEach((x) => {
+        x.setAttribute("aria-pressed", String(x.dataset.v === r.cur));
+        x.disabled = offline && r.k !== "count";
+      });
+    }
+  }
+
+  _clickMode(e) {
+    const b = e.target.closest("button[data-set]");
+    if (!b || b.disabled || b.getAttribute("aria-pressed") === "true") return;
+    const k = b.dataset.set;
+    const v = b.dataset.v;
+    const f = this._found;
+    const id = this._config.entity;
+    if (k === "count") return setCount(id, Number(v));
+    // Show the choice at once; the robot's answer confirms it (or it falls back after a while).
+    this._pend(k, v);
+    this._render();
+    if (k === "fan") return this._call("vacuum", "set_fan_speed", { entity_id: id, fan_speed: v });
+    const ent = { mode: f.mode, water: f.mop_water, route: f.mop_route }[k];
+    if (ent) return this._call("select", "select_option", { entity_id: ent, option: v });
   }
 
   /* Rooms and segment ids per map, from roborock.get_maps (or the maps: option). */
@@ -4831,34 +4926,64 @@ class RobotVacuumCard extends HTMLElement {
       });
   }
 
-  _syncMap(url) {
-    if (url === this._mapUrl) return;
-    this._mapUrl = url;
-    if (typeof Image === "undefined") return;
-    const img = new Image();
-    img.decoding = "async";
-    img.onload = () => {
-      if (this._mapUrl !== url) return;
-      this._mapImg = img;
-      this._mapCrop = cropBox(img);
+  /* Every floor's picture, loaded once per version of the map (the URL's token rotates, the
+     picture doesn't), so a floor switch paints from memory. */
+  _preload() {
+    if (typeof Image === "undefined" || this._config.hide_map) return;
+    for (const id of this._found.images || []) {
+      const s = this._hass.states[id];
+      const pic = s?.attributes?.entity_picture;
+      if (!pic) continue;
+      const key = `${id}|${s.state}`;
+      if (this._imgs[key]) continue;
+      const img = new Image();
+      img.decoding = "async";
+      const entry = { img, crop: null, ready: false };
+      this._imgs[key] = entry;
+      img.onload = () => {
+        entry.crop = cropBox(img);
+        entry.ready = true;
+        // Older versions of this floor's picture are no longer needed.
+        for (const k of Object.keys(this._imgs)) if (k.startsWith(`${id}|`) && k !== key && this._imgs[k].ready) delete this._imgs[k];
+        if (this._mapKey === key) this._paintMap();
+      };
+      img.src = pic;
+    }
+  }
+
+  _syncMap(image) {
+    const s = this._hass.states[image.id];
+    const key = `${image.id}|${s?.state}`;
+    if (key === this._mapKey) return;
+    // Keep showing the current picture until the next one is ready, unless the floor changed.
+    const entry = this._imgs[key];
+    if (entry?.ready || !this._mapKey || !this._mapKey.startsWith(`${image.id}|`)) {
+      this._mapKey = key;
       this._paintMap();
-    };
-    img.src = url;
+    } else this._nextKey = key;
   }
 
   _paintMap() {
-    const img = this._mapImg;
+    if (this._nextKey && this._imgs[this._nextKey]?.ready) {
+      this._mapKey = this._nextKey;
+      this._nextKey = null;
+    }
+    const entry = this._imgs?.[this._mapKey];
     const box = this._mapEl;
     const cv = box?.querySelector("canvas");
-    if (!img || !cv || box.hidden) return;
+    if (!cv || box.hidden) return;
+    if (!entry?.ready) {
+      cv.width = 0;
+      return;
+    }
     const pad = 8;
     const W = box.clientWidth - pad * 2;
     const H = box.clientHeight - pad * 2;
-    const c = this._mapCrop;
+    const c = entry.crop;
     if (W <= 0 || H <= 0 || !c?.w || !c?.h) return;
-    const s = Math.min(W / c.w, H / c.h);
-    const w = Math.round(c.w * s);
-    const h = Math.round(c.h * s);
+    const sc = Math.min(W / c.w, H / c.h);
+    const w = Math.round(c.w * sc);
+    const h = Math.round(c.h * sc);
     const dpr = window.devicePixelRatio || 1;
     cv.width = Math.round(w * dpr);
     cv.height = Math.round(h * dpr);
@@ -4868,31 +4993,20 @@ class RobotVacuumCard extends HTMLElement {
     if (!ctx) return;
     ctx.imageSmoothingQuality = "high";
     ctx.clearRect(0, 0, cv.width, cv.height);
-    ctx.drawImage(img, c.x, c.y, c.w, c.h, 0, 0, cv.width, cv.height);
-  }
-
-  async _dockJob(k) {
-    const id = this._found[k];
-    const on = this._hass.states[id]?.state === "on";
-    const c = DOCK_CONFIRM[k]?.[on ? "stop" : "start"];
-    if (c) {
-      const ok = await confirmDialog({
-        title: c.title, icon: on ? "mdi:stop-circle-outline" : c.icon, color: on ? C.orange : C.blue,
-        primary: this._m?.name || "Vacuum", secondary: c.text, confirmLabel: c.label,
-      });
-      if (!ok) return;
-    }
-    return this._call("switch", on ? "turn_off" : "turn_on", { entity_id: id });
+    ctx.drawImage(entry.img, c.x, c.y, c.w, c.h, 0, 0, cv.width, cv.height);
   }
 
   /* What a clean will use, for the confirmation: "Vac & mop · Turbo · Standard mop". */
   _settingsText() {
-    const m = this._m;
-    const mode = DEAD.includes(m.mode) ? null : m.mode;
+    const hass = this._hass;
+    const f = this._found;
+    const mode = hass.states[f.mode]?.state;
+    const fan = hass.states[this._config.entity]?.attributes?.fan_speed;
+    const water = hass.states[f.mop_water]?.state;
     return [
-      mode ? optLabel(mode) : "",
-      m.fan && mode !== "mop" ? optLabel(m.fan) : "",
-      m.water && !DEAD.includes(m.water) && m.water !== "off" && mode !== "vacuum" ? `${optLabel(m.water)} mop` : "",
+      mode && !DEAD.includes(mode) ? optLabel(mode) : "",
+      fan && mode !== "mop" ? optLabel(fan) : "",
+      water && !DEAD.includes(water) && water !== "off" && mode !== "vacuum" ? `${optLabel(water)} mop` : "",
     ].filter(Boolean).join(" · ");
   }
 
@@ -4905,6 +5019,8 @@ class RobotVacuumCard extends HTMLElement {
       `Only once the robot is on that floor: it loads the ${name} map and its rooms.`, "Switch");
     if (!ok) return;
     this._sel.clear();
+    this._pend("floor", name);
+    this._render();
     return this._call("select", "select_option", { entity_id: this._found.map_select, option: name });
   }
 
@@ -4915,18 +5031,23 @@ class RobotVacuumCard extends HTMLElement {
     const how = this._settingsText();
     if (k === "clean") {
       const segs = [...this._sel];
+      const twice = getCount(id) === 2;
+      // ×2 with no rooms picked: every room on the floor, twice.
+      const all = !segs.length && twice ? m.rooms.map((r) => r.id) : [];
       const names = segs.map((s) => m.rooms.find((r) => r.id === s)?.name).filter(Boolean);
       const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
+      const times = twice ? ", twice" : "";
       const ok = await this._ask(
         segs.length ? `Clean ${segs.length} room${segs.length > 1 ? "s" : ""}` : "Clean all",
         "mdi:play", C.blue,
-        segs.length ? `${list}${how ? `, ${how}` : ""}.` : `Every room${m.mapName ? ` on the ${m.mapName}` : ""}${how ? `, ${how}` : ""}.`,
+        segs.length ? `${list}${times}${how ? `, ${how}` : ""}.` : `Every room${m.mapName ? ` on the ${m.mapName}` : ""}${times}${how ? `, ${how}` : ""}.`,
         "Clean",
       );
       if (!ok) return;
       this._sel.clear();
       this._render();
-      if (segs.length) return this._call("vacuum", "send_command", { entity_id: id, command: "app_segment_clean", params: [{ segments: segs, repeat: 1 }] });
+      const target = segs.length ? segs : all;
+      if (target.length) return this._call("vacuum", "send_command", { entity_id: id, command: "app_segment_clean", params: [{ segments: target, repeat: twice ? 2 : 1 }] });
       return this._call("vacuum", "start", { entity_id: id });
     }
     if (k === "pause") return this._call("vacuum", "pause", { entity_id: id });
@@ -4954,91 +5075,6 @@ class RobotVacuumCard extends HTMLElement {
     }
   }
 
-  /* ---- Cleaning settings sheet ---- */
-
-  _rows() {
-    const m = this._m;
-    const f = this._found;
-    const st = (id) => (id ? this._hass.states[id] : undefined);
-    const v = st(this._config.entity);
-    const mode = DEAD.includes(m.mode) ? null : m.mode;
-    const rows = [];
-    if (f.mode && st(f.mode)) rows.push({ k: "mode", label: "Mode", cur: mode, opts: offer(st(f.mode).attributes?.options, mode, ORDER.mode) });
-    if (v?.attributes?.fan_speed_list) rows.push({ k: "fan", label: "Suction", cur: m.fan, opts: offer(v.attributes.fan_speed_list, m.fan, ORDER.fan), hide: mode === "mop" });
-    if (f.mop_water && st(f.mop_water)) rows.push({ k: "water", label: "Mop water", cur: m.water, opts: offer(st(f.mop_water).attributes?.options, m.water, ORDER.water), hide: mode === "vacuum" });
-    // Deep and Deep+ routes only apply when mopping alone; suction only when vacuuming.
-    if (f.mop_route && st(f.mop_route)) {
-      const all = offer(st(f.mop_route).attributes?.options, m.route, ORDER.route);
-      const opts = mode === "mop" ? all : all.filter((o) => !["deep", "deep_plus"].includes(o) || o === m.route);
-      rows.push({ k: "route", label: "Mop route", cur: m.route, opts, hide: mode === "vacuum" });
-    }
-    return rows;
-  }
-
-  _openSheet() {
-    if (this._sheet) return;
-    const host = document.createElement("rvc-settings-sheet");
-    const root = host.attachShadow({ mode: "open" });
-    root.innerHTML = `<style>${SHEET_CSS}</style><div class="backdrop"></div>
-      <div class="dialog" role="dialog" aria-modal="true" aria-label="Cleaning settings">
-        <div class="row"><div class="glyph" style="background:${tint(C.blue, 20)}"><ha-icon icon="mdi:tune-variant" style="color:${C.blue}"></ha-icon></div>
-          <div class="title">Cleaning settings</div></div>
-        <div class="rows"></div>
-        <div class="actions"><button class="done"><span class="glyph"><ha-icon icon="mdi:check"></ha-icon></span>Done</button></div></div>`;
-    const onKey = (e) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        this._closeSheet();
-      }
-    };
-    root.querySelector(".backdrop").addEventListener("click", () => this._closeSheet());
-    root.querySelector(".done").addEventListener("click", () => this._closeSheet());
-    root.querySelector(".rows").addEventListener("click", (e) => {
-      const b = e.target.closest("button[data-v]");
-      if (!b || b.getAttribute("aria-pressed") === "true") return;
-      const k = b.closest("[data-k]").dataset.k;
-      const f = this._found;
-      const v = b.dataset.v;
-      // Show the choice at once; the next state update confirms it.
-      b.parentElement.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-      if (k === "fan") this._call("vacuum", "set_fan_speed", { entity_id: this._config.entity, fan_speed: v });
-      else this._call("select", "select_option", { entity_id: { mode: f.mode, water: f.mop_water, route: f.mop_route }[k], option: v });
-    });
-    document.addEventListener("keydown", onKey, true);
-    document.body.appendChild(host);
-    this._sheet = { host, root, onKey, key: "" };
-    this._syncSheet();
-    root.querySelector(".done").focus();
-  }
-
-  _syncSheet() {
-    const sh = this._sheet;
-    if (!sh || !this._m) return;
-    const rows = this._rows();
-    const key = rows.map((r) => `${r.k}:${r.opts.join(",")}`).join("|");
-    const box = sh.root.querySelector(".rows");
-    if (key !== sh.key) {
-      box.innerHTML = rows
-        .map((r) => `<div class="sect" data-k="${r.k}"><div class="k">${esc(r.label)}</div><div class="seg">${r.opts
-          .map((o) => `<button data-v="${esc(o)}">${esc(optLabel(o))}</button>`).join("")}</div></div>`)
-        .join("");
-      sh.key = key;
-    }
-    for (const r of rows) {
-      const sect = box.querySelector(`[data-k="${r.k}"]`);
-      sect.hidden = !!r.hide;
-      sect.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === r.cur)));
-    }
-  }
-
-  _closeSheet() {
-    const sh = this._sheet;
-    if (!sh) return;
-    document.removeEventListener("keydown", sh.onKey, true);
-    sh.host.remove();
-    this._sheet = null;
-  }
-
   async _call(domain, service, data) {
     try {
       await this._hass.callService(domain, service, data);
@@ -5057,7 +5093,7 @@ async function registerRobotVacuumCard() {
   window.customCards.push({
     type: RVC_TAG,
     name: "Robot vacuum",
-    description: "Robot vacuum: state, battery, map with floors, room cleaning, cleaning settings and the buttons for the state.",
+    description: "Robot vacuum: state, battery, map with floors, room cleaning and buttons – or (layout: mode) the cleaning mode, like the Roborock app.",
   });
   console.info(`%c ROBOT-VACUUM-CARD %c ${RVC_VERSION} `, "background:#2196f3;color:#fff", "");
 }
@@ -6122,20 +6158,22 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== vacuum-maintenance-card 1.0.0 ===== */
+/* ===== vacuum-maintenance-card 2.0.0 ===== */
 (() => {
 /*
  * Vacuum maintenance card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * A robot vacuum's consumables in one row of numbers: main brush, side brush, filter and
  * sensors as the share of life left (hours when the life isn't known, e.g. the dock's brush
- * and strainer), what is due next, and the dock's water tanks and auto-empty mode as chips.
- * Tap a number for the details (hours left, about how many cleans that is at your average)
- * and Reset after replacing, which asks first. Entities are found from the vacuum's device
- * and its dock device. See cards/vacuum-maintenance-card/README.md for every option.
+ * and strainer), what is due next, a quiet line for the dock (water tanks, auto-empty mode)
+ * and – while the robot is on the dock – the dock's own jobs: Empty, Wash mop and Dry, each
+ * glowing while it runs and asking before it starts or stops. Tap a number for the details
+ * (hours left, about how many cleans that is at your average) and Reset after replacing,
+ * which asks first. Entities are found from the vacuum's device and its dock device.
+ * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "1.0.0";
+const VMC_VERSION = "2.0.0";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -6143,6 +6181,7 @@ const C = {
   amber: "var(--amber-color, #ffc107)",
   red: "var(--red-color, #f44336)",
   orange: "var(--orange-color, #ff9800)",
+  blue: "var(--blue-color, #2196f3)",
 };
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 const tx = (c, p = 70) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-color))`;
@@ -6179,6 +6218,30 @@ const OTHER = {
   clean_box: { domain: "binary_sensor", tk: ["clean_box_empty", "dock_clean_water_box"], sfx: ["_clean_water_box"] },
   dirty_box: { domain: "binary_sensor", tk: ["dirty_box_full", "dock_dirty_water_box"], sfx: ["_dirty_water_box"] },
   empty_mode: { domain: "select", tk: ["dust_collection_mode", "dock_empty_mode"], sfx: ["_empty_mode", "_dust_collection_mode"] },
+  // The dock's own jobs, as switches that are on while each runs.
+  empty_sw: { domain: "switch", tk: ["dust_emptying", "dock_dust_emptying"], sfx: ["_dust_emptying"] },
+  wash_sw: { domain: "switch", tk: ["mop_washing", "dock_mop_washing"], sfx: ["_mop_washing"] },
+  dry_sw: { domain: "switch", tk: ["mop_drying", "dock_mop_drying"], sfx: ["_mop_drying"] },
+};
+const JOBS = [
+  ["empty_sw", "mdi:delete-empty-outline", "Empty", "Emptying"],
+  ["wash_sw", "mdi:water-sync", "Wash mop", "Washing"],
+  ["dry_sw", "mdi:fan", "Dry", "Drying"],
+];
+/* The dock's jobs ask before they start and before they stop (the user's choice). */
+const DOCK_CONFIRM = {
+  empty_sw: {
+    start: { title: "Empty the bin", label: "Empty", text: "The dock empties the robot's dust bin into its bag now. It's loud for about half a minute." },
+    stop: { title: "Stop emptying", label: "Stop emptying", text: "The dock stops emptying the bin now." },
+  },
+  wash_sw: {
+    start: { title: "Wash the mop", label: "Wash mop", text: "The dock washes the mop now, with clean water from its tank. The dirty water goes to the dirty tank." },
+    stop: { title: "Stop washing", label: "Stop washing", text: "The dock stops washing the mop now." },
+  },
+  dry_sw: {
+    start: { title: "Dry the mop", label: "Dry", text: "The dock dries the mop now, for the drying time set in the Roborock app." },
+    stop: { title: "Stop drying", label: "Stop drying", text: "The dock stops drying the mop now, so it may stay damp." },
+  },
 };
 
 function deviceEntityIds(hass, vacuumId) {
@@ -6241,6 +6304,9 @@ function model(hass, cfg, found) {
     clean: found.clean_box ? { e: found.clean_box, bad: box(found.clean_box) === "on" } : null,
     dirty: found.dirty_box ? { e: found.dirty_box, bad: box(found.dirty_box) === "on" } : null,
     empty: found.empty_mode && !DEAD.includes(box(found.empty_mode)) ? { e: found.empty_mode, mode: box(found.empty_mode) } : null,
+    vacuum: hass.states[cfg.entity]?.state,
+    jobs: JOBS.filter(([k]) => found[k] && hass.states[found[k]]).map(([k, icon, idle, running]) => ({
+      k, icon, idle, running, e: found[k], on: box(found[k]) === "on", dead: DEAD.includes(box(found[k])) })),
   };
 }
 
@@ -6279,6 +6345,48 @@ const SHEET_CSS = `
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
 
+function confirmDialog({ title, icon, color, primary, secondary, confirmLabel }) {
+  return new Promise((resolve) => {
+    const host = document.createElement("vmc-confirm-dialog");
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>${SHEET_CSS}
+      .body { margin-top: 20px; }
+      .primary { font-size: 17px; line-height: 24px; font-weight: 600; }
+      .secondary { font-size: 15px; line-height: 21px; margin-top: 2px; color: var(--secondary-text-color); }
+      .buttons { margin-top: 20px; padding-top: 0; border-top: none; }
+      button.confirm { color: #fff; }
+      button.confirm .glyph { background: rgba(255,255,255,.2); }
+      button.confirm .glyph ha-icon { color: #fff; }</style>
+      <div class="backdrop"></div>
+      <div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+        <div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(icon)}" style="color:${color}"></ha-icon></div>
+          <div class="title">${esc(title)}</div></div>
+        <div class="row body"><div class="glyph"><ha-icon icon="mdi:robot-vacuum" style="color:${color}"></ha-icon></div>
+          <div><div class="primary">${esc(primary)}</div><div class="secondary">${esc(secondary)}</div></div></div>
+        <div class="buttons">
+          <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
+          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+        </div></div>`;
+    const done = (ok) => {
+      document.removeEventListener("keydown", onKey, true);
+      host.remove();
+      resolve(ok);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        done(false);
+      }
+    };
+    root.querySelector(".backdrop").addEventListener("click", () => done(false));
+    root.querySelector(".cancel").addEventListener("click", () => done(false));
+    root.querySelector(".confirm").addEventListener("click", () => done(true));
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(host);
+    root.querySelector(".confirm").focus();
+  });
+}
+
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
@@ -6302,16 +6410,24 @@ const CSS = `
   .stats b.soon { color: ${tx(C.amber, 70)}; }
   .stats b.due { color: ${tx(C.red, 85)}; }
   .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  .chips:empty { display: none; }
-  .chip { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; height: 30px; border-radius: 15px; padding: 0 12px 0 8px;
-    font-size: 12px; font-weight: 500; letter-spacing: .2px; white-space: nowrap; cursor: pointer;
-    background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--secondary-text-color); -webkit-tap-highlight-color: transparent; }
-  .chip ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; }
-  .chip.bad { background: ${tint(C.red, 18)}; color: ${tx(C.red, 85)}; }
-  .chip.bad ha-icon { color: ${C.red}; }
-  .stats > button:active, .chip:active { filter: brightness(.92); }
-  .stats > button:focus-visible, .chip:focus-visible, .s:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  /* The dock: one quiet line (a tank that needs you turns red), then its jobs as primary pills. */
+  .dock { margin-top: 10px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
+  .dock:empty { display: none; }
+  .dock .p { white-space: nowrap; }
+  .dock [data-e] { cursor: pointer; border-radius: 4px; }
+  .dock .bad { color: ${tx(C.red, 85)}; }
+  .jobs { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+  .jobs:empty { display: none; }
+  .pill { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; border-radius: 18px;
+    padding: 0 10px; min-width: 0; font-size: 13px; font-weight: 600; letter-spacing: .2px; white-space: nowrap; cursor: pointer;
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color); -webkit-tap-highlight-color: transparent; }
+  .pill span { overflow: hidden; text-overflow: ellipsis; }
+  .pill ha-icon { --mdc-icon-size: 18px; color: ${C.grey}; flex: none; }
+  .pill.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
+  .pill.run ha-icon { color: ${C.blue}; }
+  .pill[disabled] { opacity: .45; cursor: default; }
+  .stats > button:active, .pill:active { filter: brightness(.92); }
+  .stats > button:focus-visible, .pill:focus-visible, .s:focus-visible, .dock [data-e]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
 class VacuumMaintenanceCard extends HTMLElement {
@@ -6328,11 +6444,14 @@ class VacuumMaintenanceCard extends HTMLElement {
           { name: "title", selector: { text: {} } },
           { name: "due_soon", selector: { number: { min: 0, max: 100, mode: "box", unit_of_measurement: "h" } } },
         ] },
-        { name: "hide_dock", selector: { boolean: {} } },
+        { type: "grid", name: "", schema: [
+          { name: "hide_dock", selector: { boolean: {} } },
+          { name: "hide_dock_actions", selector: { boolean: {} } },
+        ] },
         { name: "lives", selector: { object: {} } },
       ],
       computeLabel: (s) =>
-        ({ entity: "Vacuum", title: "Title", due_soon: "Due soon below", hide_dock: "Hide the dock chips", lives: "Lives in hours (YAML)" })[s.name] ?? s.name,
+        ({ entity: "Vacuum", title: "Title", due_soon: "Due soon below", hide_dock: "Hide the dock line and jobs", hide_dock_actions: "Hide Empty / Wash mop / Dry", lives: "Lives in hours (YAML)" })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
           due_soon: "A part with fewer hours left than this shows in amber. Default 10.",
@@ -6371,9 +6490,14 @@ class VacuumMaintenanceCard extends HTMLElement {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${CSS}</style><ha-card>
       <div class="label"><div class="slot"><ha-icon icon="mdi:wrench-clock"></ha-icon></div><span class="t"></span><span class="s" role="button" tabindex="0"></span></div>
-      <div class="stats"></div><div class="chips"></div></ha-card>`;
+      <div class="stats"></div><div class="dock"></div><div class="jobs"></div></ha-card>`;
     const card = root.querySelector("ha-card");
     card.addEventListener("click", (e) => {
+      const job = e.target.closest("[data-job]");
+      if (job) {
+        if (!job.disabled) this._job(job.dataset.job);
+        return;
+      }
       const b = e.target.closest("[data-k]");
       if (b) return this._openSheet(b.dataset.k);
       if (e.target.closest(".s") && this._m?.next) return this._openSheet(this._m.next.k);
@@ -6429,15 +6553,50 @@ class VacuumMaintenanceCard extends HTMLElement {
       b.classList.toggle("soon", i.soon);
     }
 
-    const chips = [];
+    // The dock: a quiet line, red where a tank needs you.
+    const parts = [];
     if (!this._config.hide_dock) {
-      if (m.clean) chips.push([m.clean.e, m.clean.bad, m.clean.bad ? "mdi:cup-off-outline" : "mdi:cup-water", m.clean.bad ? "Clean water empty" : "Clean water OK"]);
-      if (m.dirty) chips.push([m.dirty.e, m.dirty.bad, m.dirty.bad ? "mdi:water-off" : "mdi:water-check", m.dirty.bad ? "Dirty water full" : "Dirty water OK"]);
-      if (m.empty) chips.push([m.empty.e, false, "mdi:delete-empty-outline", `Auto-empty: ${human(m.empty.mode)}`]);
+      if (m.clean) parts.push([m.clean.e, m.clean.bad, m.clean.bad ? "Clean water empty" : "Clean water OK"]);
+      if (m.dirty) parts.push([m.dirty.e, m.dirty.bad, m.dirty.bad ? "Dirty water full" : "Dirty water OK"]);
+      if (m.empty) parts.push([m.empty.e, false, `Auto-empty ${human(m.empty.mode)}`]);
     }
-    set(".chips", chips
-      .map(([e, bad, icon, label]) => `<button class="chip${bad ? " bad" : ""}" data-e="${esc(e)}"><ha-icon icon="${icon}"></ha-icon>${esc(label)}</button>`)
-      .join(""), true);
+    set(".dock", parts.length
+      ? ["Dock", ...parts.map(([e, bad, label]) => `<span class="p${bad ? " bad" : ""}" data-e="${esc(e)}" role="button" tabindex="0">${esc(label)}</span>`)].join(" · ")
+      : "", true);
+
+    // The dock's jobs, only while the robot is on the dock (greyed out while it's offline).
+    const jobsBox = root.querySelector(".jobs");
+    const offline = !m.vacuum || DEAD.includes(m.vacuum);
+    const jobs = !this._config.hide_dock && !this._config.hide_dock_actions && (m.vacuum === "docked" || offline) ? m.jobs : [];
+    const jk = jobs.map((j) => j.k).join();
+    if (jk !== this._keys.jobs) {
+      jobsBox.style.setProperty("--n", String(jobs.length || 1));
+      jobsBox.innerHTML = jobs.map((j) => `<button class="pill" data-job="${j.k}"><ha-icon icon="${j.icon}"></ha-icon><span></span></button>`).join("");
+      this._keys.jobs = jk;
+    }
+    for (const j of jobs) {
+      const b = jobsBox.querySelector(`[data-job="${j.k}"]`);
+      const label = j.on ? j.running : j.idle;
+      const sp = b.querySelector("span");
+      if (sp.textContent !== label) sp.textContent = label;
+      b.classList.toggle("run", j.on);
+      b.setAttribute("aria-pressed", String(j.on));
+      b.disabled = offline || j.dead;
+    }
+  }
+
+  async _job(k) {
+    const j = this._m?.jobs.find((x) => x.k === k);
+    if (!j) return;
+    const c = DOCK_CONFIRM[k]?.[j.on ? "stop" : "start"];
+    if (c) {
+      const ok = await confirmDialog({
+        title: c.title, icon: j.on ? "mdi:stop-circle-outline" : j.icon, color: j.on ? C.orange : C.blue,
+        primary: this._hass.states[this._config.entity]?.attributes?.friendly_name || "Vacuum", secondary: c.text, confirmLabel: c.label,
+      });
+      if (!ok) return;
+    }
+    return this._call("switch", j.on ? "turn_off" : "turn_on", { entity_id: j.e });
   }
 
   /* ---- Details sheet ---- */
