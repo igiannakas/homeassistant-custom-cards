@@ -18,7 +18,7 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 │ │ (tune) Cleaning mode                            › │ │
 │ │        Vac & mop · Turbo · Intense mop            │ │
 │ └──────────────────────────────────────────────────┘ │
-│ (    ▶ Clean all     ) (     Auto clean     )         │
+│ (    ▶ Clean entire floor     ) (     Auto clean     )         │
 │ (   Empty   ) (  Wash mop  ) (    Dry    )   docked   │
 └──────────────────────────────────────────────────────┘
 ```
@@ -53,7 +53,7 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 - **Cleaning mode tile**: what the next clean will use ("Vac & mop · Turbo · Intense mop",
   "· ×2" for two passes) under a blue tune icon, with a chevron – a taller tile, so it never
   reads as one more room. A tap opens the Cleaning mode sheet (below).
-- **Buttons** for the state: Clean all (or Clean N rooms) when idle, Pause and Dock while
+- **Buttons** for the state: Clean entire floor (or Clean N rooms) when idle, Pause and Dock while
   cleaning, Resume and Dock when paused, Pause while returning. Dock only shows when the
   robot is away from the dock. Every button asks first except Pause; the clean's
   confirmation names the rooms, the cleaning count and the settings it will use ("Study

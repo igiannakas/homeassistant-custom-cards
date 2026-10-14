@@ -4,7 +4,7 @@
  * A Roborock (or similar) robot vacuum. The default layout: state and battery, what needs you
  * (dock tanks, errors), the job while it runs, a floor switch and the floor map (cropped to
  * the rooms, live while cleaning; a switch shows at once), the rooms in an even grid to build
- * a clean, a Cleaning mode tile, and the buttons for the state – Clean all / Clean N rooms,
+ * a clean, a Cleaning mode tile, and the buttons for the state – Clean entire floor / Clean N rooms,
  * Pause, Resume, Dock – plus an optional Auto clean pill, and while the robot is docked the
  * dock's own jobs: Empty, Wash mop, Dry (glowing while they run). Every button asks first
  * except Pause.
@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.2.0";
+const RVC_VERSION = "2.2.1";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -1038,7 +1038,7 @@ class RobotVacuumCard extends HTMLElement {
     else if (m.key === "paused") acts.push(["resume", "Resume", "mdi:play", C.blue], ["dock", "Dock", "mdi:home-import-outline", C.grey]);
     else if (m.key === "returning") acts.push(["pause", "Pause", "mdi:pause", C.amber]);
     else {
-      acts.push(["clean", n ? `Clean ${n} room${n > 1 ? "s" : ""}` : "Clean all", "mdi:play", C.blue]);
+      acts.push(["clean", n ? `Clean ${n} room${n > 1 ? "s" : ""}` : "Clean entire floor", "mdi:play", C.blue]);
       // One control per job: Dock only while the robot is away from the dock.
       if (hass.states[this._config.entity]?.state !== "docked") acts.push(["dock", "Dock", "mdi:home-import-outline", C.grey]);
     }
@@ -1378,7 +1378,7 @@ class RobotVacuumCard extends HTMLElement {
       const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
       const times = twice ? ", twice" : "";
       const ok = await this._ask(
-        segs.length ? `Clean ${segs.length} room${segs.length > 1 ? "s" : ""}` : "Clean all",
+        segs.length ? `Clean ${segs.length} room${segs.length > 1 ? "s" : ""}` : "Clean entire floor",
         "mdi:play", C.blue,
         segs.length ? `${list}${times}${how ? `, ${how}` : ""}.` : `Every room${m.mapName ? ` on the ${m.mapName}` : ""}${times}${how ? `, ${how}` : ""}.`,
         "Clean",

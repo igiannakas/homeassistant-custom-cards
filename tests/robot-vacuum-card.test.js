@@ -173,9 +173,9 @@ const cfg = {
   eq(["Second Bedroom", "Master Bedroom", "En-suite Bathroom", "Bathroom", "Upstairs Corridor", "Study"].map(icon),
     ["mdi:baby-carriage", "mdi:bed-king", "mdi:shower", "mdi:bathtub", "mdi:stairs", "mdi:chair-rolling"]);
 
-  // Docked: one row of buttons, Clean all and Auto clean (glowing: the automation is on).
+  // Docked: one row of buttons, Clean entire floor and Auto clean (glowing: the automation is on).
   // No settings chips and no dock jobs on this card any more.
-  eq(acts(), ["Clean all", "Auto clean"]);
+  eq(acts(), ["Clean entire floor", "Auto clean"]);
   assert(q('[data-k="auto"]').classList.contains("on"));
   assert.strictEqual(q(".acts").style.getPropertyValue("--n"), "2");
   assert(!q(".sets"), "no settings rows on the card itself");
@@ -229,9 +229,9 @@ const cfg = {
   q('[data-k="clean"]').click();
   assert.strictEqual(await yes("Clean 2 rooms"), "Study and Upstairs Corridor, Vac & mop · Turbo · Standard mop.");
   eq(calls.pop(), ["vacuum", "send_command", { entity_id: "vacuum.vacuum_cleaner", command: "app_segment_clean", params: [{ segments: [21, 20], repeat: 1 }] }]);
-  eq(acts(), ["Clean all", "Auto clean"]);
+  eq(acts(), ["Clean entire floor", "Auto clean"]);
   q('[data-k="clean"]').click();
-  assert.strictEqual(await yes("Clean all"), "Every room on the First floor, Vac & mop · Turbo · Standard mop.");
+  assert.strictEqual(await yes("Clean entire floor"), "Every room on the First floor, Vac & mop · Turbo · Standard mop.");
   eq(calls.pop(), ["vacuum", "start", { entity_id: "vacuum.vacuum_cleaner" }]);
 
   // Auto clean asks, then toggles the automation.
@@ -249,7 +249,7 @@ const cfg = {
   eq(all(".floors button").map((b) => b.getAttribute("aria-pressed")), ["false", "true"]);
   assert(card._mapKey.startsWith("image.study_vacuum_cleaner_ground_floor|"));
   assert(!q(".map .loading").hidden, "Loading map… while the robot loads it");
-  eq(acts(), ["Clean all", "Auto clean"], "selection cleared");
+  eq(acts(), ["Clean entire floor", "Auto clean"], "selection cleared");
   card.hass = full(states()); // robot not there yet: still showing the new floor
   eq(roomNames(), ["Kitchen", "Downstairs Corridor", "Downstairs Bathroom", "Living room"]);
   card.hass = full(states({ "select.vacuum_cleaner_selected_map": st("Ground floor", { options: ["First floor", "Ground floor"] }) }));
@@ -374,7 +374,7 @@ const cfg = {
   assert.strictEqual(value("count"), "2 times");
   assert.strictEqual(t.window.localStorage.getItem("robot-vacuum-card:count:vacuum.vacuum_cleaner"), "2");
   q('[data-k="clean"]').click();
-  assert.strictEqual(await yes("Clean all"), "Every room on the First floor, twice, Vac & mop · Turbo · Standard mop.");
+  assert.strictEqual(await yes("Clean entire floor"), "Every room on the First floor, twice, Vac & mop · Turbo · Standard mop.");
   eq(calls.pop(), ["vacuum", "send_command", { entity_id: "vacuum.vacuum_cleaner", command: "app_segment_clean", params: [{ segments: [16, 17, 18, 19, 20, 21], repeat: 2 }] }]);
   room("Study").click();
   q('[data-k="clean"]').click();
@@ -434,7 +434,7 @@ const cfg = {
   card.hass = full(states({ "binary_sensor.vacuum_cleaner_dock_dirty_water_box": st("on", { device_class: "problem" }) }));
   assert.strictEqual(text(".nm"), "Vacuum cleaner · Needs you");
   eq(all(".msg").map((m) => m.textContent.trim()), ["Dock: empty the dirty water tank"]);
-  eq(acts(), ["Clean all", "Auto clean"]);
+  eq(acts(), ["Clean entire floor", "Auto clean"]);
   assert(!q('[data-k="clean"]').disabled, "Needs you doesn't stop a clean");
   q(".msg").click();
   eq(events.pop(), ["more-info", "binary_sensor.vacuum_cleaner_dock_dirty_water_box"]);
@@ -445,11 +445,11 @@ const cfg = {
   card.hass = full(states({ "vacuum.vacuum_cleaner": st("error", { friendly_name: "Vacuum cleaner" }), "sensor.vacuum_cleaner_vacuum_error": st("main_brush_jammed") }));
   assert.strictEqual(text(".nm"), "Vacuum cleaner · Error");
   eq(all(".msg").map((m) => m.textContent.trim()), ["Robot: main brush jammed"]);
-  eq(acts(), ["Clean all", "Dock", "Auto clean"]);
+  eq(acts(), ["Clean entire floor", "Dock", "Auto clean"]);
 
   // Idle away from the dock: Dock appears.
   card.hass = full(states({ "vacuum.vacuum_cleaner": st("idle", { friendly_name: "Vacuum cleaner" }) }));
-  eq(acts(), ["Clean all", "Dock", "Auto clean"]);
+  eq(acts(), ["Clean entire floor", "Dock", "Auto clean"]);
   q('[data-k="dock"]').click();
   assert.strictEqual(await yes("Return to the dock"), "The robot goes back to the dock.");
   eq(calls.pop(), ["vacuum", "return_to_base", { entity_id: "vacuum.vacuum_cleaner" }]);
@@ -485,7 +485,7 @@ const cfg = {
   const r2 = card2.shadowRoot;
   assert(r2.querySelector(".map").hidden && r2.querySelector(".rooms").hidden && r2.querySelector(".modetile").hidden);
   assert(r2.querySelector(".batt").classList.contains("low"));
-  eq([...r2.querySelectorAll(".acts:not(.jobs) .pill")].map((b) => b.textContent.trim()), ["Clean all", "Dock"]);
+  eq([...r2.querySelectorAll(".acts:not(.jobs) .pill")].map((b) => b.textContent.trim()), ["Clean entire floor", "Dock"]);
   assert.strictEqual(r2.querySelectorAll(".jobs .pill").length, 0);
 
   // Without the entity registry (old frontend): found by object id.
