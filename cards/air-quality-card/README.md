@@ -30,9 +30,10 @@
   same height.
 - The status shares a line with CO₂ and VOC only when all of them fit; otherwise
   it has its own line and CO₂ and VOC stay together on the next. When a room's
-  name or its CO₂ and VOC would need a second line, every tile takes the phone's
-  8px sides instead, if that keeps them whole ("CO₂ 655 ppm  VOC 146" on a 440px
-  phone), so one room never makes every tile taller. Text sizes never change.
+  name or its CO₂ and VOC would need a second line, every tile takes the tight
+  phone spacing (6px sides, 6px icon gap) instead, if that keeps them whole ("CO₂
+  526 ppm  VOC 119" on a 430–440px phone), so one room never makes every tile
+  taller. The card checks where the text actually lands. Text sizes never change.
 
 ## Configuration
 

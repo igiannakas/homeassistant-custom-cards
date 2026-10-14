@@ -361,7 +361,6 @@ const cfg = {
   assert(/\.room \.nm \{ flex: 1; min-width: 0;[^}]*overflow-wrap: break-word/.test(css), "a long name wraps");
   assert(/@container \(max-width: 175px\) \{ \.tile, \.stack \.tile \{ padding: 11px 6px; gap: 6px; \} \}/.test(css), "phone tile spacing as before, two-line readings or not");
   assert(/\.tight \.tile \{ padding: 11px 6px; gap: 6px; \}/.test(css), "a name that doesn't fit gets the phone spacing, not a second line");
-  assert(/\.measure \.room \.nm \{ white-space: nowrap; \}/.test(css), "names measured on one line");
   assert(!/\.room \.nm \{[^}]*font-size: 1[0-3]/.test(css) && !/\.tight[^{]*\{[^}]*font-size/.test(css), "the name is never shrunk");
   assert(!("_fitRooms" in card), "no column fitting: columns are fixed");
 

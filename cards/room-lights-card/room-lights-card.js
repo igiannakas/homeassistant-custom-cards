@@ -10,7 +10,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.5.1";
+const RLC_VERSION = "1.5.2";
 const RLC_TAG = "room-lights-card";
 
 // One meaning per colour (design tokens → Colours): orange = lights, green = someone here,
@@ -398,7 +398,6 @@ const CSS = `
   /* While the card measures (one frame, never painted): names, presence and readings on one line
      at their natural width. */
   .measure .m, .measure .g { flex-wrap: nowrap; }
-  .measure .room .nm { white-space: nowrap; }
   /* When any room's readings do not fit on one line (the card measures this), every tile
      switches together: temperature on one line, humidity + light level on the next. All tiles
      keep the same height (grid-auto-rows: 1fr) even if one room has more sensors. */
@@ -626,10 +625,16 @@ class RoomLightsCard extends HTMLElement {
       card.classList.remove("stack", "tight");
       card.classList.add("measure");
       const stack = [...card.querySelectorAll(".m, .g")].some(over);
-      card.classList.toggle("stack", stack);
-      const tight = [...card.querySelectorAll(".room .nm")].some(over);
       card.classList.remove("measure");
-      card.classList.toggle("tight", tight);
+      card.classList.toggle("stack", stack);
+      // Names: read where they actually land (a name 0.4px too wide still wraps; rounded widths
+      // miss it). Tighter spacing stays only if it puts a wrapped name back on one line.
+      const wrapped = () => [...card.querySelectorAll(".room .nm")].filter((n) => n.getBoundingClientRect().height > 30).length;
+      const before = wrapped();
+      if (before) {
+        card.classList.add("tight");
+        if (wrapped() >= before) card.classList.remove("tight");
+      }
     });
   }
 

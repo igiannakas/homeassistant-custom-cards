@@ -10,7 +10,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.3.3";
+const AQC_VERSION = "1.3.4";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -139,13 +139,13 @@ const CSS = `
   .v.hot small { color: inherit; }
   .room:active { filter: brightness(.92); }
   .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
-  /* Phone width: 8px tile sides (the shape–text gap stays 10px, so names stay at edge + 46). The
-     same when a room's name, or its CO₂ and VOC, would otherwise need a second line (measured):
-     "CO₂ 655 ppm  VOC 146" is 1.4px too wide for a 440px phone's tile, and one taller tile makes
-     every tile taller. Text sizes never change. */
+  /* Phone width: 8px tile sides (the shape–text gap stays 10px, so names stay at edge + 46). When
+     a room's name, or its CO₂ and VOC, would still need a second line, every tile takes the room
+     lights' tight phone spacing – 6px sides, 6px gap – if that keeps it on one: "CO₂ 526 ppm  VOC
+     119" is a few px too wide for a 430–440px phone's tile, and one taller tile makes every tile
+     taller. Text sizes never change. */
   @container rooms (max-width: 400px) { .room { padding: 11px 8px; } }
-  .tight .room { padding: 11px 8px; }
-  .measure .nm { white-space: nowrap; }
+  .tight .room { padding: 11px 6px; gap: 6px; }
   /* Status and gases on one line only when all fit; else the status alone, the gases together. */
   .split .row:not(.pm) .st { flex-basis: 100%; }
 `;
@@ -344,45 +344,41 @@ class AirQualityCard extends HTMLElement {
 
   /* The particle grid per tile: 4 across, else 2×2 (never 3 + 1), else one per line – from the
      readings' natural widths against the space the tile has. Without a layout nothing changes. */
-  /* Fit the tiles to what they hold, measured, the same for every tile (equal rows):
-     - the status and the gases share a line only when all of them fit; otherwise the status gets
-       its own line and CO₂ and VOC the next ("Excellent" / "CO₂ 655 ppm  VOC 146") – never a
-       ragged split with VOC left on its own;
-     - the phone's 8px tile sides whenever a room's name or its CO₂ and VOC wouldn't otherwise fit
-       on one line, so no tile – and with equal rows no row – grows a line for a pixel or two;
+  /* Fit the tiles to what they hold, the same for every tile (equal rows), read from where the
+     text actually lands – not from adding up rounded widths, which missed a VOC 0.4px too wide:
+     - the status and the gases share a line only when every tile's fit on one; otherwise the
+       status gets its own line and CO₂ and VOC the next ("Excellent" / "CO₂ 526 ppm  VOC 119") –
+       never a ragged split with VOC left on its own;
+     - the tight phone spacing (6px sides, 6px gap) whenever that puts a wrapped name or CO₂ / VOC
+       line back on one line, so no tile – and with equal rows no row – grows a line for a few px;
      - then each particle grid.
      Font sizes never change; a line that doesn't fit even then wraps between readings. */
   _fit() {
     const root = this.shadowRoot;
     const card = root?.querySelector("ha-card");
     if (!card || !card.isConnected) return;
-    const measure = () => {
-      card.classList.add("measure");
-      const r = { name: false, gases: false, all: false };
-      for (const t of root.querySelectorAll(".room")) {
-        const nm = t.querySelector(".nm");
-        if (nm && nm.scrollWidth > nm.clientWidth + 1) r.name = true;
-        const row = t.querySelector(".row:not(.pm)");
-        const avail = t.querySelector(".txt")?.clientWidth;
-        if (!row || !avail) continue;
-        const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
-        const span = (els) => els.reduce((a, c) => a + c.getBoundingClientRect().width, 0) + gap * Math.max(0, els.length - 1);
-        const kids = [...row.children];
-        if (span(kids.filter((c) => !c.classList.contains("st"))) > avail + 0.5) r.gases = true;
-        if (span(kids) > avail + 0.5) r.all = true;
-      }
-      card.classList.remove("measure");
-      return r;
-    };
+    const rooms = [...root.querySelectorAll(".room")];
+    const lines = (els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top))).size;
+    const wrapped = (el) => !!el && el.getBoundingClientRect().height > (parseFloat(getComputedStyle(el).lineHeight) || 20) * 1.5;
+    const gasesOf = (t) => [...(t.querySelector(".row:not(.pm)")?.children || [])].filter((c) => !c.classList.contains("st"));
+    // Tiles where something meant for one line takes two.
+    const broken = () => rooms.filter((t) => wrapped(t.querySelector(".nm")) || (gasesOf(t).length > 1 && lines(gasesOf(t)) > 1)).length;
+    // Does every tile's status and gases fit on one line?
+    const shared = () => rooms.every((t) => {
+      const row = t.querySelector(".row:not(.pm)");
+      return !row || lines([...row.children]) === 1;
+    });
     card.classList.remove("tight", "split");
-    let m = measure();
-    if (m.name || m.gases) {
+    card.classList.toggle("split", !shared());
+    const before = broken();
+    if (before) {
       card.classList.add("tight");
-      const t = measure();
-      if ((t.name && t.gases) || (t.name === m.name && t.gases === m.gases)) card.classList.remove("tight"); // no help: roomy
-      else m = t;
+      if (broken() >= before) card.classList.remove("tight"); // no help: keep the roomy sides
+      else if (card.classList.contains("split")) {
+        card.classList.remove("split");
+        card.classList.toggle("split", !shared());
+      }
     }
-    card.classList.toggle("split", m.all);
     this._fitPm();
   }
 

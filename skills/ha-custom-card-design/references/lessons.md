@@ -63,7 +63,7 @@ Most of them generalise to any dashboard.
 - Think about the scroll order (context → shortcuts → per-room controls → later sections). Link deeper dashboards from a pill rather than embedding them.
 - Global switches go in the section header, not in the tile grid.
 - Design for what's coming next, but build only what was asked.
-- One line that wraps in one tile makes every tile taller (equal rows). Before letting it wrap, win the space back by measuring: the card's phone spacing (room lights 6px, air quality 8px tile sides) when that keeps every name and reading line whole. Never shrink the font, never cut the text.
+- One line that wraps in one tile makes every tile taller (equal rows). Before letting it wrap, win the space back by measuring: the tight phone spacing (6px tile sides, 6px icon gap) when that keeps every name and reading line whole. Judge it from where the text actually lands (line tops, heights), never by adding up rounded widths – a VOC 0.4px too wide slipped through that way. Never shrink the font, never cut the text.
 - Lines that wrap keep their groups: a status and its readings share a line only if all fit; otherwise the status gets its own line and the readings stay together on the next (never a lone "VOC 80").
 
 ## Robot vacuum (Oct 2026)
