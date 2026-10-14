@@ -137,6 +137,7 @@ const cfg = {
   // Docked, live values: state, last clean with its numbers, battery, no messages.
   assert.strictEqual(text(".nm"), "Vacuum cleaner · Docked");
   assert(/^Last clean \w{3} \d\d:\d\d · 22\.6 m² · 28 min$/.test(text(".line")), text(".line"));
+  eq(all(".line .p").map((p) => p.textContent).slice(1), ["22.6 m²", "28 min"], "each part is one unbreakable span");
   assert.strictEqual(text(".batt"), "100%");
   assert.strictEqual(q(".batt ha-icon").getAttribute("icon"), "mdi:battery-charging-100");
   assert.strictEqual(all(".msg").length, 0);

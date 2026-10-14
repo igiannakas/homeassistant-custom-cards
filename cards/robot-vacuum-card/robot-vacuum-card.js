@@ -16,7 +16,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "1.1.0";
+const RVC_VERSION = "1.1.1";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -375,6 +375,7 @@ const CSS = `
   /* The line under the name may wrap (numbers are never cut off). */
   .sc { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .sc:empty { display: none; }
+  .sc .p { white-space: nowrap; }
   [data-e] { cursor: pointer; border-radius: 4px; -webkit-tap-highlight-color: transparent; }
   .sc [data-e]:active, .jt [data-e]:active { filter: brightness(.85); }
   /* Primary pills: 36px, the icon circle's height. */
@@ -717,7 +718,8 @@ class RobotVacuumCard extends HTMLElement {
     if (ic.getAttribute("icon") !== m.state.icon) ic.setAttribute("icon", m.state.icon);
     ic.style.color = m.state.color;
     set(".nm", `${esc(m.name)} <span class="st">· ${esc(m.state.word)}</span>`, true);
-    set(".line", m.line.map((p) => (p.e ? `<span data-e="${esc(p.e)}">${esc(p.t)}</span>` : esc(p.t))).join(" · "), true);
+    // Each part stays whole ("28 min" never splits); the line breaks only between parts.
+    set(".line", m.line.map((p) => `<span class="p"${p.e ? ` data-e="${esc(p.e)}"` : ""}>${esc(p.t)}</span>`).join(" · "), true);
     const batt = root.querySelector(".batt");
     batt.hidden = m.battery === null;
     if (m.battery !== null) {
