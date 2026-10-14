@@ -93,6 +93,11 @@ Most of these generalise to any dashboard.
 | "The maintenance bit should be the one from option C" (a row of numbers, over tiles with bars) | Consumables read best as a compact row of numbers with "Next: … in 13 h"; details, history and Reset are one tap away. Reset is the one action that asks first. |
 | Status line rendered "… 22.6 m² · 28 / min" at 375px | Units stay with their numbers: each part of a status line is an unbreakable span and the line breaks only at the separators. |
 | Picked option B "but" with five changes | A pick with tweaks is a go: redraw the mock-up with the changes so they can redirect, and build in parallel instead of waiting for a second approval. |
+| "clean all should be renamed to Clean entire floor" | Name the action by its real scope. When the scope changes with context (a floor switch), the label says which. |
+| "vertical alignment on the Next:... is wrong. Also it doesnt wrap." (a right-aligned "Next:" squeezed beside the title) | Secondary info about a card goes under its title as the title's second line, ink-aligned with the title and free to wrap – never squeezed into the title row's right side. A single-line title sits 1px low to centre on its icon, like everywhere else. |
+| "auto empty max → its not aligned to anything! It should be aligned to the icons and tap buttons for clean water" | Every item on a card snaps to a line something else already uses. A loose status line under tiles becomes a tile of its own (full width), so its circle and text share the tiles' x positions. Measure: same circle x, same text x. |
+| "text is clipped" ("Downstairs Bathro…" in a room pill) → "same text clipping" ("Wash m…" in a three-across pill row) | Never truncate a label. Rows of buttons: `display:flex; flex-wrap:wrap` with each pill `flex:1 1 0; min-width:max-content` – equal widths while everything fits, a longer label takes the width it needs, wrap as a last resort. Even grids (rooms): the label wraps inside its pill (min-height, not height), so the grid stays aligned. Measuring at 375px isn't enough – the user's phone and font size differ; check at 320px too. |
+| "dry is dry mop" | A short label still names its object when the verb alone is ambiguous next to its neighbours ("Dry mop", like "Wash mop"). |
 
 ## Process
 

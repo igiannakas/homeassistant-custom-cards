@@ -84,7 +84,11 @@ const devices = {
   assert.strictEqual(q(".t").textContent, "Dock & maintenance");
   // The water tanks first: two tiles with a tank glyph, blue and brown while all is well.
   const tanks = () => all(".tank").map((b) => [b.querySelector(".nm").textContent, b.querySelector(".st").textContent, b.classList.contains("bad")]);
-  eq(tanks(), [["Clean water", "OK", false], ["Dirty water", "OK", false]]);
+  eq(tanks(), [["Clean water", "OK", false], ["Dirty water", "OK", false], ["Auto-empty", "Max", false]]);
+  assert(q('.tank[data-tank="empty"]').classList.contains("wide"), "auto-empty spans the row, laid out like the tanks");
+  assert.strictEqual(q('.tank[data-tank="empty"] ha-icon').getAttribute("icon"), "mdi:delete-empty-outline");
+  // "Next: …" is the title's second line (it wraps), not a squeezed right-hand summary.
+  eq([...q(".lt").children].map((c) => c.className), ["t", "s"]);
   assert(q(".tanks").compareDocumentPosition(q(".stats")) & 4, "tanks come before the numbers");
   assert.strictEqual(all(".tank svg").length, 2);
   assert(q('.tank[data-tank="clean"] .shape').style.color.includes("blue"));
@@ -95,8 +99,7 @@ const devices = {
   assert.strictEqual(q(".s").textContent, "Next: dock brush in 13 h");
   assert(!all(".stats b").some((b) => b.classList.contains("soon") || b.classList.contains("due")));
   // The dock: one quiet line, each part opens its entity.
-  assert.strictEqual(q(".dock").textContent, "Auto-empty Max");
-  q(".dock [data-e]").click();
+  q('.tank[data-tank="empty"]').click();
   eq(events.pop(), ["more-info", "select.vacuum_cleaner_dock_empty_mode"]);
 
   // Details sheet: hours, cleans at your average, life; Reset asks first, then presses.
@@ -147,7 +150,7 @@ const devices = {
 
   // Dock tanks that need you glow red.
   card.hass = full(states({ "binary_sensor.vacuum_cleaner_dock_dirty_water_box": st("on"), "binary_sensor.vacuum_cleaner_dock_clean_water_box": st("on") }));
-  eq(tanks(), [["Clean water", "Empty – refill it", true], ["Dirty water", "Full – empty it", true]], "a tank that needs you glows red and says what to do");
+  eq(tanks(), [["Clean water", "Empty – refill it", true], ["Dirty water", "Full – empty it", true], ["Auto-empty", "Max", false]], "a tank that needs you glows red and says what to do");
   assert(q('.tank[data-tank="dirty"] .shape').style.color.includes("red"));
   card.hass = full(states());
   assert.strictEqual(all(".jobs, .pill").length, 0, "the dock's jobs live on the vacuum card");
@@ -159,7 +162,6 @@ const devices = {
   card2.hass = full(states());
   const r2 = card2.shadowRoot;
   assert.strictEqual(r2.querySelector(".t").textContent, "Care");
-  assert.strictEqual(r2.querySelector(".dock").textContent, "");
   assert.strictEqual(r2.querySelectorAll(".tank").length, 0);
   const card3 = document.createElement("vacuum-maintenance-card");
   document.body.appendChild(card3);
@@ -168,6 +170,10 @@ const devices = {
   assert.strictEqual(card3.shadowRoot.querySelector(".t").textContent, "Maintenance");
   eq([...r2.querySelectorAll(".stats b")].map((b) => b.textContent), ["97%", "96%", "94%", "71%", "4%", "27 h"]);
   eq([...r2.querySelectorAll(".stats b")].map((b) => b.classList.contains("soon")), [false, false, false, true, true, true]);
+
+  // Text is never clipped (a long label wraps instead).
+  const css = [...card3.shadowRoot.querySelectorAll("style")].map((x) => x.textContent).join("");
+  assert(!/text-overflow:\s*ellipsis/.test(css), "no clipped text");
 
   console.log("ALL VACUUM-MAINTENANCE-CARD TESTS PASSED");
   process.exit(0);

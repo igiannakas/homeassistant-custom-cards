@@ -3844,7 +3844,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 2.2.1 ===== */
+/* ===== robot-vacuum-card 2.2.2 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3854,7 +3854,7 @@ registerPrinterTempsCard();
  * the rooms, live while cleaning; a switch shows at once), the rooms in an even grid to build
  * a clean, a Cleaning mode tile, and the buttons for the state – Clean entire floor / Clean N rooms,
  * Pause, Resume, Dock – plus an optional Auto clean pill, and while the robot is docked the
- * dock's own jobs: Empty, Wash mop, Dry (glowing while they run). Every button asks first
+ * dock's own jobs: Empty, Wash mop, Dry mop (glowing while they run). Every button asks first
  * except Pause.
  *
  * The Cleaning mode tile shows the current mode ("Vac & mop · Turbo · Intense mop") and opens
@@ -3870,7 +3870,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.2.1";
+const RVC_VERSION = "2.2.2";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -4291,9 +4291,9 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
 /* Segmented selector (32px segments in a 38px track) and the mode rows' label + value line. */
 const SEG_CSS = `
   .seg { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
-  .seg button { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: 0; height: 32px; border-radius: 9px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
+  .seg button { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: 0; min-height: 32px; padding: 0 6px; border-radius: 9px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; line-height: 16px; font-weight: 500;
+    color: var(--secondary-text-color); overflow-wrap: break-word; -webkit-tap-highlight-color: transparent; }
   .seg button[aria-pressed="true"] { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
   .seg button[disabled] { opacity: .45; cursor: default; }
   .seg button:active { filter: brightness(.92); }
@@ -4343,7 +4343,7 @@ const MODE_SHEET_CSS = `
 const JOBS = [
   ["empty_sw", "mdi:delete-empty-outline", "Empty", "Emptying"],
   ["wash_sw", "mdi:water-sync", "Wash mop", "Washing"],
-  ["dry_sw", "mdi:fan", "Dry", "Drying"],
+  ["dry_sw", "mdi:fan", "Dry mop", "Drying"],
 ];
 const DOCK_CONFIRM = {
   empty_sw: {
@@ -4355,7 +4355,7 @@ const DOCK_CONFIRM = {
     stop: { title: "Stop washing", label: "Stop washing", text: "The dock stops washing the mop now." },
   },
   dry_sw: {
-    start: { title: "Dry the mop", label: "Dry", text: "The dock dries the mop now, for the drying time set in the Roborock app." },
+    start: { title: "Dry the mop", label: "Dry mop", text: "The dock dries the mop now, for the drying time set in the Roborock app." },
     stop: { title: "Stop drying", label: "Stop drying", text: "The dock stops drying the mop now, so it may stay damp." },
   },
 };
@@ -4378,9 +4378,9 @@ const CSS = `
     cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .shape ha-icon { --mdc-icon-size: 24px; }
   .txt { flex: 1; min-width: 0; cursor: pointer; }
-  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .nm .st { font-weight: 400; color: var(--secondary-text-color); }
+  /* Text is never clipped: a line too long for its box wraps (between its parts) instead. */
+  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
+  .nm .st { font-weight: 400; color: var(--secondary-text-color); white-space: nowrap; }
   /* The line under the name may wrap, but only between its parts ("28 min" stays whole). */
   .sc { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .sc:empty { display: none; }
@@ -4414,22 +4414,24 @@ const CSS = `
   .map canvas { display: block; }
   .map .loading { position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 10px; font-size: 11px; line-height: 14px;
     letter-spacing: .4px; color: var(--secondary-text-color); background: var(--card-background-color, #fff); }
-  /* Rooms: an even grid of secondary pills (30px), two across on a phone. */
+  /* Rooms: an even grid of secondary pills (30px), two across on a phone. A name too long for
+     its pill wraps onto a second line (the pill and its row grow) – never clipped. */
   .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .rooms:empty { display: none; }
-  .chip { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; height: 30px; border-radius: 15px; padding: 0 12px 0 8px;
-    font-size: 12px; font-weight: 500; letter-spacing: .2px; white-space: nowrap; cursor: pointer; min-width: 0;
+  .chip { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; min-height: 30px; border-radius: 15px; padding: 7px 12px 7px 8px;
+    font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .2px; cursor: pointer; min-width: 0;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color); -webkit-tap-highlight-color: transparent; }
-  .chip span { overflow: hidden; text-overflow: ellipsis; }
+  .chip span { min-width: 0; overflow-wrap: break-word; }
   .chip ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; flex: none; }
   .chip.sel { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
   .chip.sel ha-icon { color: ${C.blue}; }
   .chip.now { box-shadow: inset 0 0 0 1.5px ${tint(C.blue, 60)}; }
   .chip[aria-disabled="true"] { cursor: default; }
   .chip[disabled] { opacity: .45; cursor: default; }
-  .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; }
-  .acts .pill { padding: 0 10px; min-width: 0; }
-  .acts .pill span { overflow: hidden; text-overflow: ellipsis; }
+  /* Button rows: equal widths while every label fits; a longer label takes the width it needs
+     (the others share the rest), and only if a row can't hold them all does one wrap. */
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .acts .pill { flex: 1 1 0; min-width: max-content; padding: 0 10px; }
   .acts:empty { display: none; }
   .pill.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
   .pill.run ha-icon { color: ${C.blue}; }
@@ -4444,7 +4446,6 @@ const CSS = `
     cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
   .modetile .shape { background: ${tint(C.blue, 20)}; }
   .modetile .shape ha-icon { color: ${C.blue}; }
-  .modetile .sc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .modetile .chev { --mdc-icon-size: 20px; color: ${C.grey}; flex: none; }
   .modetile[disabled] { opacity: .45; cursor: default; }
   .modetile:active { filter: brightness(.92); }
@@ -4578,7 +4579,7 @@ class RobotVacuumCard extends HTMLElement {
           hide_map: "Hide the map",
           hide_rooms: "Hide the rooms",
           hide_mode: "Hide the Cleaning mode tile",
-          hide_dock_actions: "Hide Empty / Wash mop / Dry",
+          hide_dock_actions: "Hide Empty / Wash mop / Dry mop",
           rooms: "Rooms (YAML)",
         })[s.name] ?? s.name,
       computeHelper: (s) =>
@@ -4779,7 +4780,7 @@ class RobotVacuumCard extends HTMLElement {
     ic.style.color = m.state.color;
     set(".nm", `${esc(m.name)} <span class="st">· ${esc(m.state.word)}</span>`, true);
     // Each part stays whole ("28 min" never splits); the line breaks only between parts.
-    set(".line", m.line.map((p) => `<span class="p"${p.e ? ` data-e="${esc(p.e)}"` : ""}>${esc(p.t)}</span>`).join(" · "), true);
+    set(".line", m.line.map((p) => `<span class="p"${p.e ? ` data-e="${esc(p.e)}"` : ""}>${esc(p.t)}</span>`).join("&nbsp;· "), true);
     const batt = root.querySelector(".batt");
     batt.hidden = m.battery === null;
     if (m.battery !== null) {
@@ -4874,7 +4875,7 @@ class RobotVacuumCard extends HTMLElement {
     const tileEl = root.querySelector(".modetile");
     tileEl.hidden = !!this._config.hide_mode || (!this._found.mode && !hass.states[this._config.entity]?.attributes?.fan_speed_list);
     if (!tileEl.hidden) {
-      set(".mode-line", this._modeSummary());
+      set(".mode-line", this._modeParts().map((p) => `<span class="p">${esc(p)}</span>`).join("&nbsp;· "), true);
       tileEl.disabled = offline;
     }
     if (this._sheet) this._paintMode(this._sheet.root, this._sheet.keys);
@@ -4913,7 +4914,7 @@ class RobotVacuumCard extends HTMLElement {
       }
     }
 
-    // The dock's jobs, only while the robot is docked: Empty, Wash mop, Dry. Each glows while it
+    // The dock's jobs, only while the robot is docked: Empty, Wash mop, Dry mop. Each glows while it
     // runs (e.g. after stopping a clean early with Dock).
     const jobsBox = root.querySelector(".jobs");
     const docked = hass.states[this._config.entity]?.state === "docked";
@@ -5022,16 +5023,21 @@ class RobotVacuumCard extends HTMLElement {
 
   /* "Vac & mop · Turbo · Intense mop", plus "· ×2" – what the tile says. */
   _modeSummary() {
+    return this._modeParts().join(" · ");
+  }
+
+  _modeParts() {
     const { mode, rows } = this._modeRows();
     const cur = (k) => rows.find((r) => r.k === k)?.cur;
     const fan = cur("fan");
     const water = cur("water");
-    return [
+    const parts = [
       mode ? optLabel(mode) : "",
       fan && !["off"].includes(fan) ? optLabel(fan) : "",
       water && water !== "off" ? `${optLabel(water)} mop` : "",
       getCount(this._config.entity) === 2 ? "×2" : "",
-    ].filter(Boolean).join(" · ") || "Set the mode";
+    ].filter(Boolean);
+    return parts.length ? parts : ["Set the mode"];
   }
 
   _openMode() {
@@ -6346,7 +6352,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== vacuum-maintenance-card 2.2.1 ===== */
+/* ===== vacuum-maintenance-card 2.3.0 ===== */
 (() => {
 /*
  * Vacuum maintenance card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -6356,13 +6362,13 @@ registerRoomLightsCard();
  * Then the consumables in one row of numbers: main brush, side brush, filter and
  * sensors as the share of life left (hours when the life isn't known, e.g. the dock's brush
  * and strainer), what is due next, a quiet line for the dock (water tanks, auto-empty mode)
- * (the dock's own jobs – Empty, Wash mop, Dry – are on the robot vacuum card). Tap a number for the details
+ * (the dock's own jobs – Empty, Wash mop, Dry mop – are on the robot vacuum card). Tap a number for the details
  * (hours left, about how many cleans that is at your average) and Reset after replacing,
  * which asks first. Entities are found from the vacuum's device and its dock device.
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.2.1";
+const VMC_VERSION = "2.3.0";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -6524,6 +6530,32 @@ const TANKS = {
   dirty: { name: "Dirty water", color: C.brown, ok: "OK", bad: "Full – empty it" },
 };
 
+/* Ink alignment (design rule): the line under the title starts on the title's vertical line,
+   measured on ink (each first letter has its own side bearing). */
+const INK = { ctx: undefined };
+function inkBearing(el) {
+  if (INK.ctx === undefined) INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  const node = [...el.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+  if (!INK.ctx || !node) return null;
+  const cs = getComputedStyle(el);
+  INK.ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -INK.ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+function inkSchedule(host, selector) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const block = host.shadowRoot?.querySelector(selector);
+    const [title, line] = block ? [...block.children] : [];
+    if (!title || !line || !line.textContent) return;
+    const a = inkBearing(title), b = inkBearing(line);
+    if (a === null || b === null) return;
+    const v = Math.abs(a - b) > 0.2 ? `${(a - b).toFixed(2)}px` : "";
+    if (line.style.marginLeft !== v) line.style.marginLeft = v;
+  });
+}
+
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
@@ -6531,14 +6563,17 @@ const CSS = `
   ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { padding: 10px; }
-  /* Label row: Mushroom-sized icon slot (decorative, so no circle), title at edge + 46px. */
-  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; }
+  /* Two-line label row: Mushroom-sized icon slot (decorative, so no circle), the title at edge
+     + 46px and "Next: …" under it on the same vertical line (it wraps); the icon is centred on
+     the text block. */
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 10px; }
   .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
   .slot ha-icon { --mdc-icon-size: 24px; color: ${C.grey}; }
-  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); position: relative; top: 1px;
-    white-space: nowrap; }
-  .s { margin-left: auto; min-width: 0; font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .lt { flex: 1; min-width: 0; }
+  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  .lt.one .t { position: relative; top: 1px; } /* alone, a 20px line reads ~1px high next to the icon */
+  .s { display: block; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); cursor: pointer; border-radius: 4px; }
+  .s:empty { display: none; }
   .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 10px; text-align: center; }
   .stats > button { all: unset; box-sizing: border-box; display: grid; min-width: 0; cursor: pointer; text-align: center;
     border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); -webkit-tap-highlight-color: transparent; }
@@ -6546,9 +6581,11 @@ const CSS = `
   .stats b { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--primary-text-color); white-space: nowrap; font-variant-numeric: tabular-nums; }
   .stats b.soon { color: ${tx(C.amber, 70)}; }
   .stats b.due { color: ${tx(C.red, 85)}; }
-  .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); overflow-wrap: break-word; padding: 0 4px; }
   /* The water tanks come first: tiles with a tank glyph in a circle; red glow when one needs you. */
-  .tanks { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; margin: 0 0 12px; }
+  .tanks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; margin: 0 0 12px; }
+  .tank.wide { grid-column: 1 / -1; }
+  .tank .shape ha-icon { --mdc-icon-size: 24px; }
   .tanks:empty { display: none; }
   .tank { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 11px 10px; border-radius: 10px;
     cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
@@ -6559,16 +6596,11 @@ const CSS = `
   .tank svg .b { fill: none; stroke: currentColor; stroke-width: 1.6; }
   .tank svg .c { fill: currentColor; }
   .tank .tx { min-width: 0; }
-  .tank .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tank .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
   .tank .st { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .tank.bad .st { color: ${tx(C.red, 85)}; font-weight: 500; }
-  /* The consumables, quieter, under the tanks; the auto-empty mode as one quiet line. */
-  .dock { margin-top: 10px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
-  .dock:empty { display: none; }
-  .dock [data-e] { cursor: pointer; border-radius: 4px; }
   .stats > button:active, .tank:active { filter: brightness(.92); }
-  .stats > button:focus-visible, .tank:focus-visible, .s:focus-visible, .dock [data-e]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  .stats > button:focus-visible, .tank:focus-visible, .s:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
 class VacuumMaintenanceCard extends HTMLElement {
@@ -6627,8 +6659,9 @@ class VacuumMaintenanceCard extends HTMLElement {
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      <div class="label"><div class="slot"><ha-icon icon="mdi:wrench-clock"></ha-icon></div><span class="t"></span><span class="s" role="button" tabindex="0"></span></div>
-      <div class="tanks"></div><div class="stats"></div><div class="dock"></div></ha-card>`;
+      <div class="label"><div class="slot"><ha-icon icon="mdi:wrench-clock"></ha-icon></div>
+        <div class="lt"><div class="t"></div><span class="s" role="button" tabindex="0"></span></div></div>
+      <div class="tanks"></div><div class="stats"></div></ha-card>`;
     const card = root.querySelector("ha-card");
     card.addEventListener("click", (e) => {
       const b = e.target.closest("[data-k]");
@@ -6670,6 +6703,7 @@ class VacuumMaintenanceCard extends HTMLElement {
     const s = root.querySelector(".s");
     const next = m.next;
     set(".s", !next ? "" : next.due ? `${next.name}: due now` : `Next: ${next.name.toLowerCase()} in ${hText(next.left)}`);
+    root.querySelector(".lt").classList.toggle("one", !next);
     s.style.color = next?.due ? tx(C.red, 85) : "";
 
     const stats = root.querySelector(".stats");
@@ -6688,21 +6722,30 @@ class VacuumMaintenanceCard extends HTMLElement {
 
     // The water tanks, first and largest. A tank that needs you glows red and says what to do.
     const tanks = root.querySelector(".tanks");
-    const list = this._config.hide_dock ? [] : [["clean", m.clean], ["dirty", m.dirty]].filter(([, x]) => x);
+    const list = this._config.hide_dock ? [] : [["clean", m.clean], ["dirty", m.dirty], ["empty", m.empty]].filter(([, x]) => x);
     const tk = list.map(([k]) => k).join();
     if (tk !== this._keys.tanks) {
-      tanks.style.setProperty("--n", String(list.length || 1));
       tanks.innerHTML = list
-        .map(([k, x]) => `<button class="tank" data-tank="${k}" data-e="${esc(x.e)}"><div class="shape"></div>
-          <div class="tx"><div class="nm">${esc(TANKS[k].name)}</div><div class="st"></div></div></button>`).join("");
+        .map(([k, x]) => `<button class="tank${k === "empty" ? " wide" : ""}" data-tank="${k}" data-e="${esc(x.e)}"><div class="shape"></div>
+          <div class="tx"><div class="nm">${esc(k === "empty" ? "Auto-empty" : TANKS[k].name)}</div><div class="st"></div></div></button>`).join("");
       this._keys.tanks = tk;
     }
     for (const [k, x] of list) {
-      const spec = TANKS[k];
       const b = tanks.querySelector(`[data-tank="${k}"]`);
+      const shape = b.querySelector(".shape");
+      const st = b.querySelector(".st");
+      if (k === "empty") {
+        // Auto-empty: a setting, not a state – neutral, laid out exactly like the tanks above.
+        shape.style.background = tint(C.grey, 20);
+        shape.style.color = C.grey;
+        if (!shape.firstElementChild) shape.innerHTML = `<ha-icon icon="mdi:delete-empty-outline"></ha-icon>`;
+        const v = human(x.mode);
+        if (st.textContent !== v) st.textContent = v;
+        continue;
+      }
+      const spec = TANKS[k];
       const color = x.bad ? C.red : spec.color;
       b.classList.toggle("bad", x.bad);
-      const shape = b.querySelector(".shape");
       shape.style.background = tint(color, 20);
       shape.style.color = color;
       const svg = tankSvg(k);
@@ -6710,14 +6753,10 @@ class VacuumMaintenanceCard extends HTMLElement {
         shape.dataset.svg = svg;
         shape.innerHTML = svg;
       }
-      const st = b.querySelector(".st");
       const label = x.bad ? spec.bad : spec.ok;
       if (st.textContent !== label) st.textContent = label;
     }
-
-    // Auto-empty mode: one quiet line under the numbers.
-    set(".dock", !this._config.hide_dock && m.empty
-      ? `<span data-e="${esc(m.empty.e)}" role="button" tabindex="0">Auto-empty ${esc(human(m.empty.mode))}</span>` : "", true);
+    inkSchedule(this, ".lt");
   }
 
   /* ---- Details sheet ---- */

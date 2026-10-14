@@ -18,8 +18,8 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 │ │ (tune) Cleaning mode                            › │ │
 │ │        Vac & mop · Turbo · Intense mop            │ │
 │ └──────────────────────────────────────────────────┘ │
-│ (    ▶ Clean entire floor     ) (     Auto clean     )         │
-│ (   Empty   ) (  Wash mop  ) (    Dry    )   docked   │
+│ (   ▶ Clean entire floor    ) (     Auto clean      )  │
+│ (   Empty   ) (  Wash mop  ) (  Dry mop  )   docked   │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -47,7 +47,8 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 - **Rooms**: the loaded map's rooms in an even grid (from `roborock.get_maps`), with your
   Home Assistant area icons – an area of the same name, or one whose name is inside the
   room's ("Corridor" in "Upstairs Corridor"), else a guess from the name; set your own
-  under `rooms:`. Tap rooms to build a clean: the button becomes **Clean 2 rooms** and
+  under `rooms:`. A name too long for its pill wraps onto a second line rather than being cut
+  off. Tap rooms to build a clean: the button becomes **Clean 2 rooms** and
   sends `app_segment_clean` for those segments. During a job the room the robot is in is
   ringed and rooms can't be picked.
 - **Cleaning mode tile**: what the next clean will use ("Vac & mop · Turbo · Intense mop",
@@ -55,13 +56,14 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
   reads as one more room. A tap opens the Cleaning mode sheet (below).
 - **Buttons** for the state: Clean entire floor (or Clean N rooms) when idle, Pause and Dock while
   cleaning, Resume and Dock when paused, Pause while returning. Dock only shows when the
-  robot is away from the dock. Every button asks first except Pause; the clean's
+  robot is away from the dock. The buttons share the row evenly, but a longer label always
+  gets the width it needs. Every button asks first except Pause; the clean's
   confirmation names the rooms, the cleaning count and the settings it will use ("Study
   and Upstairs Corridor, twice, Vac & mop · Turbo · Standard mop"). Dock warns when it
   ends a clean.
 - **Auto clean** (optional, `auto_clean`): a pill that glows teal while your automation
   (or switch) is on; a tap asks, then turns it off or on; a hold opens its more-info.
-- **Dock jobs** (only while the robot is docked): **Empty**, **Wash mop** and **Dry**, a row
+- **Dock jobs** (only while the robot is docked): **Empty**, **Wash mop** and **Dry mop**, a row
   of three under the buttons, for the dock's own switches – handy after stopping a clean
   early with Dock. Each glows blue while it runs ("Drying") and asks before it starts, and
   before it stops.
@@ -104,7 +106,7 @@ rooms:
 | `auto_clean` | – | An automation, `input_boolean` or switch for the Auto clean pill. |
 | `auto_clean_name` | Auto clean | The pill's label. |
 | `rooms` | – | Per room (by the robot's room name): `icon`, `name`, `hide: true`. |
-| `hide_map`, `hide_rooms`, `hide_mode`, `hide_dock_actions` | false | Leave a part out (`hide_mode`: the Cleaning mode tile; `hide_dock_actions`: Empty / Wash mop / Dry). |
+| `hide_map`, `hide_rooms`, `hide_mode`, `hide_dock_actions` | false | Leave a part out (`hide_mode`: the Cleaning mode tile; `hide_dock_actions`: Empty / Wash mop / Dry mop). |
 | `maps` | from `roborock.get_maps` | Your own rooms per map: `- name: First floor`, `rooms: {16: Bedroom, 17: Study}`. |
 | `entities` | found | Override any entity the card finds: `battery`, `charging`, `status`, `error`, `dock_error`, `dirty_box`, `clean_box`, `water_shortage`, `mop_attached`, `area`, `time`, `progress`, `room`, `last_start`, `map_select`, `mode`, `mop_water`, `mop_route`, `drying`, `empty_sw`, `wash_sw`, `dry_sw`. |
 

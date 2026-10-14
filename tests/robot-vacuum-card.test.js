@@ -181,7 +181,7 @@ const cfg = {
   assert(!q(".sets"), "no settings rows on the card itself");
   // The dock's jobs, under the buttons, while docked: each asks before it starts and stops.
   const jobs = () => all(".jobs .pill").map((b) => b.textContent.trim() + (b.classList.contains("run") ? "*" : ""));
-  eq(jobs(), ["Empty", "Wash mop", "Dry"]);
+  eq(jobs(), ["Empty", "Wash mop", "Dry mop"]);
   assert.strictEqual(q(".jobs").style.getPropertyValue("--n"), "3");
   {
     const n1 = calls.length;
@@ -206,7 +206,7 @@ const cfg = {
   // The Cleaning mode tile: two lines, a blue circle and a chevron – not one more room pill.
   assert(!q(".modetile").hidden);
   assert.strictEqual(q(".modetile .nm").textContent, "Cleaning mode");
-  assert.strictEqual(q(".modetile .mode-line").textContent, "Vac & mop · Turbo · Standard mop");
+  assert.strictEqual(text(".modetile .mode-line"), "Vac & mop · Turbo · Standard mop");
   assert.strictEqual(q(".modetile .chev").getAttribute("icon"), "mdi:chevron-right");
   assert.strictEqual(q(".modetile").nextElementSibling, q(".acts"), "between the rooms and the buttons");
 
@@ -280,7 +280,7 @@ const cfg = {
   await tick();
   eq(calls.pop(), ["select", "select_option", { entity_id: "select.vacuum_cleaner_mop_intensity", option: "intense" }]);
   assert.strictEqual(sr.querySelector('.set[data-k="water"] .k b').textContent, "Intense", "shows at once");
-  assert.strictEqual(q(".modetile .mode-line").textContent, "Vac & mop · Turbo · Intense mop", "the tile follows");
+  assert.strictEqual(text(".modetile .mode-line"), "Vac & mop · Turbo · Intense mop", "the tile follows");
   sr.querySelectorAll(".tabs button")[1].click();
   await tick();
   eq(calls.pop(), ["select", "select_option", { entity_id: "select.study_vacuum_cleaner_cleaning_mode", option: "mop" }]);
@@ -289,11 +289,11 @@ const cfg = {
     "select.study_vacuum_cleaner_cleaning_mode": st("mop", { options: ["vacuum", "vac_and_mop", "mop", "custom"] }),
     "select.vacuum_cleaner_mop_intensity": st("intense", { options: ["off", "mild", "standard", "intense", "custom"] }),
   }));
-  assert.strictEqual(q(".modetile .mode-line").textContent, "Mop · Intense mop");
+  assert.strictEqual(text(".modetile .mode-line"), "Mop · Intense mop");
   sr.querySelector(".done").click();
   assert(!sheet(), "Done closes");
   card.hass = full(states());
-  assert.strictEqual(q(".modetile .mode-line").textContent, "Vac & mop · Turbo · Standard mop");
+  assert.strictEqual(text(".modetile .mode-line"), "Vac & mop · Turbo · Standard mop");
   q(".modetile").click();
   sheet().shadowRoot.querySelector(".backdrop").click();
   assert(!sheet(), "backdrop closes");
@@ -370,7 +370,7 @@ const cfg = {
   rowOf("count").querySelector('[data-v="2"]').click();
   await tick();
   eq(opts("count"), ["1", "2*"]);
-  assert.strictEqual(q(".modetile .mode-line").textContent, "Vac & mop · Turbo · Standard mop · ×2", "the count shows on the tile");
+  assert.strictEqual(text(".modetile .mode-line"), "Vac & mop · Turbo · Standard mop · ×2", "the count shows on the tile");
   assert.strictEqual(value("count"), "2 times");
   assert.strictEqual(t.window.localStorage.getItem("robot-vacuum-card:count:vacuum.vacuum_cleaner"), "2");
   q('[data-k="clean"]').click();
@@ -495,6 +495,11 @@ const cfg = {
   card3.hass = { states: states(), callService: async () => {} };
   assert.strictEqual(card3.shadowRoot.querySelector(".batt span").textContent, "100%");
   assert(/22\.6 m²/.test(card3.shadowRoot.querySelector(".line").textContent));
+
+  // Text is never clipped: no ellipsis anywhere; button rows keep each label's width and wrap.
+  const css = [...card3.shadowRoot.querySelectorAll("style")].map((x) => x.textContent).join("");
+  assert(!/text-overflow:\s*ellipsis/.test(css), "no clipped text");
+  assert(/\.acts \{ display: flex; flex-wrap: wrap;/.test(css) && /\.acts \.pill \{ flex: 1 1 0; min-width: max-content;/.test(css), "pill rows never squeeze a label");
 
   console.log("ALL ROBOT-VACUUM-CARD TESTS PASSED");
   process.exit(0);

@@ -6,13 +6,13 @@
  * Then the consumables in one row of numbers: main brush, side brush, filter and
  * sensors as the share of life left (hours when the life isn't known, e.g. the dock's brush
  * and strainer), what is due next, a quiet line for the dock (water tanks, auto-empty mode)
- * (the dock's own jobs – Empty, Wash mop, Dry – are on the robot vacuum card). Tap a number for the details
+ * (the dock's own jobs – Empty, Wash mop, Dry mop – are on the robot vacuum card). Tap a number for the details
  * (hours left, about how many cleans that is at your average) and Reset after replacing,
  * which asks first. Entities are found from the vacuum's device and its dock device.
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.2.1";
+const VMC_VERSION = "2.3.0";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -174,6 +174,32 @@ const TANKS = {
   dirty: { name: "Dirty water", color: C.brown, ok: "OK", bad: "Full – empty it" },
 };
 
+/* Ink alignment (design rule): the line under the title starts on the title's vertical line,
+   measured on ink (each first letter has its own side bearing). */
+const INK = { ctx: undefined };
+function inkBearing(el) {
+  if (INK.ctx === undefined) INK.ctx = /jsdom/i.test(navigator.userAgent) ? null : document.createElement("canvas").getContext("2d");
+  const node = [...el.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+  if (!INK.ctx || !node) return null;
+  const cs = getComputedStyle(el);
+  INK.ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  return -INK.ctx.measureText(node.textContent.trim()[0]).actualBoundingBoxLeft;
+}
+function inkSchedule(host, selector) {
+  if (host._inkQueued) return;
+  host._inkQueued = true;
+  requestAnimationFrame(() => {
+    host._inkQueued = false;
+    const block = host.shadowRoot?.querySelector(selector);
+    const [title, line] = block ? [...block.children] : [];
+    if (!title || !line || !line.textContent) return;
+    const a = inkBearing(title), b = inkBearing(line);
+    if (a === null || b === null) return;
+    const v = Math.abs(a - b) > 0.2 ? `${(a - b).toFixed(2)}px` : "";
+    if (line.style.marginLeft !== v) line.style.marginLeft = v;
+  });
+}
+
 /* ------------------------------------------------------------------------ */
 
 const CSS = `
@@ -181,14 +207,17 @@ const CSS = `
   ha-icon[hidden] { display: none; }
   :host { display: block; }
   ha-card { padding: 10px; }
-  /* Label row: Mushroom-sized icon slot (decorative, so no circle), title at edge + 46px. */
-  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 8px; }
+  /* Two-line label row: Mushroom-sized icon slot (decorative, so no circle), the title at edge
+     + 46px and "Next: …" under it on the same vertical line (it wraps); the icon is centred on
+     the text block. */
+  .label { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 0 10px; }
   .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
   .slot ha-icon { --mdc-icon-size: 24px; color: ${C.grey}; }
-  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); position: relative; top: 1px;
-    white-space: nowrap; }
-  .s { margin-left: auto; min-width: 0; font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .lt { flex: 1; min-width: 0; }
+  .t { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); }
+  .lt.one .t { position: relative; top: 1px; } /* alone, a 20px line reads ~1px high next to the icon */
+  .s { display: block; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); cursor: pointer; border-radius: 4px; }
+  .s:empty { display: none; }
   .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 10px; text-align: center; }
   .stats > button { all: unset; box-sizing: border-box; display: grid; min-width: 0; cursor: pointer; text-align: center;
     border-left: 1px solid var(--divider-color, rgba(0,0,0,.12)); -webkit-tap-highlight-color: transparent; }
@@ -196,9 +225,11 @@ const CSS = `
   .stats b { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--primary-text-color); white-space: nowrap; font-variant-numeric: tabular-nums; }
   .stats b.soon { color: ${tx(C.amber, 70)}; }
   .stats b.due { color: ${tx(C.red, 85)}; }
-  .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stats span { font-size: 11px; line-height: 14px; letter-spacing: .4px; color: var(--secondary-text-color); overflow-wrap: break-word; padding: 0 4px; }
   /* The water tanks come first: tiles with a tank glyph in a circle; red glow when one needs you. */
-  .tanks { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; margin: 0 0 12px; }
+  .tanks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; margin: 0 0 12px; }
+  .tank.wide { grid-column: 1 / -1; }
+  .tank .shape ha-icon { --mdc-icon-size: 24px; }
   .tanks:empty { display: none; }
   .tank { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 11px 10px; border-radius: 10px;
     cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
@@ -209,16 +240,11 @@ const CSS = `
   .tank svg .b { fill: none; stroke: currentColor; stroke-width: 1.6; }
   .tank svg .c { fill: currentColor; }
   .tank .tx { min-width: 0; }
-  .tank .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tank .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
   .tank .st { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .tank.bad .st { color: ${tx(C.red, 85)}; font-weight: 500; }
-  /* The consumables, quieter, under the tanks; the auto-empty mode as one quiet line. */
-  .dock { margin-top: 10px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
-  .dock:empty { display: none; }
-  .dock [data-e] { cursor: pointer; border-radius: 4px; }
   .stats > button:active, .tank:active { filter: brightness(.92); }
-  .stats > button:focus-visible, .tank:focus-visible, .s:focus-visible, .dock [data-e]:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
+  .stats > button:focus-visible, .tank:focus-visible, .s:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;
 
 class VacuumMaintenanceCard extends HTMLElement {
@@ -277,8 +303,9 @@ class VacuumMaintenanceCard extends HTMLElement {
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${CSS}</style><ha-card>
-      <div class="label"><div class="slot"><ha-icon icon="mdi:wrench-clock"></ha-icon></div><span class="t"></span><span class="s" role="button" tabindex="0"></span></div>
-      <div class="tanks"></div><div class="stats"></div><div class="dock"></div></ha-card>`;
+      <div class="label"><div class="slot"><ha-icon icon="mdi:wrench-clock"></ha-icon></div>
+        <div class="lt"><div class="t"></div><span class="s" role="button" tabindex="0"></span></div></div>
+      <div class="tanks"></div><div class="stats"></div></ha-card>`;
     const card = root.querySelector("ha-card");
     card.addEventListener("click", (e) => {
       const b = e.target.closest("[data-k]");
@@ -320,6 +347,7 @@ class VacuumMaintenanceCard extends HTMLElement {
     const s = root.querySelector(".s");
     const next = m.next;
     set(".s", !next ? "" : next.due ? `${next.name}: due now` : `Next: ${next.name.toLowerCase()} in ${hText(next.left)}`);
+    root.querySelector(".lt").classList.toggle("one", !next);
     s.style.color = next?.due ? tx(C.red, 85) : "";
 
     const stats = root.querySelector(".stats");
@@ -338,21 +366,30 @@ class VacuumMaintenanceCard extends HTMLElement {
 
     // The water tanks, first and largest. A tank that needs you glows red and says what to do.
     const tanks = root.querySelector(".tanks");
-    const list = this._config.hide_dock ? [] : [["clean", m.clean], ["dirty", m.dirty]].filter(([, x]) => x);
+    const list = this._config.hide_dock ? [] : [["clean", m.clean], ["dirty", m.dirty], ["empty", m.empty]].filter(([, x]) => x);
     const tk = list.map(([k]) => k).join();
     if (tk !== this._keys.tanks) {
-      tanks.style.setProperty("--n", String(list.length || 1));
       tanks.innerHTML = list
-        .map(([k, x]) => `<button class="tank" data-tank="${k}" data-e="${esc(x.e)}"><div class="shape"></div>
-          <div class="tx"><div class="nm">${esc(TANKS[k].name)}</div><div class="st"></div></div></button>`).join("");
+        .map(([k, x]) => `<button class="tank${k === "empty" ? " wide" : ""}" data-tank="${k}" data-e="${esc(x.e)}"><div class="shape"></div>
+          <div class="tx"><div class="nm">${esc(k === "empty" ? "Auto-empty" : TANKS[k].name)}</div><div class="st"></div></div></button>`).join("");
       this._keys.tanks = tk;
     }
     for (const [k, x] of list) {
-      const spec = TANKS[k];
       const b = tanks.querySelector(`[data-tank="${k}"]`);
+      const shape = b.querySelector(".shape");
+      const st = b.querySelector(".st");
+      if (k === "empty") {
+        // Auto-empty: a setting, not a state – neutral, laid out exactly like the tanks above.
+        shape.style.background = tint(C.grey, 20);
+        shape.style.color = C.grey;
+        if (!shape.firstElementChild) shape.innerHTML = `<ha-icon icon="mdi:delete-empty-outline"></ha-icon>`;
+        const v = human(x.mode);
+        if (st.textContent !== v) st.textContent = v;
+        continue;
+      }
+      const spec = TANKS[k];
       const color = x.bad ? C.red : spec.color;
       b.classList.toggle("bad", x.bad);
-      const shape = b.querySelector(".shape");
       shape.style.background = tint(color, 20);
       shape.style.color = color;
       const svg = tankSvg(k);
@@ -360,14 +397,10 @@ class VacuumMaintenanceCard extends HTMLElement {
         shape.dataset.svg = svg;
         shape.innerHTML = svg;
       }
-      const st = b.querySelector(".st");
       const label = x.bad ? spec.bad : spec.ok;
       if (st.textContent !== label) st.textContent = label;
     }
-
-    // Auto-empty mode: one quiet line under the numbers.
-    set(".dock", !this._config.hide_dock && m.empty
-      ? `<span data-e="${esc(m.empty.e)}" role="button" tabindex="0">Auto-empty ${esc(human(m.empty.mode))}</span>` : "", true);
+    inkSchedule(this, ".lt");
   }
 
   /* ---- Details sheet ---- */

@@ -6,7 +6,7 @@
  * the rooms, live while cleaning; a switch shows at once), the rooms in an even grid to build
  * a clean, a Cleaning mode tile, and the buttons for the state – Clean entire floor / Clean N rooms,
  * Pause, Resume, Dock – plus an optional Auto clean pill, and while the robot is docked the
- * dock's own jobs: Empty, Wash mop, Dry (glowing while they run). Every button asks first
+ * dock's own jobs: Empty, Wash mop, Dry mop (glowing while they run). Every button asks first
  * except Pause.
  *
  * The Cleaning mode tile shows the current mode ("Vac & mop · Turbo · Intense mop") and opens
@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.2.1";
+const RVC_VERSION = "2.2.2";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -443,9 +443,9 @@ function confirmDialog({ title, icon, color, primary, secondary, confirmLabel })
 /* Segmented selector (32px segments in a 38px track) and the mode rows' label + value line. */
 const SEG_CSS = `
   .seg { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); }
-  .seg button { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: 0; height: 32px; border-radius: 9px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; }
+  .seg button { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: 0; min-height: 32px; padding: 0 6px; border-radius: 9px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; line-height: 16px; font-weight: 500;
+    color: var(--secondary-text-color); overflow-wrap: break-word; -webkit-tap-highlight-color: transparent; }
   .seg button[aria-pressed="true"] { background: var(--card-background-color, #fff); color: var(--primary-text-color); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
   .seg button[disabled] { opacity: .45; cursor: default; }
   .seg button:active { filter: brightness(.92); }
@@ -495,7 +495,7 @@ const MODE_SHEET_CSS = `
 const JOBS = [
   ["empty_sw", "mdi:delete-empty-outline", "Empty", "Emptying"],
   ["wash_sw", "mdi:water-sync", "Wash mop", "Washing"],
-  ["dry_sw", "mdi:fan", "Dry", "Drying"],
+  ["dry_sw", "mdi:fan", "Dry mop", "Drying"],
 ];
 const DOCK_CONFIRM = {
   empty_sw: {
@@ -507,7 +507,7 @@ const DOCK_CONFIRM = {
     stop: { title: "Stop washing", label: "Stop washing", text: "The dock stops washing the mop now." },
   },
   dry_sw: {
-    start: { title: "Dry the mop", label: "Dry", text: "The dock dries the mop now, for the drying time set in the Roborock app." },
+    start: { title: "Dry the mop", label: "Dry mop", text: "The dock dries the mop now, for the drying time set in the Roborock app." },
     stop: { title: "Stop drying", label: "Stop drying", text: "The dock stops drying the mop now, so it may stay damp." },
   },
 };
@@ -530,9 +530,9 @@ const CSS = `
     cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .shape ha-icon { --mdc-icon-size: 24px; }
   .txt { flex: 1; min-width: 0; cursor: pointer; }
-  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .nm .st { font-weight: 400; color: var(--secondary-text-color); }
+  /* Text is never clipped: a line too long for its box wraps (between its parts) instead. */
+  .nm { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color); overflow-wrap: break-word; }
+  .nm .st { font-weight: 400; color: var(--secondary-text-color); white-space: nowrap; }
   /* The line under the name may wrap, but only between its parts ("28 min" stays whole). */
   .sc { font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .sc:empty { display: none; }
@@ -566,22 +566,24 @@ const CSS = `
   .map canvas { display: block; }
   .map .loading { position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 10px; font-size: 11px; line-height: 14px;
     letter-spacing: .4px; color: var(--secondary-text-color); background: var(--card-background-color, #fff); }
-  /* Rooms: an even grid of secondary pills (30px), two across on a phone. */
+  /* Rooms: an even grid of secondary pills (30px), two across on a phone. A name too long for
+     its pill wraps onto a second line (the pill and its row grow) – never clipped. */
   .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .rooms:empty { display: none; }
-  .chip { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; height: 30px; border-radius: 15px; padding: 0 12px 0 8px;
-    font-size: 12px; font-weight: 500; letter-spacing: .2px; white-space: nowrap; cursor: pointer; min-width: 0;
+  .chip { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; min-height: 30px; border-radius: 15px; padding: 7px 12px 7px 8px;
+    font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .2px; cursor: pointer; min-width: 0;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color); -webkit-tap-highlight-color: transparent; }
-  .chip span { overflow: hidden; text-overflow: ellipsis; }
+  .chip span { min-width: 0; overflow-wrap: break-word; }
   .chip ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; flex: none; }
   .chip.sel { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
   .chip.sel ha-icon { color: ${C.blue}; }
   .chip.now { box-shadow: inset 0 0 0 1.5px ${tint(C.blue, 60)}; }
   .chip[aria-disabled="true"] { cursor: default; }
   .chip[disabled] { opacity: .45; cursor: default; }
-  .acts { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: 8px; }
-  .acts .pill { padding: 0 10px; min-width: 0; }
-  .acts .pill span { overflow: hidden; text-overflow: ellipsis; }
+  /* Button rows: equal widths while every label fits; a longer label takes the width it needs
+     (the others share the rest), and only if a row can't hold them all does one wrap. */
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .acts .pill { flex: 1 1 0; min-width: max-content; padding: 0 10px; }
   .acts:empty { display: none; }
   .pill.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
   .pill.run ha-icon { color: ${C.blue}; }
@@ -596,7 +598,6 @@ const CSS = `
     cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); -webkit-tap-highlight-color: transparent; }
   .modetile .shape { background: ${tint(C.blue, 20)}; }
   .modetile .shape ha-icon { color: ${C.blue}; }
-  .modetile .sc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .modetile .chev { --mdc-icon-size: 20px; color: ${C.grey}; flex: none; }
   .modetile[disabled] { opacity: .45; cursor: default; }
   .modetile:active { filter: brightness(.92); }
@@ -730,7 +731,7 @@ class RobotVacuumCard extends HTMLElement {
           hide_map: "Hide the map",
           hide_rooms: "Hide the rooms",
           hide_mode: "Hide the Cleaning mode tile",
-          hide_dock_actions: "Hide Empty / Wash mop / Dry",
+          hide_dock_actions: "Hide Empty / Wash mop / Dry mop",
           rooms: "Rooms (YAML)",
         })[s.name] ?? s.name,
       computeHelper: (s) =>
@@ -931,7 +932,7 @@ class RobotVacuumCard extends HTMLElement {
     ic.style.color = m.state.color;
     set(".nm", `${esc(m.name)} <span class="st">· ${esc(m.state.word)}</span>`, true);
     // Each part stays whole ("28 min" never splits); the line breaks only between parts.
-    set(".line", m.line.map((p) => `<span class="p"${p.e ? ` data-e="${esc(p.e)}"` : ""}>${esc(p.t)}</span>`).join(" · "), true);
+    set(".line", m.line.map((p) => `<span class="p"${p.e ? ` data-e="${esc(p.e)}"` : ""}>${esc(p.t)}</span>`).join("&nbsp;· "), true);
     const batt = root.querySelector(".batt");
     batt.hidden = m.battery === null;
     if (m.battery !== null) {
@@ -1026,7 +1027,7 @@ class RobotVacuumCard extends HTMLElement {
     const tileEl = root.querySelector(".modetile");
     tileEl.hidden = !!this._config.hide_mode || (!this._found.mode && !hass.states[this._config.entity]?.attributes?.fan_speed_list);
     if (!tileEl.hidden) {
-      set(".mode-line", this._modeSummary());
+      set(".mode-line", this._modeParts().map((p) => `<span class="p">${esc(p)}</span>`).join("&nbsp;· "), true);
       tileEl.disabled = offline;
     }
     if (this._sheet) this._paintMode(this._sheet.root, this._sheet.keys);
@@ -1065,7 +1066,7 @@ class RobotVacuumCard extends HTMLElement {
       }
     }
 
-    // The dock's jobs, only while the robot is docked: Empty, Wash mop, Dry. Each glows while it
+    // The dock's jobs, only while the robot is docked: Empty, Wash mop, Dry mop. Each glows while it
     // runs (e.g. after stopping a clean early with Dock).
     const jobsBox = root.querySelector(".jobs");
     const docked = hass.states[this._config.entity]?.state === "docked";
@@ -1174,16 +1175,21 @@ class RobotVacuumCard extends HTMLElement {
 
   /* "Vac & mop · Turbo · Intense mop", plus "· ×2" – what the tile says. */
   _modeSummary() {
+    return this._modeParts().join(" · ");
+  }
+
+  _modeParts() {
     const { mode, rows } = this._modeRows();
     const cur = (k) => rows.find((r) => r.k === k)?.cur;
     const fan = cur("fan");
     const water = cur("water");
-    return [
+    const parts = [
       mode ? optLabel(mode) : "",
       fan && !["off"].includes(fan) ? optLabel(fan) : "",
       water && water !== "off" ? `${optLabel(water)} mop` : "",
       getCount(this._config.entity) === 2 ? "×2" : "",
-    ].filter(Boolean).join(" · ") || "Set the mode";
+    ].filter(Boolean);
+    return parts.length ? parts : ["Set the mode"];
   }
 
   _openMode() {
