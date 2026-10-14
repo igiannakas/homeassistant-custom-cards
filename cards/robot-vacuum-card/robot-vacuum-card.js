@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.3.1";
+const RVC_VERSION = "2.4.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -567,14 +567,16 @@ const CSS = `
   .map canvas { display: block; }
   .map .loading { position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 10px; font-size: 11px; line-height: 14px;
     letter-spacing: .4px; color: var(--secondary-text-color); background: var(--card-background-color, #fff); }
-  /* Rooms: an even grid of secondary pills (30px), at least two across (even on a 320px phone).
-     A name too long for its pill wraps onto a second line (the pill and its row grow) – never clipped. */
-  .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, calc(50% - 4px)), 1fr)); gap: 8px; }
+  /* Rooms: an even grid of secondary pills (30px). Every name stays whole on one line – the
+     columns are set from the measured names (_fitRooms): even columns as wide as the longest
+     name's pill; if only one would fit, two columns each as wide as its own longest name; else
+     one. Only a name wider than the whole card wraps. */
+  .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .rooms:empty { display: none; }
-  .chip { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; min-height: 30px; border-radius: 15px; padding: 7px 12px 7px 8px;
-    font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .2px; cursor: pointer; min-width: 0;
+  .chip { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; min-height: 30px; border-radius: 15px; padding: 0 12px 0 8px;
+    font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .2px; white-space: nowrap; cursor: pointer; min-width: 0;
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .05); color: var(--primary-text-color); -webkit-tap-highlight-color: transparent; }
-  .chip span { min-width: 0; overflow-wrap: break-word; }
+  .rooms.wrap .chip { white-space: normal; padding-top: 7px; padding-bottom: 7px; }
   .chip ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; flex: none; }
   .chip.sel { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
   .chip.sel ha-icon { color: ${C.blue}; }
@@ -585,23 +587,20 @@ const CSS = `
      (the others share the rest), and only if a row can't hold them all does one wrap. */
   .acts { display: flex; flex-wrap: wrap; gap: 8px; }
   .acts .pill { flex: 1 1 0; min-width: max-content; padding: 0 10px; }
-  /* The dock's jobs: one tile of icon-over-label buttons, split by short dividers (like the
-     maintenance numbers) – a different shape from the action pills, so they read as the dock's
-     own controls, not more robot actions. The one that runs is tinted blue. */
-  .jobs { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 10px;
-    background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); }
+  /* The dock's jobs are secondary: quiet text buttons (no fill, 30px, 12px, grey) in one row
+     under the main buttons – there when the robot is docked, never competing with Clean. The
+     one that runs is tinted blue. */
+  .jobs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: -4px; }
   .jobs:empty { display: none; }
-  .jobs button { all: unset; box-sizing: border-box; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 2px; min-width: 0; min-height: 50px; padding: 6px 4px; border-radius: 8px; cursor: pointer; text-align: center; overflow-wrap: break-word;
-    font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .2px; color: var(--primary-text-color); -webkit-tap-highlight-color: transparent; }
-  .jobs button + button::before { content: ""; position: absolute; left: -2.5px; top: 12px; bottom: 12px; width: 1px;
-    background: var(--divider-color, rgba(0,0,0,.12)); }
-  .jobs ha-icon { --mdc-icon-size: 20px; color: ${C.grey}; }
+  .jobs button { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: max-content; display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px; height: 30px; padding: 0 10px; border-radius: 15px; cursor: pointer; white-space: nowrap;
+    font-size: 12px; font-weight: 500; letter-spacing: .2px; color: var(--secondary-text-color); -webkit-tap-highlight-color: transparent; }
+  .jobs ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; }
   .jobs button.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
   .jobs button.run ha-icon { color: ${C.blue}; }
-  .jobs button.run::before, .jobs button.run + button::before { display: none; }
   .jobs button[disabled] { opacity: .45; cursor: default; }
-  .jobs button:active { filter: brightness(.92); }
+  .jobs button:active { background: rgba(var(--rgb-primary-text-color, 33,33,33), .06); }
+  @media (hover: hover) { .jobs button:not([disabled]):hover { background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); } }
   .jobs button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .acts:empty { display: none; }
   .pill.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
@@ -787,7 +786,10 @@ class RobotVacuumCard extends HTMLElement {
 
   connectedCallback() {
     COUNT_CARDS.add(this);
-    if (this._built && this._ro && this._mapEl) this._ro.observe(this._mapEl);
+    if (this._built && this._ro && this._mapEl) {
+      this._ro.observe(this._mapEl);
+      this._ro.observe(this._roomsEl);
+    }
   }
 
   disconnectedCallback() {
@@ -849,10 +851,15 @@ class RobotVacuumCard extends HTMLElement {
     this._mapEl = root.querySelector(".map");
     this._mapKey = null;
     this._imgs = {};
+    this._roomsEl = root.querySelector(".rooms");
     if (typeof ResizeObserver !== "undefined") {
-      this._ro = new ResizeObserver(() => this._paintMap());
+      this._ro = new ResizeObserver((es) => {
+        for (const e of es) e.target === this._mapEl ? this._paintMap() : this._fitRooms();
+      });
       this._ro.observe(this._mapEl);
+      this._ro.observe(this._roomsEl);
     }
+    document.fonts?.ready?.then(() => this._fitRooms());
     this._bindHold(root.querySelector(".acts"));
     this._built = true;
     this._keys = {};
@@ -1027,6 +1034,7 @@ class RobotVacuumCard extends HTMLElement {
           .map((r) => `<button class="chip" data-room="${r.id}"><ha-icon></ha-icon><span>${esc(this._config.rooms?.[r.name]?.name || r.name)}</span></button>`)
           .join("");
         this._keys.rooms = rk;
+        this._fitRooms();
       }
       for (const id of [...this._sel]) if (!m.rooms.some((r) => r.id === id)) this._sel.delete(id);
       rooms.querySelectorAll(".chip").forEach((b) => {
@@ -1108,6 +1116,29 @@ class RobotVacuumCard extends HTMLElement {
       b.setAttribute("aria-pressed", String(on));
       b.disabled = DEAD.includes(s);
     }
+  }
+
+  /* The room grid's columns, so that every name fits on one line. A pill is its text + 8px +
+     16px icon + 6px gap + 12px. Even columns (at least 150px) as wide as the longest pill while
+     two or more fit; else two columns each as wide as its own longest pill (the rest shared
+     out evenly); else one column – where only a name wider than the card wraps. */
+  _fitRooms() {
+    const rooms = this._roomsEl;
+    if (!rooms || rooms.hidden) return;
+    const W = rooms.clientWidth;
+    const spans = [...rooms.querySelectorAll(".chip span")];
+    if (!W || !spans.length) return;
+    rooms.classList.remove("wrap");
+    const ws = spans.map((s) => Math.ceil(s.scrollWidth) + 43);
+    const max = Math.max(150, ...ws);
+    let cols;
+    if (2 * max + 8 <= W) cols = `repeat(auto-fill, minmax(${max}px, 1fr))`;
+    else {
+      const col = (k) => Math.max(0, ...ws.filter((_, i) => i % 2 === k));
+      cols = ws.length > 1 && col(0) + col(1) + 8 <= W ? "repeat(2, minmax(max-content, 1fr))" : "minmax(0, 1fr)";
+      rooms.classList.toggle("wrap", cols === "minmax(0, 1fr)" && max > W);
+    }
+    if (rooms.style.gridTemplateColumns !== cols) rooms.style.gridTemplateColumns = cols;
   }
 
   async _job(k) {

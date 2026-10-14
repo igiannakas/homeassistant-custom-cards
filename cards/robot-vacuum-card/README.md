@@ -19,10 +19,7 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 │ │        Vac & mop · Turbo · Intense mop            │ │
 │ └──────────────────────────────────────────────────┘ │
 │ (   ▶ Clean entire floor    ) (     Auto clean      )  │
-│ ┌──────────────────────────────────────────────────┐ │
-│ │     🗑      │      💧      │      ✇        docked │ │
-│ │    Empty    │   Wash mop   │   Dry mop           │ │
-│ └──────────────────────────────────────────────────┘ │
+│     🗑 Empty        💧 Wash mop       ✇ Dry mop  docked │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -50,8 +47,8 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 - **Rooms**: the loaded map's rooms in an even grid (from `roborock.get_maps`), with your
   Home Assistant area icons – an area of the same name, or one whose name is inside the
   room's ("Corridor" in "Upstairs Corridor"), else a guess from the name; set your own
-  under `rooms:`. A name too long for its pill wraps onto a second line rather than being cut
-  off. Tap rooms to build a clean: the button becomes **Clean 2 rooms** and
+  under `rooms:`. Every name stays whole on one line: the columns are as wide as the longest
+  name needs (fewer columns rather than a cut or wrapped name). Tap rooms to build a clean: the button becomes **Clean 2 rooms** and
   sends `app_segment_clean` for those segments. During a job the room the robot is in is
   ringed and rooms can't be picked.
 - **Cleaning mode tile**: what the next clean will use ("Vac & mop · Turbo · Intense mop",
@@ -66,11 +63,10 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
   ends a clean.
 - **Auto clean** (optional, `auto_clean`): a pill that glows teal while your automation
   (or switch) is on; a tap asks, then turns it off or on; a hold opens its more-info.
-- **Dock jobs** (only while the robot is docked): **Empty**, **Wash mop** and **Dry mop** in a
-  tile of their own under the buttons – icon over label, split by short dividers, so they read
-  as the dock's controls rather than more robot actions – for the dock's own switches, handy
-  after stopping a clean early with Dock. The one that runs is tinted blue ("Drying"); each
-  asks before it starts, and before it stops.
+- **Dock jobs** (only while the robot is docked): **Empty**, **Wash mop** and **Dry mop** as
+  quiet secondary buttons (grey text, no fill) in one row under the main buttons – the dock's
+  own switches, handy after stopping a clean early with Dock, without competing with Clean.
+  The one that runs is tinted blue ("Drying"); each asks before it starts, and before it stops.
 
 ## Cleaning mode (the sheet, or `layout: mode`)
 
