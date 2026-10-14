@@ -3844,7 +3844,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 2.2.2 ===== */
+/* ===== robot-vacuum-card 2.2.3 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3870,7 +3870,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.2.2";
+const RVC_VERSION = "2.2.3";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -4414,9 +4414,9 @@ const CSS = `
   .map canvas { display: block; }
   .map .loading { position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 10px; font-size: 11px; line-height: 14px;
     letter-spacing: .4px; color: var(--secondary-text-color); background: var(--card-background-color, #fff); }
-  /* Rooms: an even grid of secondary pills (30px), two across on a phone. A name too long for
-     its pill wraps onto a second line (the pill and its row grow) – never clipped. */
-  .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  /* Rooms: an even grid of secondary pills (30px), at least two across (even on a 320px phone).
+     A name too long for its pill wraps onto a second line (the pill and its row grow) – never clipped. */
+  .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, calc(50% - 4px)), 1fr)); gap: 8px; }
   .rooms:empty { display: none; }
   .chip { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; min-height: 30px; border-radius: 15px; padding: 7px 12px 7px 8px;
     font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .2px; cursor: pointer; min-width: 0;
