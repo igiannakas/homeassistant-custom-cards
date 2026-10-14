@@ -18,7 +18,7 @@
   left half switches the plug at once, both ways; the watts open the power sensor.
 - **Today's numbers**, split by straight dividers: the reading (e.g. the room's humidity),
   **On for** 1 h 12 min (or **Off since** 07:00 / Tue 18:10 / 4 Oct), energy today and today's
-  cost. The run time comes from the history, so a Home Assistant restart (the plug briefly
+  cost (in pence under a pound, "9p"; "£1.20" from a pound up). The run time comes from the history, so a Home Assistant restart (the plug briefly
   unavailable) doesn't reset it.
 - **Tap anywhere but the pill** to open the appliance's own dashboard (`navigation_path`), or
   its more-info without one.

@@ -106,6 +106,7 @@ Most of them generalise to any dashboard.
 
 ## Appliances (Oct 2026)
 
+- Costs read in pence under a pound ("9p") and in pounds from a pound up ("£1.23") – on every card, chart label and tooltip, not just one card.
 - One card per appliance: circle + "Name · Running" + the rule line, the printer's split power pill ("On | 252 W" while on, "Off" while off), and a strip of today's numbers (reading, On for / Off since, Today, Today's cost) with straight dividers.
 - An appliance's circle shows its state: orange while on (power, like a lit room and the pill), grey while off. Teal is for a tap target with no state colour of its own; blue for a job in progress (print, clean).
 - Say what the automation does in its own words: "On at 17:30", "Off at 09:00", "On above 62%" – never a vague "Auto".

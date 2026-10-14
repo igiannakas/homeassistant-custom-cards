@@ -24,7 +24,7 @@
  * split by straight dividers. Anywhere but the pill opens the appliance's own dashboard.
  */
 
-const AC_VERSION = "1.0.1";
+const AC_VERSION = "1.0.2";
 const AC_TAG = "appliance-card";
 
 const C = {
@@ -125,6 +125,17 @@ function money(v, currency) {
   } catch (e) {
     return `${v.toFixed(2)} ${currency}`;
   }
+}
+
+/* Costs (design rule): under a pound in pence – "7p", under a penny "0.5p" – and from a pound up
+   as money, "£1.23"; the same for cents in euros and dollars. Other currencies always as money. */
+const MINOR = { GBP: "p", EUR: "c", USD: "¢" };
+function cost(v, currency) {
+  if (v === null || v === undefined || !Number.isFinite(v) || !currency) return null;
+  const unit = MINOR[currency];
+  if (!unit || Math.abs(v) >= 0.995) return money(v, currency);
+  const c = v * 100;
+  return `${c > 0 && c < 0.95 ? c.toFixed(1) : Math.round(c)}${unit}`;
 }
 
 /* The price per kWh: the card's own setting, else the grid price in the Energy settings. */
@@ -247,8 +258,8 @@ function model(hass, cfg, now, run, price) {
     const k = kwh(S[cfg.energy]);
     stats.push({ v: k === null ? "–" : `${k === 0 ? "0" : fmt(k, k < 10 ? 2 : k < 100 ? 1 : 0)} kWh`, l: "Today" });
     const p = price ? (price.entity ? num(S[price.entity]?.state) : price.value) : null;
-    const cost = k !== null && p !== null && p !== undefined ? money(k * p, hass.config?.currency) : null;
-    if (cost) stats.push({ v: cost, l: "Today's cost" });
+    const spent = k !== null && p !== null && p !== undefined ? cost(k * p, hass.config?.currency) : null;
+    if (spent) stats.push({ v: spent, l: "Today's cost" });
   }
 
   return {

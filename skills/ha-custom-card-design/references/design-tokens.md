@@ -196,6 +196,10 @@ cells) and 8px gaps, never through extra height.
 - **Formats:** durations `45 min`, `3 h`, `1 h 23 min`, `2 d` (a space, short units); readings
   `21.4°` (no C), `48%`, `612 ppm`, PM values bare (always µg/m³, the PM label says so), `1,204 kWh` (`toLocaleString`), times `14:05`
   (en-GB); unknown or unavailable `–`; every reading keeps its unit.
+- **Money:** under a pound in pence – `7p`, `0p`, under a penny one decimal `0.5p` – and from a pound
+  up as money, `£1.23` (from 99.5p it is `£1.00`, never `100p`). Running costs the same with `/h`
+  (`15p/h`, `0.2p/h`, `£1.20/h`). Euros and dollars use cents the same way; other currencies are
+  always money. Every card and every dashboard chart label follows it.
 - **Errors:** HA's own message when there is one, else "Couldn't <what you tried>." with the
   friendly name – never an entity id.
 - Text sizes: 20 / 16 / 15 (dialog title / rows / body text), 14 (names, titles, values), 13 (pill

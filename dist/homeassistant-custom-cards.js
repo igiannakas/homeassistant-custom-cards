@@ -505,7 +505,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== appliance-card 1.0.1 ===== */
+/* ===== appliance-card 1.0.2 ===== */
 (() => {
 /*
  * Appliance card – a plug-powered appliance (dehumidifier, air purifier, dryer…) in one card.
@@ -533,7 +533,7 @@ registerAirQualityCard();
  * split by straight dividers. Anywhere but the pill opens the appliance's own dashboard.
  */
 
-const AC_VERSION = "1.0.1";
+const AC_VERSION = "1.0.2";
 const AC_TAG = "appliance-card";
 
 const C = {
@@ -634,6 +634,17 @@ function money(v, currency) {
   } catch (e) {
     return `${v.toFixed(2)} ${currency}`;
   }
+}
+
+/* Costs (design rule): under a pound in pence – "7p", under a penny "0.5p" – and from a pound up
+   as money, "£1.23"; the same for cents in euros and dollars. Other currencies always as money. */
+const MINOR = { GBP: "p", EUR: "c", USD: "¢" };
+function cost(v, currency) {
+  if (v === null || v === undefined || !Number.isFinite(v) || !currency) return null;
+  const unit = MINOR[currency];
+  if (!unit || Math.abs(v) >= 0.995) return money(v, currency);
+  const c = v * 100;
+  return `${c > 0 && c < 0.95 ? c.toFixed(1) : Math.round(c)}${unit}`;
 }
 
 /* The price per kWh: the card's own setting, else the grid price in the Energy settings. */
@@ -756,8 +767,8 @@ function model(hass, cfg, now, run, price) {
     const k = kwh(S[cfg.energy]);
     stats.push({ v: k === null ? "–" : `${k === 0 ? "0" : fmt(k, k < 10 ? 2 : k < 100 ? 1 : 0)} kWh`, l: "Today" });
     const p = price ? (price.entity ? num(S[price.entity]?.state) : price.value) : null;
-    const cost = k !== null && p !== null && p !== undefined ? money(k * p, hass.config?.currency) : null;
-    if (cost) stats.push({ v: cost, l: "Today's cost" });
+    const spent = k !== null && p !== null && p !== undefined ? cost(k * p, hass.config?.currency) : null;
+    if (spent) stats.push({ v: spent, l: "Today's cost" });
   }
 
   return {
@@ -2147,7 +2158,7 @@ async function registerEnclosureFilterCard() {
 registerEnclosureFilterCard();
 })();
 
-/* ===== energy-summary-card 1.3.1 ===== */
+/* ===== energy-summary-card 1.4.0 ===== */
 (() => {
 /*
  * Energy summary card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2162,7 +2173,7 @@ registerEnclosureFilterCard();
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.3.1";
+const ESC_VERSION = "1.4.0";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -2217,11 +2228,21 @@ function money(v, currency, locale) {
   }
 }
 
-/* Running cost of the current draw: "15p/h" in pounds, otherwise "€0.15/h". */
+/* Costs (design rule): under a pound in pence – "7p", under a penny "0.5p" – and from a pound up
+   as money, "£1.23"; the same for cents in euros and dollars. Other currencies always as money. */
+const MINOR = { GBP: "p", EUR: "c", USD: "¢" };
+function cost(v, currency, locale) {
+  if (v === null || v === undefined || !Number.isFinite(v) || !currency) return "";
+  const unit = MINOR[currency];
+  if (!unit || Math.abs(v) >= 0.995) return money(v, currency, locale);
+  const c = v * 100;
+  return `${c > 0 && c < 0.95 ? c.toFixed(1) : Math.round(c)}${unit}`;
+}
+
+/* Running cost of the current draw, the same way: "15p/h", "0.2p/h", "£1.20/h". */
 function perHour(v, currency, locale) {
-  if (v === null || !currency) return "";
-  if (currency === "GBP" && v < 1) return `${Math.round(v * 100)}p/h`;
-  return `${money(v, currency, locale)}/h`;
+  const c = cost(v, currency, locale);
+  return c ? `${c}/h` : "";
 }
 
 /* The price per kWh: the card's own setting, else the grid source in the Energy settings. */
@@ -2523,7 +2544,7 @@ class EnergySummaryCard extends HTMLElement {
     const currency = hass.config?.currency;
     const locale = hass.locale?.language || hass.language;
     const price = this._priceValue();
-    const cost = (kwh) => (kwh === null || price === null ? "" : money(kwh * price, currency, locale));
+    const costOf = (kwh) => (kwh === null || price === null ? "" : cost(kwh * price, currency, locale));
     const w = num(hass.states[this._config.power]?.state);
     const month = new Date().toLocaleDateString(locale || "en-GB", { month: "long" });
     // Today and the month run live: statistics up to the latest block, plus the meter since then.
@@ -2533,9 +2554,9 @@ class EnergySummaryCard extends HTMLElement {
     const monthSoFar = live(this._totals.month);
     const rows = {
       now: ["Now", power(w, locale), w === null || price === null ? "" : perHour((w / 1000) * price, currency, locale)],
-      today: ["Today", energy(today, locale), cost(today)],
-      yesterday: ["Yesterday", energy(this._totals.yesterday, locale), cost(this._totals.yesterday)],
-      month: [month.charAt(0).toUpperCase() + month.slice(1), energy(monthSoFar, locale), cost(monthSoFar)],
+      today: ["Today", energy(today, locale), costOf(today)],
+      yesterday: ["Yesterday", energy(this._totals.yesterday, locale), costOf(this._totals.yesterday)],
+      month: [month.charAt(0).toUpperCase() + month.slice(1), energy(monthSoFar, locale), costOf(monthSoFar)],
     };
     root.querySelector(".shape ha-icon").setAttribute("icon", this._config.icon || "mdi:home-lightning-bolt");
     for (const [key, [label, [value, unit], money_]] of Object.entries(rows)) {

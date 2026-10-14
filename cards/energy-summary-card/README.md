@@ -7,6 +7,8 @@
 </p>
 
 - **Now** is the live power and what it costs per hour at that rate.
+- Costs under a pound show in pence ("59p", "0.2p/h" under a penny), from a pound up in
+  pounds ("£1.89").
 - **Today, Yesterday and the month so far** come from Home Assistant's
   long-term statistics for the energy sensor (the same numbers as the Energy
   dashboard), refreshed every two minutes.

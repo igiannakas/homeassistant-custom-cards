@@ -213,6 +213,16 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
   c8.shadowRoot.querySelector(".stat.today .v").click();
   assert.deepStrictEqual(more8, ["sensor.power", "sensor.power"]);
 
+  // Costs under a pound in pence ("59p"), a running cost under a penny an hour with a decimal.
+  changes.day0 = 2.5;
+  const c9 = document.createElement("energy-summary-card");
+  document.body.appendChild(c9);
+  c9.setConfig({ ...cfg, price: 0.2372 });
+  c9.hass = hass("5", "2.5");
+  await tick(10);
+  assert.strictEqual(c9.shadowRoot.querySelector(".stat.today .c").textContent, "59p");
+  assert.strictEqual(c9.shadowRoot.querySelector(".stat.now .c").textContent, "0.1p/h");
+
   assert.throws(() => new Card().setConfig({}));
   console.log("ALL ENERGY-SUMMARY TESTS PASSED");
   process.exit(0);

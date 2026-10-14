@@ -158,7 +158,7 @@ const view = (card) => {
   assert.strictEqual(v.pill, "off:Off");
   assert.strictEqual(v.plug, "mdi:power-plug-off");
   assert(v.color.includes("grey"), "off: grey circle");
-  assert.deepStrictEqual(v.stats, ["52%/Humidity", "07:00/Off since", "0.13 kWh/Today", "£0.03/Today's cost"]);
+  assert.deepStrictEqual(v.stats, ["52%/Humidity", "07:00/Off since", "0.13 kWh/Today", "3p/Today's cost"]);
   assert(ws.includes("energy/get_prefs") && ws.includes("history/history_during_period"));
 
   // Stability: the same hass again rewrites nothing; nodes and the written strings stay.
@@ -222,7 +222,7 @@ const view = (card) => {
   assert.strictEqual(v.pill, "on:On|266 W");
   assert.strictEqual(v.plug, "mdi:power-plug");
   assert(v.color.includes("orange"), "on: orange circle (power)");
-  assert.deepStrictEqual(v.stats, ["66%/Humidity", "1 h 12 min/On for", "0.38 kWh/Today", "£0.09/Today's cost"]);
+  assert.deepStrictEqual(v.stats, ["66%/Humidity", "1 h 12 min/On for", "0.38 kWh/Today", "9p/Today's cost"]);
   assert.strictEqual(dh.shadowRoot.querySelector(".tog").getAttribute("aria-pressed"), "true");
 
   // Idle: on, drawing next to nothing.
@@ -263,7 +263,7 @@ const view = (card) => {
   assert.strictEqual(v.nm, "Bedroom Dehumidifier · Unavailable");
   assert.strictEqual(v.pill, "hidden");
   assert.strictEqual(v.sc, "");
-  assert.deepStrictEqual(v.stats, ["52%/Humidity", "0.13 kWh/Today", "£0.03/Today's cost"]);
+  assert.deepStrictEqual(v.stats, ["52%/Humidity", "0.13 kWh/Today", "3p/Today's cost"]);
 
   // 4. Air purifier: off before 17:30 → On at 17:30; on → Off at 09:00. PM2.5 bare (always µg/m³).
   history["switch.tasmota_2"] = [{ s: "on", lu: sec("2026-10-07T16:30:00Z") }, { s: "unavailable", lu: sec("2026-10-14T06:00:00Z") }, { s: "off", lu: sec("2026-10-14T08:00:00Z") }];
@@ -272,7 +272,7 @@ const view = (card) => {
   v = view(ap);
   assert.strictEqual(v.nm, "Air Purifier · Off");
   assert.strictEqual(v.sc, "On at 17:30");
-  assert.deepStrictEqual(v.stats, ["3/PM2.5", "09:00/Off since", "0.09 kWh/Today", "£0.02/Today's cost"]);
+  assert.deepStrictEqual(v.stats, ["3/PM2.5", "09:00/Off since", "0.09 kWh/Today", "2p/Today's cost"]);
   history["switch.tasmota_2"] = [{ s: "on", lu: sec("2026-10-07T16:30:00Z") }, { s: "off", lu: sec("2026-10-14T08:00:00Z") }, { s: "on", lu: sec("2026-10-14T16:30:00Z") }];
   ap._now = () => T("2026-10-14T17:15:00Z");
   ap.hass = hass({ "switch.tasmota_2": st("on", {}, "2026-10-14T16:30:00Z"), "sensor.tasmota_energy_power_3": st("9", { unit_of_measurement: "W" }) });
@@ -299,10 +299,16 @@ const view = (card) => {
   assert.strictEqual(v.nm, "Clothes Dryer · Off", "friendly name by default");
   assert.strictEqual(cd.shadowRoot.querySelector(".shape ha-icon").getAttribute("icon"), "mdi:tumble-dryer");
   assert.strictEqual(v.sc, "", "no schedule, no line");
-  assert.deepStrictEqual(v.stats, ["10 d+/Off for", "1.20 kWh/Today", "£0.36/Today's cost"]);
+  assert.deepStrictEqual(v.stats, ["10 d+/Off for", "1.20 kWh/Today", "36p/Today's cost"]);
   cd.hass = hass({ "switch.clothes_dryer": st("off", { friendly_name: "Clothes Dryer" }), "sensor.cd_today": st("0", { unit_of_measurement: "kWh" }) });
   await tick(10);
-  assert.deepStrictEqual(view(cd).stats.slice(1), ["0 kWh/Today", "£0.00/Today's cost"], "nothing today: 0 kWh, not 0.00");
+  assert.deepStrictEqual(view(cd).stats.slice(1), ["0 kWh/Today", "0p/Today's cost"], "nothing today: 0 kWh, not 0.00");
+  // Costs: pence under a pound, a decimal under a penny, money from a pound up.
+  for (const [kwh, want] of [["0.02", "0.6p"], ["4", "£1.20"], ["3.3", "99p"], ["3.32", "£1.00"], ["40", "£12.00"]]) {
+    cd.hass = hass({ "switch.clothes_dryer": st("off", { friendly_name: "Clothes Dryer" }), "sensor.cd_today": st(kwh, { unit_of_measurement: "kWh" }) });
+    await tick(10);
+    assert.strictEqual(view(cd).stats[2], `${want}/Today's cost`, `${kwh} kWh at 30p`);
+  }
   // No navigation_path: the card opens the plug.
   cd.shadowRoot.querySelector(".open").click();
   eq(cd.ev, [["more-info", "switch.clothes_dryer"]]);
