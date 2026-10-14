@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.5.0";
+const RVC_VERSION = "2.6.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -589,6 +589,10 @@ const CSS = `
   .acts { display: flex; flex-wrap: wrap; gap: 8px; }
   .acts .pill { flex: 1 1 0; min-width: max-content; height: 44px; border-radius: 22px; padding: 0 10px; gap: 8px; font-size: 14px; }
   .acts .pill ha-icon { --mdc-icon-size: 20px; }
+  /* The one that sets the robot going (Clean / Resume) is filled blue: the card's main action at
+     a glance, and unlike a state tint (Auto clean on, a running dock job) it never means "on". */
+  .acts .pill.go { background: ${C.blue}; color: var(--text-primary-color, #fff); }
+  .acts .pill.go ha-icon { color: var(--text-primary-color, #fff); }
   /* The dock's jobs are secondary: the card's footer – a full-width rule, then three quiet text
      buttons (grey 12px, no fill) split by short dividers. There while docked, never competing
      with Clean. The one that runs is tinted blue. */
@@ -1081,7 +1085,10 @@ class RobotVacuumCard extends HTMLElement {
     if (ak !== this._keys.acts) {
       box.style.setProperty("--n", String(acts.length));
       box.innerHTML = acts
-        .map(([k, , icon, color]) => `<button class="pill" data-k="${k}"><ha-icon icon="${icon}"${color ? ` style="color:${color}"` : ""}></ha-icon><span></span></button>`)
+        .map(([k, , icon, color]) => {
+          const go = k === "clean" || k === "resume";
+          return `<button class="pill${go ? " go" : ""}" data-k="${k}"><ha-icon icon="${icon}"${color && !go ? ` style="color:${color}"` : ""}></ha-icon><span></span></button>`;
+        })
         .join("");
       this._keys.acts = ak;
     }

@@ -183,6 +183,7 @@ const cfg = {
   const jobs = () => all(".jobs button").map((b) => b.textContent.trim() + (b.classList.contains("run") ? "*" : ""));
   eq(jobs(), ["Empty", "Wash mop", "Dry mop"]);
   assert.strictEqual(q(".jobs").style.getPropertyValue("--n"), "3");
+  assert(q('.acts .pill[data-k="clean"]').classList.contains("go") && !q('.acts .pill[data-k="auto"]').classList.contains("go"), "Clean is the filled main action");
   assert(all(".jobs button").every((b) => !b.classList.contains("pill")) && !q(".jobs").classList.contains("acts"), "dock jobs are a tile of their own, not more action pills");
   {
     const n1 = calls.length;

@@ -55,7 +55,8 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 - **Cleaning mode tile**: what the next clean will use ("Vac & mop · Turbo · Intense mop",
   "· ×2" for two passes) under a blue tune icon, with a chevron – a taller tile, so it never
   reads as one more room. A tap opens the Cleaning mode sheet (below).
-- **Buttons** for the state – the card's main controls, so 44px pills: Clean entire floor (or Clean N rooms) when idle, Pause and Dock while
+- **Buttons** for the state – the card's main controls, so 44px pills, the one that sets the robot
+  going (Clean, Resume) filled blue: Clean entire floor (or Clean N rooms) when idle, Pause and Dock while
   cleaning, Resume and Dock when paused, Pause while returning. Dock only shows when the
   robot is away from the dock. The buttons share the row evenly, but a longer label always
   gets the width it needs. Every button asks first except Pause; the clean's
