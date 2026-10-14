@@ -13,7 +13,7 @@
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.5.0";
+const VMC_VERSION = "2.5.1";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -347,7 +347,7 @@ class VacuumMaintenanceCard extends HTMLElement {
     const root = this.shadowRoot;
     const set = (sel, v, html = false) => {
       const n = root.querySelector(sel);
-      if (n && (html ? n.innerHTML !== v : n.textContent !== v)) html ? (n.innerHTML = v) : (n.textContent = v);
+      if (n && (html ? n._h !== v : n.textContent !== v)) html ? ((n.innerHTML = v), (n._h = v)) : (n.textContent = v);
     };
     set(".t", this._config.title || (this._config.hide_dock ? "Maintenance" : "Dock & maintenance"));
     const s = root.querySelector(".s");

@@ -8,7 +8,7 @@
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.3.0";
+const HSC_VERSION = "1.3.1";
 const HSC_TAG = "home-status-card";
 
 // One meaning per colour (design tokens → Colours): green = someone home, orange = the step
@@ -503,7 +503,10 @@ class HomeStatusCard extends HTMLElement {
     // swallows the tap, and Home Assistant pushes state updates several times a second.
     // "Greece · Occupied": on a narrow card only the state word moves down, the dot staying with the name.
     const nameHtml = `${esc(this._config.name || "Home")}<span class="state">&nbsp;· <span class="w">${esc(m.presence.label)}</span></span>`;
-    if (e.name.innerHTML !== nameHtml) e.name.innerHTML = nameHtml;
+    if (e.name._h !== nameHtml) {
+      e.name.innerHTML = nameHtml;
+      e.name._h = nameHtml;
+    }
     if (e.detail.textContent !== m.presence.detail) e.detail.textContent = m.presence.detail;
 
     e.alarm.style.display = m.alarm ? "" : "none";

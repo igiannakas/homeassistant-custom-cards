@@ -10,7 +10,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.3.1";
+const AQC_VERSION = "1.3.2";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -417,7 +417,10 @@ class AirQualityCard extends HTMLElement {
     }
     const sum = parts.map((p) => `<span class="p">${esc(p)}</span>`).join(", ");
     const sumEl = root.querySelector(".s");
-    if (sumEl.innerHTML !== sum) sumEl.innerHTML = sum;
+    if (sumEl._h !== sum) {
+      sumEl.innerHTML = sum;
+      sumEl._h = sum;
+    }
     root.querySelector(".lt").classList.toggle("one", !sum);
     // The label icon shows the house's level, so it takes that colour.
     const lab = root.querySelector(".slot ha-icon");

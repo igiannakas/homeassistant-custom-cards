@@ -14,7 +14,7 @@
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.4.2";
+const CMC_VERSION = "1.4.3";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -495,7 +495,10 @@ class ClimateModesCard extends HTMLElement {
       const key = `${full}|${status.clientWidth}`;
       if (key === this._statusKey) html = this._statusHtml;
       else {
-        if (status.innerHTML !== full) status.innerHTML = full;
+        if (status._h !== full) {
+          status.innerHTML = full;
+          status._h = full;
+        }
         status.classList.add("measure");
         if (status.scrollWidth > status.clientWidth) html = partsHtml(a.short);
         status.classList.remove("measure");
@@ -503,7 +506,10 @@ class ClimateModesCard extends HTMLElement {
         this._statusHtml = html;
       }
     }
-    if (status.innerHTML !== html) status.innerHTML = html;
+    if (status._h !== html) {
+      status.innerHTML = html;
+      status._h = html;
+    }
     status.parentElement.classList.toggle("one", !html);
   }
 

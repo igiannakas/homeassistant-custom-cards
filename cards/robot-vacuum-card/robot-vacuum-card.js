@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.7.0";
+const RVC_VERSION = "2.7.1";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -953,7 +953,7 @@ class RobotVacuumCard extends HTMLElement {
     const root = this.shadowRoot;
     const set = (sel, v, html = false) => {
       const n = root.querySelector(sel);
-      if (n && (html ? n.innerHTML !== v : n.textContent !== v)) html ? (n.innerHTML = v) : (n.textContent = v);
+      if (n && (html ? n._h !== v : n.textContent !== v)) html ? ((n.innerHTML = v), (n._h = v)) : (n.textContent = v);
     };
     const offline = m.key === "offline";
     const busy = BUSY.includes(m.key);

@@ -183,9 +183,13 @@ class ExampleCard extends HTMLElement {
     if (!this._built) this._build();
     const root = this.shadowRoot;
     const S = this._hass.states;
-    // Only touch the DOM when something changed, so a tap is never lost mid-update.
+    // Only touch the DOM when something changed, so a tap is never lost mid-update. Compare with
+    // the string last written – innerHTML never serialises back to exactly the same text.
     const set = (node, html) => {
-      if (node && node.innerHTML !== html) node.innerHTML = html;
+      if (node && node._h !== html) {
+        node.innerHTML = html;
+        node._h = html;
+      }
     };
     let onCount = 0;
     this._config.items.forEach((it, i) => {

@@ -9,7 +9,7 @@
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.2.1";
+const EFC_VERSION = "1.2.2";
 const EFC_TAG = "enclosure-filter-card";
 const PENDING_MS = 45000; // how long a vent move shows before Home Assistant confirms it
 
@@ -325,7 +325,12 @@ class EnclosureFilterCard extends HTMLElement {
     const root = this.shadowRoot;
     // Only touch the DOM when something changed, so a tap is never lost mid-update.
     const set = (n, v) => {
-      if (n && n.innerHTML !== v) n.innerHTML = v;
+      // Compared with what was last written: innerHTML never serialises back to the same string
+      // (and ink alignment adds margins), which rewrote the readings on every update.
+      if (n && n._h !== v) {
+        n.innerHTML = v;
+        n._h = v;
+      }
     };
     const vent = this._shown("vent", this._hass.states[this._config.vent]?.state);
     if (!this._pending.vent) clearTimeout(this._pendTimer);

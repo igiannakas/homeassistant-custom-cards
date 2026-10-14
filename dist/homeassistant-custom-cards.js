@@ -4,7 +4,7 @@
  * air-quality-card, climate-modes-card, enclosure-filter-card, energy-summary-card, home-status-card, mmu-lanes-card, printer-status-card, printer-temps-card, robot-vacuum-card, room-lights-card, vacuum-maintenance-card, weather-presence-card
  */
 
-/* ===== air-quality-card 1.3.1 ===== */
+/* ===== air-quality-card 1.3.2 ===== */
 (() => {
 /*
  * Air quality card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -18,7 +18,7 @@
  * See cards/air-quality-card/README.md for every option.
  */
 
-const AQC_VERSION = "1.3.1";
+const AQC_VERSION = "1.3.2";
 const AQC_TAG = "air-quality-card";
 
 const C = {
@@ -425,7 +425,10 @@ class AirQualityCard extends HTMLElement {
     }
     const sum = parts.map((p) => `<span class="p">${esc(p)}</span>`).join(", ");
     const sumEl = root.querySelector(".s");
-    if (sumEl.innerHTML !== sum) sumEl.innerHTML = sum;
+    if (sumEl._h !== sum) {
+      sumEl.innerHTML = sum;
+      sumEl._h = sum;
+    }
     root.querySelector(".lt").classList.toggle("one", !sum);
     // The label icon shows the house's level, so it takes that colour.
     const lab = root.querySelector(".slot ha-icon");
@@ -457,7 +460,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== climate-modes-card 1.4.2 ===== */
+/* ===== climate-modes-card 1.4.3 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -475,7 +478,7 @@ registerAirQualityCard();
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.4.2";
+const CMC_VERSION = "1.4.3";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -956,7 +959,10 @@ class ClimateModesCard extends HTMLElement {
       const key = `${full}|${status.clientWidth}`;
       if (key === this._statusKey) html = this._statusHtml;
       else {
-        if (status.innerHTML !== full) status.innerHTML = full;
+        if (status._h !== full) {
+          status.innerHTML = full;
+          status._h = full;
+        }
         status.classList.add("measure");
         if (status.scrollWidth > status.clientWidth) html = partsHtml(a.short);
         status.classList.remove("measure");
@@ -964,7 +970,10 @@ class ClimateModesCard extends HTMLElement {
         this._statusHtml = html;
       }
     }
-    if (status.innerHTML !== html) status.innerHTML = html;
+    if (status._h !== html) {
+      status.innerHTML = html;
+      status._h = html;
+    }
     status.parentElement.classList.toggle("one", !html);
   }
 
@@ -1079,7 +1088,7 @@ async function registerClimateModesCard() {
 registerClimateModesCard();
 })();
 
-/* ===== enclosure-filter-card 1.2.1 ===== */
+/* ===== enclosure-filter-card 1.2.2 ===== */
 (() => {
 /*
  * Enclosure filter card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1092,7 +1101,7 @@ registerClimateModesCard();
  * See cards/enclosure-filter-card/README.md for every option.
  */
 
-const EFC_VERSION = "1.2.1";
+const EFC_VERSION = "1.2.2";
 const EFC_TAG = "enclosure-filter-card";
 const PENDING_MS = 45000; // how long a vent move shows before Home Assistant confirms it
 
@@ -1408,7 +1417,12 @@ class EnclosureFilterCard extends HTMLElement {
     const root = this.shadowRoot;
     // Only touch the DOM when something changed, so a tap is never lost mid-update.
     const set = (n, v) => {
-      if (n && n.innerHTML !== v) n.innerHTML = v;
+      // Compared with what was last written: innerHTML never serialises back to the same string
+      // (and ink alignment adds margins), which rewrote the readings on every update.
+      if (n && n._h !== v) {
+        n.innerHTML = v;
+        n._h = v;
+      }
     };
     const vent = this._shown("vent", this._hass.states[this._config.vent]?.state);
     if (!this._pending.vent) clearTimeout(this._pendTimer);
@@ -1484,7 +1498,7 @@ async function registerEnclosureFilterCard() {
 registerEnclosureFilterCard();
 })();
 
-/* ===== energy-summary-card 1.3.0 ===== */
+/* ===== energy-summary-card 1.3.1 ===== */
 (() => {
 /*
  * Energy summary card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1499,7 +1513,7 @@ registerEnclosureFilterCard();
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.3.0";
+const ESC_VERSION = "1.3.1";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -1884,7 +1898,10 @@ class EnergySummaryCard extends HTMLElement {
       const vv = el.querySelector(".v");
       const c = el.querySelector(".c");
       if (k.textContent !== label) k.textContent = label;
-      if (vv.innerHTML !== v) vv.innerHTML = v;
+      if (vv._h !== v) {
+        vv.innerHTML = v;
+        vv._h = v;
+      }
       if (c.textContent !== money_) c.textContent = money_;
     }
   }
@@ -1923,7 +1940,7 @@ async function registerEnergySummaryCard() {
 registerEnergySummaryCard();
 })();
 
-/* ===== home-status-card 1.3.0 ===== */
+/* ===== home-status-card 1.3.1 ===== */
 (() => {
 /*
  * Home status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -1935,7 +1952,7 @@ registerEnergySummaryCard();
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.3.0";
+const HSC_VERSION = "1.3.1";
 const HSC_TAG = "home-status-card";
 
 // One meaning per colour (design tokens → Colours): green = someone home, orange = the step
@@ -2430,7 +2447,10 @@ class HomeStatusCard extends HTMLElement {
     // swallows the tap, and Home Assistant pushes state updates several times a second.
     // "Greece · Occupied": on a narrow card only the state word moves down, the dot staying with the name.
     const nameHtml = `${esc(this._config.name || "Home")}<span class="state">&nbsp;· <span class="w">${esc(m.presence.label)}</span></span>`;
-    if (e.name.innerHTML !== nameHtml) e.name.innerHTML = nameHtml;
+    if (e.name._h !== nameHtml) {
+      e.name.innerHTML = nameHtml;
+      e.name._h = nameHtml;
+    }
     if (e.detail.textContent !== m.presence.detail) e.detail.textContent = m.presence.detail;
 
     e.alarm.style.display = m.alarm ? "" : "none";
@@ -2531,7 +2551,7 @@ async function registerHomeStatusCard() {
 registerHomeStatusCard();
 })();
 
-/* ===== mmu-lanes-card 1.2.0 ===== */
+/* ===== mmu-lanes-card 1.2.1 ===== */
 (() => {
 /*
  * MMU lanes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2545,7 +2565,7 @@ registerHomeStatusCard();
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.2.0";
+const MLC_VERSION = "1.2.1";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
@@ -2909,8 +2929,14 @@ class MmuLanesCard extends HTMLElement {
       const html =
         `<button class="v" data-e="${l.ids.humidity}"${l.tone ? ` style="color:${TEXT[l.tone]}"` : ""}><ha-icon icon="mdi:water-percent"${l.tone ? ` style="color:${C[l.tone]}"` : ""}></ha-icon>${hum}</button>` +
         `<button class="v" data-e="${l.ids.temp}"><ha-icon icon="mdi:thermometer"></ha-icon>${l.t === null ? "–" : `${l.t.toFixed(1)}°`}</button>`;
+      // Compared with what was last written, not with innerHTML: the browser's serialisation (and
+      // the ink alignment's margins on the icons) never matches the string, which rewrote the
+      // readings on every update and lost taps mid-press.
       const lv = el.querySelector(".lv");
-      if (lv.innerHTML !== html) lv.innerHTML = html;
+      if (lv.dataset.h !== html) {
+        lv.innerHTML = html;
+        lv.dataset.h = html;
+      }
     });
     const loaded = ls.filter((l) => l.loaded).length;
     const sum = `${loaded} of ${ls.length} loaded`;
@@ -2937,7 +2963,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.7.1 ===== */
+/* ===== printer-status-card 1.7.2 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2960,7 +2986,7 @@ registerMmuLanesCard();
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.7.1";
+const PSC_VERSION = "1.7.2";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -3498,7 +3524,7 @@ class PrinterStatusCard extends HTMLElement {
     const root = this.shadowRoot;
     const set = (sel, v, html = false) => {
       const n = root.querySelector(sel);
-      if (n && (html ? n.innerHTML !== v : n.textContent !== v)) html ? (n.innerHTML = v) : (n.textContent = v);
+      if (n && (html ? n._h !== v : n.textContent !== v)) html ? ((n.innerHTML = v), (n._h = v)) : (n.textContent = v);
     };
     const shape = root.querySelector(".shape");
     shape.style.background = tint(m.state.color, 20);
@@ -3645,7 +3671,7 @@ class PrinterStatusCard extends HTMLElement {
     const set = (sel, v, html = false) => {
       const n = root.querySelector(sel);
       if (!n) return;
-      if (html ? n.innerHTML !== v : n.textContent !== v) html ? (n.innerHTML = v) : (n.textContent = v);
+      if (html ? n._h !== v : n.textContent !== v) html ? ((n.innerHTML = v), (n._h = v)) : (n.textContent = v);
     };
 
     const shape = root.querySelector(".shape");
@@ -3875,7 +3901,7 @@ async function registerPrinterStatusCard() {
 registerPrinterStatusCard();
 })();
 
-/* ===== printer-temps-card 1.2.0 ===== */
+/* ===== printer-temps-card 1.2.1 ===== */
 (() => {
 /*
  * Printer temperatures card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3888,7 +3914,7 @@ registerPrinterStatusCard();
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.2.0";
+const PTC_VERSION = "1.2.1";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -4194,7 +4220,12 @@ class PrinterTempsCard extends HTMLElement {
     const items = [...heaters(this._hass, this._config).filter((h) => !h.missing), ...readings(this._hass, this._config)];
     // Only touch the DOM when something changed, so a tap is never lost mid-update.
     const set = (n, v) => {
-      if (n.innerHTML !== v) n.innerHTML = v;
+      // Compared with what was last written: innerHTML never serialises back to the same string
+      // (and ink alignment adds margins), which rewrote the values on every update.
+      if (n._h !== v) {
+        n.innerHTML = v;
+        n._h = v;
+      }
     };
     root.querySelectorAll(".tile").forEach((el, i) => {
       const it = items[i];
@@ -4251,7 +4282,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 2.7.0 ===== */
+/* ===== robot-vacuum-card 2.7.1 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -4277,7 +4308,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.7.0";
+const RVC_VERSION = "2.7.1";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -5208,7 +5239,7 @@ class RobotVacuumCard extends HTMLElement {
     const root = this.shadowRoot;
     const set = (sel, v, html = false) => {
       const n = root.querySelector(sel);
-      if (n && (html ? n.innerHTML !== v : n.textContent !== v)) html ? (n.innerHTML = v) : (n.textContent = v);
+      if (n && (html ? n._h !== v : n.textContent !== v)) html ? ((n.innerHTML = v), (n._h = v)) : (n.textContent = v);
     };
     const offline = m.key === "offline";
     const busy = BUSY.includes(m.key);
@@ -6876,7 +6907,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== vacuum-maintenance-card 2.5.0 ===== */
+/* ===== vacuum-maintenance-card 2.5.1 ===== */
 (() => {
 /*
  * Vacuum maintenance card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -6893,7 +6924,7 @@ registerRoomLightsCard();
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.5.0";
+const VMC_VERSION = "2.5.1";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -7227,7 +7258,7 @@ class VacuumMaintenanceCard extends HTMLElement {
     const root = this.shadowRoot;
     const set = (sel, v, html = false) => {
       const n = root.querySelector(sel);
-      if (n && (html ? n.innerHTML !== v : n.textContent !== v)) html ? (n.innerHTML = v) : (n.textContent = v);
+      if (n && (html ? n._h !== v : n.textContent !== v)) html ? ((n.innerHTML = v), (n._h = v)) : (n.textContent = v);
     };
     set(".t", this._config.title || (this._config.hide_dock ? "Maintenance" : "Dock & maintenance"));
     const s = root.querySelector(".s");
@@ -7394,7 +7425,7 @@ async function registerVacuumMaintenanceCard() {
 registerVacuumMaintenanceCard();
 })();
 
-/* ===== weather-presence-card 1.4.1 ===== */
+/* ===== weather-presence-card 1.4.2 ===== */
 (() => {
 /*
  * Weather & presence card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -7408,7 +7439,7 @@ registerVacuumMaintenanceCard();
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.4.1";
+const WPC_VERSION = "1.4.2";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -7842,8 +7873,10 @@ class WeatherPresenceCard extends HTMLElement {
     let changed = false;
     const set = (node, v, html = false) => {
       if (!node) return;
-      if (html ? node.innerHTML !== v : node.textContent !== v) {
-        html ? (node.innerHTML = v) : (node.textContent = v);
+      // HTML is compared with what was last written (innerHTML never serialises back to the same
+      // string), so a reading under the finger isn't rebuilt mid-tap.
+      if (html ? node._h !== v : node.textContent !== v) {
+        html ? ((node.innerHTML = v), (node._h = v)) : (node.textContent = v);
         changed = true;
       }
     };

@@ -9,7 +9,7 @@
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.2.0";
+const PTC_VERSION = "1.2.1";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
@@ -315,7 +315,12 @@ class PrinterTempsCard extends HTMLElement {
     const items = [...heaters(this._hass, this._config).filter((h) => !h.missing), ...readings(this._hass, this._config)];
     // Only touch the DOM when something changed, so a tap is never lost mid-update.
     const set = (n, v) => {
-      if (n.innerHTML !== v) n.innerHTML = v;
+      // Compared with what was last written: innerHTML never serialises back to the same string
+      // (and ink alignment adds margins), which rewrote the values on every update.
+      if (n._h !== v) {
+        n.innerHTML = v;
+        n._h = v;
+      }
     };
     root.querySelectorAll(".tile").forEach((el, i) => {
       const it = items[i];

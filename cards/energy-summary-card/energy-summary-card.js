@@ -11,7 +11,7 @@
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.3.0";
+const ESC_VERSION = "1.3.1";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -396,7 +396,10 @@ class EnergySummaryCard extends HTMLElement {
       const vv = el.querySelector(".v");
       const c = el.querySelector(".c");
       if (k.textContent !== label) k.textContent = label;
-      if (vv.innerHTML !== v) vv.innerHTML = v;
+      if (vv._h !== v) {
+        vv.innerHTML = v;
+        vv._h = v;
+      }
       if (c.textContent !== money_) c.textContent = money_;
     }
   }

@@ -10,7 +10,7 @@
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.2.0";
+const MLC_VERSION = "1.2.1";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
@@ -374,8 +374,14 @@ class MmuLanesCard extends HTMLElement {
       const html =
         `<button class="v" data-e="${l.ids.humidity}"${l.tone ? ` style="color:${TEXT[l.tone]}"` : ""}><ha-icon icon="mdi:water-percent"${l.tone ? ` style="color:${C[l.tone]}"` : ""}></ha-icon>${hum}</button>` +
         `<button class="v" data-e="${l.ids.temp}"><ha-icon icon="mdi:thermometer"></ha-icon>${l.t === null ? "–" : `${l.t.toFixed(1)}°`}</button>`;
+      // Compared with what was last written, not with innerHTML: the browser's serialisation (and
+      // the ink alignment's margins on the icons) never matches the string, which rewrote the
+      // readings on every update and lost taps mid-press.
       const lv = el.querySelector(".lv");
-      if (lv.innerHTML !== html) lv.innerHTML = html;
+      if (lv.dataset.h !== html) {
+        lv.innerHTML = html;
+        lv.dataset.h = html;
+      }
     });
     const loaded = ls.filter((l) => l.loaded).length;
     const sum = `${loaded} of ${ls.length} loaded`;

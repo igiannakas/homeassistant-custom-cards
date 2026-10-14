@@ -160,6 +160,12 @@ visual change ends with a measured alignment check – not a look at a screensho
   that compares before writing. Rebuilding `innerHTML` on every `hass` update replaces
   the element under the user's finger, and the tap is lost. Rebuild action buttons only
   when the set of actions changes.
+- **Compare HTML with what you last wrote, never with `node.innerHTML`.** The browser's
+  serialisation never matches your string exactly (attribute order, entities, the margins
+  ink alignment adds to icons), so `innerHTML !== html` is always true and the node is
+  rewritten on every update – taps on readings inside it are lost ("tapping doesn't do
+  anything, sometimes it opens the humidity"). Keep the last string: `if (n._h !== v) {
+  n.innerHTML = v; n._h = v; }`.
 - **No `transform` on `:active`.** Use `filter: brightness(.92)`, because scaling moves
   the hit area mid-tap.
 - **Long-press on mobile:**

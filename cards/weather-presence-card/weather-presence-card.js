@@ -10,7 +10,7 @@
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.4.1";
+const WPC_VERSION = "1.4.2";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -444,8 +444,10 @@ class WeatherPresenceCard extends HTMLElement {
     let changed = false;
     const set = (node, v, html = false) => {
       if (!node) return;
-      if (html ? node.innerHTML !== v : node.textContent !== v) {
-        html ? (node.innerHTML = v) : (node.textContent = v);
+      // HTML is compared with what was last written (innerHTML never serialises back to the same
+      // string), so a reading under the finger isn't rebuilt mid-tap.
+      if (html ? node._h !== v : node.textContent !== v) {
+        html ? ((node.innerHTML = v), (node._h = v)) : (node.textContent = v);
         changed = true;
       }
     };

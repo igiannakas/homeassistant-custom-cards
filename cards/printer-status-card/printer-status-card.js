@@ -19,7 +19,7 @@
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.7.1";
+const PSC_VERSION = "1.7.2";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -557,7 +557,7 @@ class PrinterStatusCard extends HTMLElement {
     const root = this.shadowRoot;
     const set = (sel, v, html = false) => {
       const n = root.querySelector(sel);
-      if (n && (html ? n.innerHTML !== v : n.textContent !== v)) html ? (n.innerHTML = v) : (n.textContent = v);
+      if (n && (html ? n._h !== v : n.textContent !== v)) html ? ((n.innerHTML = v), (n._h = v)) : (n.textContent = v);
     };
     const shape = root.querySelector(".shape");
     shape.style.background = tint(m.state.color, 20);
@@ -704,7 +704,7 @@ class PrinterStatusCard extends HTMLElement {
     const set = (sel, v, html = false) => {
       const n = root.querySelector(sel);
       if (!n) return;
-      if (html ? n.innerHTML !== v : n.textContent !== v) html ? (n.innerHTML = v) : (n.textContent = v);
+      if (html ? n._h !== v : n.textContent !== v) html ? ((n.innerHTML = v), (n._h = v)) : (n.textContent = v);
     };
 
     const shape = root.querySelector(".shape");
