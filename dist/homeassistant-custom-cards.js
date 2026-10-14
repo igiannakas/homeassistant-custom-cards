@@ -3844,7 +3844,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 1.2.1 ===== */
+/* ===== robot-vacuum-card 1.3.0 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3864,7 +3864,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "1.2.1";
+const RVC_VERSION = "1.3.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -4559,8 +4559,7 @@ class RobotVacuumCard extends HTMLElement {
     const floor = t.closest("[data-floor]");
     if (floor) {
       if (floor.disabled || floor.getAttribute("aria-pressed") === "true") return;
-      this._sel.clear();
-      return this._call("select", "select_option", { entity_id: this._found.map_select, option: floor.dataset.floor });
+      return this._switchFloor(floor.dataset.floor);
     }
     if (t.closest(".sets .chip")) return this._openSheet();
     const job = t.closest("[data-dock]");
@@ -4886,21 +4885,69 @@ class RobotVacuumCard extends HTMLElement {
     return this._call("switch", on ? "turn_off" : "turn_on", { entity_id: id });
   }
 
+  /* What a clean will use, for the confirmation: "Vac & mop · Turbo · Standard mop". */
+  _settingsText() {
+    const m = this._m;
+    const mode = DEAD.includes(m.mode) ? null : m.mode;
+    return [
+      mode ? optLabel(mode) : "",
+      m.fan && mode !== "mop" ? optLabel(m.fan) : "",
+      m.water && !DEAD.includes(m.water) && m.water !== "off" && mode !== "vacuum" ? `${optLabel(m.water)} mop` : "",
+    ].filter(Boolean).join(" · ");
+  }
+
+  _ask(title, icon, color, secondary, confirmLabel) {
+    return confirmDialog({ title, icon, color, primary: this._m?.name || "Vacuum", secondary, confirmLabel });
+  }
+
+  async _switchFloor(name) {
+    const ok = await this._ask(`Switch to ${name}`, "mdi:layers-outline", C.blue,
+      `Only once the robot is on that floor: it loads the ${name} map and its rooms.`, "Switch");
+    if (!ok) return;
+    this._sel.clear();
+    return this._call("select", "select_option", { entity_id: this._found.map_select, option: name });
+  }
+
+  /* Every button asks first except Pause (the user's choice). */
   async _action(k) {
     const id = this._config.entity;
+    const m = this._m;
+    const how = this._settingsText();
     if (k === "clean") {
       const segs = [...this._sel];
+      const names = segs.map((s) => m.rooms.find((r) => r.id === s)?.name).filter(Boolean);
+      const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
+      const ok = await this._ask(
+        segs.length ? `Clean ${segs.length} room${segs.length > 1 ? "s" : ""}` : "Clean all",
+        "mdi:play", C.blue,
+        segs.length ? `${list}${how ? `, ${how}` : ""}.` : `Every room${m.mapName ? ` on the ${m.mapName}` : ""}${how ? `, ${how}` : ""}.`,
+        "Clean",
+      );
+      if (!ok) return;
       this._sel.clear();
       this._render();
       if (segs.length) return this._call("vacuum", "send_command", { entity_id: id, command: "app_segment_clean", params: [{ segments: segs, repeat: 1 }] });
       return this._call("vacuum", "start", { entity_id: id });
     }
-    if (k === "resume") return this._call("vacuum", "start", { entity_id: id });
     if (k === "pause") return this._call("vacuum", "pause", { entity_id: id });
-    if (k === "dock") return this._call("vacuum", "return_to_base", { entity_id: id });
+    if (k === "resume") {
+      if (await this._ask("Resume", "mdi:play", C.blue, "The robot carries on with the paused clean.", "Resume")) this._call("vacuum", "start", { entity_id: id });
+      return;
+    }
+    if (k === "dock") {
+      const ends = ["cleaning", "paused"].includes(m.key);
+      const ok = await this._ask("Return to the dock", "mdi:home-import-outline", ends ? C.orange : C.blue,
+        ends ? "This ends the current clean. The robot goes back to the dock." : "The robot goes back to the dock.", "Dock");
+      if (ok) this._call("vacuum", "return_to_base", { entity_id: id });
+      return;
+    }
     if (k === "auto") {
       const a = this._config.auto_clean;
       const on = this._hass.states[a]?.state === "on";
+      const label = this._config.auto_clean_name || "Auto clean";
+      const ok = await this._ask(on ? `Turn off ${label}` : `Turn on ${label}`, "mdi:account-arrow-right", on ? C.orange : C.teal,
+        on ? `${label} stops until you turn it back on.` : `${label} runs again.`, on ? "Turn off" : "Turn on");
+      if (!ok) return;
       const [domain] = a.split(".");
       const svc = ["automation", "input_boolean", "switch"].includes(domain) ? domain : "homeassistant";
       return this._call(svc, on ? "turn_off" : "turn_on", { entity_id: a });

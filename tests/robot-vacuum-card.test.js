@@ -225,6 +225,16 @@ const cfg = {
   eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.vacuum_cleaner_dock_mop_drying" }]);
   card.hass = full(states());
 
+  const yes = async (title) => {
+    await tick();
+    assert(dlg(), `${title} asks first`);
+    if (title) assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, title);
+    const text = dlg().shadowRoot.querySelector(".secondary").textContent;
+    dlg().shadowRoot.querySelector(".confirm").click();
+    await tick();
+    return text;
+  };
+
   // Settings as chips.
   eq(all(".sets .chip").map((b) => b.textContent.trim()), ["Vac & mop", "Turbo", "Standard mop"]);
 
@@ -239,23 +249,30 @@ const cfg = {
   assert.strictEqual(q('[data-k="clean"]'), cleanBtn, "the button under the finger is updated, not replaced");
   room("Upstairs Corridor").click();
   room("Upstairs Corridor").click();
+  const nc = calls.length;
   q('[data-k="clean"]').click();
   await tick();
+  dlg().shadowRoot.querySelector(".cancel").click();
+  await tick();
+  assert.strictEqual(calls.length, nc, "Cancel: no clean");
+  eq(acts(), ["Clean 2 rooms", "Auto clean"], "Cancel keeps the rooms picked");
+  q('[data-k="clean"]').click();
+  assert.strictEqual(await yes("Clean 2 rooms"), "Study and Upstairs Corridor, Vac & mop · Turbo · Standard mop.");
   eq(calls.pop(), ["vacuum", "send_command", { entity_id: "vacuum.vacuum_cleaner", command: "app_segment_clean", params: [{ segments: [21, 20], repeat: 1 }] }]);
   eq(acts(), ["Clean all", "Auto clean"]);
   q('[data-k="clean"]').click();
-  await tick();
+  assert.strictEqual(await yes("Clean all"), "Every room on the First floor, Vac & mop · Turbo · Standard mop.");
   eq(calls.pop(), ["vacuum", "start", { entity_id: "vacuum.vacuum_cleaner" }]);
 
-  // Auto clean toggles the automation at once.
+  // Auto clean asks, then toggles the automation.
   q('[data-k="auto"]').click();
-  await tick();
+  await yes("Turn off Auto clean");
   eq(calls.pop(), ["automation", "turn_off", { entity_id: "automation.vacuum_when_away" }]);
 
-  // Floor switch loads the other map on the robot (immediately) and clears the selection.
+  // Floor switch asks, then loads the other map on the robot and clears the selection.
   room("Study").click();
   all(".floors button")[1].click();
-  await tick();
+  await yes("Switch to Ground floor");
   eq(calls.pop(), ["select", "select_option", { entity_id: "select.vacuum_cleaner_selected_map", option: "Ground floor" }]);
   card.hass = full(states({ "select.vacuum_cleaner_selected_map": st("Ground floor", { options: ["First floor", "Ground floor"] }) }));
   eq(roomNames(), ["Kitchen", "Downstairs Corridor", "Downstairs Bathroom", "Living room"]);
@@ -336,9 +353,10 @@ const cfg = {
   assert.strictEqual(q(".batt ha-icon").getAttribute("icon"), "mdi:battery-70");
   q('[data-k="pause"]').click();
   await tick();
+  assert(!dlg(), "Pause is the one immediate button");
   eq(calls.pop(), ["vacuum", "pause", { entity_id: "vacuum.vacuum_cleaner" }]);
   q('[data-k="dock"]').click();
-  await tick();
+  assert.strictEqual(await yes("Return to the dock"), "This ends the current clean. The robot goes back to the dock.");
   eq(calls.pop(), ["vacuum", "return_to_base", { entity_id: "vacuum.vacuum_cleaner" }]);
   card.hass = full(states({ ...cleaning, "sensor.vacuum_cleaner_status": st("washing_the_mop") }));
   assert.strictEqual(text(".line"), "Washing the mop");
@@ -348,7 +366,7 @@ const cfg = {
   assert.strictEqual(text(".nm"), "Vacuum cleaner · Paused");
   eq(acts(), ["Resume", "Dock", "Auto clean"]);
   q('[data-k="resume"]').click();
-  await tick();
+  await yes("Resume");
   eq(calls.pop(), ["vacuum", "start", { entity_id: "vacuum.vacuum_cleaner" }]);
 
   // Needs you: a full dirty tank says so, but never blocks a clean.

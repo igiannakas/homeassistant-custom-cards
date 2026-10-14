@@ -29,7 +29,7 @@
   refuses, its error shows here. Only an offline vacuum greys the buttons out.
 - **Job**: progress, time and area while cleaning or paused, with a bar.
 - **Floors**: one segment per map (`select.*_selected_map`). The pressed one is the map
-  loaded on the robot; tapping another loads it (immediately – carry the robot first).
+  loaded on the robot; tapping another asks, then loads it (carry the robot first).
   Hidden during a job.
 - **Map**: the floor's image entity, cropped to what is drawn and fitted to the card, live
   while cleaning. Tap it for the full image.
@@ -46,9 +46,11 @@
   `off` and `custom` only show when they are the current setting.
 - **Buttons** for the state: Clean all (or Clean N rooms) when idle, Pause and Dock while
   cleaning, Resume and Dock when paused, Pause while returning. Dock only shows when the
-  robot is away from the dock. None of these ask first.
+  robot is away from the dock. Every button asks first except Pause; the clean's
+  confirmation names the rooms and the settings it will use ("Study and Upstairs Corridor,
+  Vac & mop · Turbo · Standard mop"). Dock warns when it ends a clean.
 - **Auto clean** (optional, `auto_clean`): a pill that glows teal while your automation
-  (or switch) is on; a tap turns it off or on, a hold opens its more-info.
+  (or switch) is on; a tap asks, then turns it off or on; a hold opens its more-info.
 - **Dock jobs** (while the robot is on the dock): **Empty**, **Wash mop** and **Dry** chips
   for the dock's own switches – handy after stopping a clean early with Dock. Each glows
   blue while it runs ("Drying · 2 h 10 min"). Each asks before it starts, and a tap on a
