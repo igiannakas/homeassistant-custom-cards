@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.6.1";
+const RVC_VERSION = "2.6.2";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -1156,7 +1156,8 @@ class RobotVacuumCard extends HTMLElement {
     const on = this._hass.states[id]?.state === "on";
     const c = DOCK_CONFIRM[k]?.[on ? "stop" : "start"];
     const icon = JOBS.find((j) => j[0] === k)?.[1] || "mdi:robot-vacuum";
-    if (c && !(await this._ask(c.title, on ? "mdi:stop-circle-outline" : icon, on ? C.orange : C.blue, c.text, c.label))) return;
+    // The dialog takes the colour of the button you tapped (a job glows blue while it runs).
+    if (c && !(await this._ask(c.title, on ? "mdi:stop-circle-outline" : icon, C.blue, c.text, c.label))) return;
     return this._call("switch", on ? "turn_off" : "turn_on", { entity_id: id });
   }
 
@@ -1473,7 +1474,8 @@ class RobotVacuumCard extends HTMLElement {
       const a = this._config.auto_clean;
       const on = this._hass.states[a]?.state === "on";
       const label = this._config.auto_clean_name || "Auto clean";
-      const ok = await this._ask(on ? `Turn off ${label}` : `Turn on ${label}`, "mdi:account-arrow-right", on ? C.orange : C.teal,
+      // Teal both ways, like the pill: turning an automation off is not a warning.
+      const ok = await this._ask(on ? `Turn off ${label}` : `Turn on ${label}`, "mdi:account-arrow-right", C.teal,
         on ? `${label} stops until you turn it back on.` : `${label} runs again.`, on ? "Turn off" : "Turn on");
       if (!ok) return;
       const [domain] = a.split(".");
