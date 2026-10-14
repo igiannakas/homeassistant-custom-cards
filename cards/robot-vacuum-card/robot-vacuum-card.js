@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.2.3";
+const RVC_VERSION = "2.2.4";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -584,6 +584,8 @@ const CSS = `
      (the others share the rest), and only if a row can't hold them all does one wrap. */
   .acts { display: flex; flex-wrap: wrap; gap: 8px; }
   .acts .pill { flex: 1 1 0; min-width: max-content; padding: 0 10px; }
+  /* On a 320px phone the dock's three jobs tighten to stay on one row. */
+  @container (width < 300px) { .acts.jobs .pill { padding: 0 8px; gap: 4px; font-size: 12px; } }
   .acts:empty { display: none; }
   .pill.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
   .pill.run ha-icon { color: ${C.blue}; }
