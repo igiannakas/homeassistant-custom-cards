@@ -18,15 +18,13 @@
   (with `navigation_path`, the icon is its own button) opens the room.
 - Icon orange when the room's lights are on, grey when off. A red badge shows
   an open window.
-- **Room names are never cut off.** The card measures each name and uses up to
-  `columns` even columns while the longest fits; otherwise two columns, each as
-  wide as its own longest name; otherwise one. In a tile too narrow for the name
-  and the presence, the presence moves under the name. It fits again when the
-  card is resized.
+- **Room names are never cut off.** A name too long for its tile wraps onto a
+  second line; the presence stays beside its first line. `columns` even columns
+  (two by default).
 - **Presence** (with `occupancy`), on the same line as the room name: a green
   motion-sensor icon while someone is there (green means someone home, as in
-  Home Assistant), otherwise how long since someone was (`12 min`, `6 h`,
-  `3 d+`). This comes from the sensor's history, so a Home Assistant restart
+  Home Assistant), otherwise how long since someone was (`12m`, `6h`,
+  `3d+`). This comes from the sensor's history, so a Home Assistant restart
   does not reset it. If the lights are on and the room has been empty for
   `empty_warning` minutes (default 2), it turns amber with a
   motion-sensor-off icon – lights left on in an empty room.
@@ -82,7 +80,7 @@ rooms:
 | `entity` | Group (or light) the header switch controls. Leave out to hide the header. |
 | `name` | Header label. Default `All lights`. |
 | `empty_warning` | Minutes before lights on in an empty room are flagged. Default 2 (0 = at once). |
-| `columns` | Most tiles per row, default 2 (up to 4). The card uses fewer when a room's name wouldn't fit. |
+| `columns` | Tiles per row, default 2 (up to 4). |
 | `rooms[].entity` | The room's light, switch or group. |
 | `rooms[].name`, `rooms[].icon` | Shown on the tile. |
 | `rooms[].navigation_path` | Where tapping the icon goes. Without it, the icon toggles like the rest of the tile. |

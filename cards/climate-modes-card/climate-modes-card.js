@@ -14,7 +14,7 @@
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.4.1";
+const CMC_VERSION = "1.4.2";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -467,7 +467,10 @@ class ClimateModesCard extends HTMLElement {
       this._headColor = c.icon_color ? color(c.icon_color) : active >= 0 ? color(c.modes[active].color) : GREY;
       this._status = { parts: parts.filter(Boolean) };
     }
-    if (ic && ic.style.color !== this._headColor) ic.style.color = this._headColor;
+    // A tappable header icon sits in a tinted circle – the tap signal – and a tap target is never
+    // grey: with no state colour of its own (idle, locked, Off) it is teal (design tokens → Colours).
+    const shown = ic?.classList.contains("tap") && this._headColor === GREY ? TEAL : this._headColor;
+    if (ic && ic.style.color !== shown) ic.style.color = shown;
     this._fitStatus();
     const sw = root.querySelector(".switch");
     if (sw) {

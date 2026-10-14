@@ -10,7 +10,7 @@
  * See cards/weather-presence-card/README.md for every option.
  */
 
-const WPC_VERSION = "1.4.0";
+const WPC_VERSION = "1.4.1";
 const WPC_TAG = "weather-presence-card";
 const HISTORY_DAYS = 7;
 const HOLD_MS = 500;
@@ -451,7 +451,10 @@ class WeatherPresenceCard extends HTMLElement {
     };
 
     const w = hass.states[this._config.weather];
-    const [icon, color] = WEATHER[w?.state] || ["mdi:weather-cloudy", C.grey];
+    // The weather circle is a tap target (it opens the forecast), and a tap target is never grey:
+    // grey weather (cloudy, fog, unknown) shows teal (design tokens → Colours).
+    const [icon, wc] = WEATHER[w?.state] || ["mdi:weather-cloudy", C.grey];
+    const color = wc === C.grey ? C.teal : wc;
     const shape = root.querySelector(".shape");
     shape.style.background = tint(color, 20);
     shape.querySelector("ha-icon").setAttribute("icon", icon);

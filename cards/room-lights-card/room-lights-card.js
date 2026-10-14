@@ -10,7 +10,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.4.0";
+const RLC_VERSION = "1.5.0";
 const RLC_TAG = "room-lights-card";
 
 // One meaning per colour (design tokens → Colours): orange = lights, green = someone here,
@@ -27,7 +27,6 @@ const HOLD_MS = 500;
 const HISTORY_DAYS = 3;
 const MOVE_PX = 10;
 // A tile around its text: 10px padding + 36px icon + 10px gap … 10px padding.
-const TILE_PAD = 66;
 
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 // Readable coloured text – mixed toward the text colour, never the raw colour on white.
@@ -61,12 +60,13 @@ function lampName(friendly, room) {
   return n.charAt(0).toUpperCase() + n.slice(1);
 }
 
-/* "12 min", "3 h", "2 d" (design tokens → Formats) */
+/* "12m", "3h", "2d" – compact, so it fits beside the room name (the one place that keeps the
+   short form; design tokens → Formats). */
 function ago(ms) {
   const m = Math.max(0, Math.round(ms / 60000));
-  if (m < 60) return `${m} min`;
-  if (m < 1440) return `${Math.floor(m / 60)} h`;
-  return `${Math.floor(m / 1440)} d`;
+  if (m < 60) return `${m}m`;
+  if (m < 1440) return `${Math.floor(m / 60)}h`;
+  return `${Math.floor(m / 1440)}d`;
 }
 
 /*
@@ -84,7 +84,7 @@ function presenceModel(hass, room, lastSeen, warnMin, lightsOn) {
   if (since === null) return { kind: "empty", text: "" };
   const ms = Date.now() - since;
   const warn = lightsOn && ms >= warnMin * 60000;
-  return { kind: warn ? "warn" : "empty", text: ms > HISTORY_DAYS * 86400000 ? `${HISTORY_DAYS} d+` : ago(ms) };
+  return { kind: warn ? "warn" : "empty", text: ms > HISTORY_DAYS * 86400000 ? `${HISTORY_DAYS}d+` : ago(ms) };
 }
 
 function roomModel(hass, room) {
@@ -347,12 +347,10 @@ const CSS = `
     box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform 160ms; }
   .all.on .sw { background: ${C.orange}; }
   .all.on .sw::after { transform: translateX(16px); }
-  /* Rooms: an even grid, \`columns\` across at most. The card measures every room's name and
-     takes fewer columns when they would not fit (_fitRooms): even columns while the longest fits;
-     else two columns each as wide as its own longest; else one. Names are never cut. */
+  /* Rooms: \`columns\` even columns (two by default). */
   .rooms { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 8px; }
   .room { position: relative; min-width: 0; border-radius: 10px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
-    cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
+    container-type: inline-size; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
     -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
   .tile { display: flex; align-items: center; gap: 10px; height: 100%; box-sizing: border-box; padding: 11px 10px; min-height: 58px; }
   .room .shape { cursor: pointer; }
@@ -363,11 +361,11 @@ const CSS = `
   .badge ha-icon { --mdc-icon-size: 11px; color: #fff; }
   .badge.on { display: flex; }
   .txt { flex: 1; min-width: 0; }
-  /* Presence sits on the name's own line, so it lines up with the room title. When a tile is too
-     narrow for both, it drops under the name (it wraps, never cuts) – the columns follow the names
-     only, so a ticking "12 min" never reflows the grid. */
-  .top { display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; min-width: 0; }
-  .room .nm { flex: 0 1 auto; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
+  /* Presence sits on the name's own line, at its end, so it always lines up with the room title
+     (as it always has). A name too long for the space left wraps onto a second line – it is
+     never cut, and the presence stays beside its first line. */
+  .top { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+  .room .nm { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: .1px; color: var(--primary-text-color);
     overflow-wrap: break-word; }
   .pres { flex: 0 0 auto; display: none; align-items: center; gap: 2px; height: 20px; font-size: 12px; line-height: 20px;
     font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); white-space: nowrap; }
@@ -399,14 +397,16 @@ const CSS = `
   .all:focus-visible, .room:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   /* While the card measures (one frame, never painted): names, presence and readings on one line
      at their natural width. */
-  .measure .top, .measure .m, .measure .g { flex-wrap: nowrap; }
-  .measure .room .nm { flex: none; white-space: nowrap; }
+  .measure .m, .measure .g { flex-wrap: nowrap; }
   /* When any room's readings do not fit on one line (the card measures this), every tile
      switches together: temperature on one line, humidity + light level on the next. All tiles
      keep the same height (grid-auto-rows: 1fr) even if one room has more sensors. */
   .stack .m { flex-direction: column; }
   .stack .g { column-gap: 7px; }
   .stack .tile { padding: 11px 8px; gap: 8px; }
+  /* A phone-width tile (~170px) keeps more room for the name and its presence: 6px sides and a
+     6px gap, as before. Text sizes don't change. */
+  @container (max-width: 175px) { .tile { padding: 11px 6px; gap: 6px; } }
 `;
 
 class RoomLightsCard extends HTMLElement {
@@ -604,8 +604,8 @@ class RoomLightsCard extends HTMLElement {
     if (changed) this._fit();
   }
 
-  /* Once per frame after a change: the columns from the names (_fitRooms), then one line of
-     readings per tile if every room's fit, otherwise two lines for all of them. Measured in one
+  /* Once per frame after a change: one line of readings per tile if every room's fit, otherwise
+     two lines for all of them. Measured in one
      go (never painted in between). Without layout (tests) nothing is measured and the CSS
      default stays: \`columns\` even columns, readings wrapping between their parts. */
   _fit() {
@@ -617,57 +617,19 @@ class RoomLightsCard extends HTMLElement {
       if (!card || !card.isConnected) return;
       card.classList.remove("stack");
       card.classList.add("measure");
-      this._fitRooms();
       const overflow = [...card.querySelectorAll(".m, .g")].some((m) => m.scrollWidth > m.clientWidth + 1);
       card.classList.remove("measure");
       card.classList.toggle("stack", overflow);
     });
   }
 
-  /* The grid's columns, so that every room's name fits on one line (design tokens → Text and
-     formats). A tile needs its name (or its widest reading, if wider) + 66px around it. Even
-     columns – at most \`columns\` – as wide as the widest tile while two or more fit; else two
-     columns each as wide as its own widest tile; else one. Presence isn't counted: it drops under
-     the name in a tile too narrow for both. */
-  _fitRooms() {
-    const grid = this._el?.grid;
-    const tiles = this._el?.rooms || [];
-    const W = grid?.clientWidth;
-    if (!W || !tiles.length) return;
-    const card = grid.parentElement;
-    const had = card.classList.contains("measure");
-    card.classList.add("measure");
-    const ws = tiles.map((el) => {
-      const line = Math.ceil(el.querySelector(".nm").scrollWidth);
-      const parts = [...el.querySelectorAll(".v")].map((v) => Math.ceil(v.scrollWidth));
-      return Math.max(line, ...parts) + TILE_PAD;
-    });
-    if (!had) card.classList.remove("measure");
-    const n = this._cols();
-    const max = Math.max(...ws);
-    let cols = "minmax(0, 1fr)";
-    for (let k = n; k >= 2; k--) {
-      if (k * max + (k - 1) * 8 <= W) {
-        cols = `repeat(${k}, minmax(0, 1fr))`;
-        break;
-      }
-    }
-    if (cols === "minmax(0, 1fr)" && n >= 2 && ws.length > 1) {
-      const col = (k) => Math.max(...ws.filter((_, i) => i % 2 === k));
-      if (col(0) + col(1) + 8 <= W) cols = `minmax(${col(0)}px, 1fr) minmax(${col(1)}px, 1fr)`;
-    }
-    if (this._colsKey !== cols) {
-      this._colsKey = cols;
-      grid.style.gridTemplateColumns = cols;
-    }
-  }
 
   _cols() {
     return Math.max(1, Math.min(4, Number(this._config.columns) || 2));
   }
 
   connectedCallback() {
-    // Keeps the "12 min" counters moving.
+    // Keeps the "12m" counters moving.
     clearInterval(this._tick);
     if (this._config?.rooms?.some((r) => r.occupancy)) this._tick = setInterval(() => this._hass && this._render(), 60000);
     if (typeof ResizeObserver === "undefined") return;
@@ -855,7 +817,7 @@ const EDITOR_LABELS = {
 const EDITOR_HELPERS = {
   temperature: "Add more than one to show them all, in order (e.g. 21.1/21.8°).",
   lamps: "Leave empty to use the members of the room's group.",
-  occupancy: "Green icon while someone is here, otherwise how long since they were (12 min, 3 h, 2 d).",
+  occupancy: "Green icon while someone is here, otherwise how long since they were (12m, 3h, 2d).",
   empty_warning: "Default 2. Lights on in a room empty this long turn its time amber.",
 };
 

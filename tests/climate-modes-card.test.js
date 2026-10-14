@@ -275,7 +275,8 @@ const cfg = {
   eq(calls.pop(), ["homeassistant", "turn_on", { entity_id: "input_boolean.summer" }]);
 
   // Colours (design tokens → Colours). Without icon_color the header icon takes the active
-  // mode's colour, grey when no mode is on.
+  // mode's colour; with no state colour it would be grey, but a tappable header icon (a tinted
+  // circle) is never grey – it shows teal.
   const dc = document.createElement("climate-modes-card");
   document.body.appendChild(dc);
   const { icon_color, ...noColour } = cfg;
@@ -287,16 +288,16 @@ const cfg = {
   const head = () => dr.querySelector(".label > ha-icon").style.color;
   assert(head().includes("--purple-color"), "the active mode's colour: " + head());
   dc.hass = hass(["eco", "away", "eco", "eco"]);
-  assert(head().includes("--grey-color"), "mixed → grey");
+  assert(head().includes("--teal-color"), "mixed → teal (a tap target is never grey)");
   dc.hass = hass(Array(4).fill("frost_protection"));
-  assert(head().includes("--grey-color"), "Off (grey) → grey");
+  assert(head().includes("--teal-color"), "Off (grey) → teal on a tappable header");
   // A tile with no colour of its own glows teal when it is the mode ("what you picked" – grey
-  // wouldn't show), the header stays grey, and it asks in teal; its old subject stands in for
+  // wouldn't show), the header is teal, and it asks in teal; its old subject stands in for
   // the missing text.
   dc.hass = hass(Array(4).fill("plain"));
   const plain = dr.querySelectorAll(".mode")[4];
   assert(plain.getAttribute("style").includes("--teal-color") && plain.classList.contains("on"));
-  assert(head().includes("--grey-color"));
+  assert(head().includes("--teal-color"));
   plain.click();
   await tick(); await tick();
   dlg = document.querySelector("cmc-confirm-dialog");

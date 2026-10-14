@@ -29,7 +29,8 @@
 
 Colours follow the shared convention: green = someone home, teal = you can tap this,
 grey = away / neutral; the reading icons are a quiet grey and weather icons keep their
-literal colours.
+literal colours, except that grey weather (cloudy, fog) shows teal – the weather circle is a tap
+target, and a tap target is never grey.
 
 ## Configuration
 

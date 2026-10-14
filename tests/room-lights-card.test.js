@@ -156,13 +156,13 @@ const cfg = {
   assert(rooms()[0].querySelector(".v.l ha-icon[icon='mdi:white-balance-sunny']"));
 
   // Presence on the name's line: occupied = green motion sensor; empty = time since last seen,
-  // from history (not the restart); nothing in the history window = "3 d+".
+  // from history (not the restart); nothing in the history window = "3d+".
   await tick(10);
   const pres = (i) => rooms()[i].querySelector(".top .pres");
   assert(pres(0).classList.contains("here") && pres(0).querySelector("ha-icon[icon='mdi:motion-sensor']"));
-  eq(pres(1).textContent, "12 min");
+  eq(pres(1).textContent, "12m");
   assert(pres(1).classList.contains("empty"), "kitchen lights off → plain");
-  eq(pres(2).textContent, "3 d+");
+  eq(pres(2).textContent, "3d+");
   assert(wsCalls.filter((t) => t === "history/history_during_period").length === 1, "history read once");
   // Lights on in a room empty for longer than the threshold → warning.
   card.hass = hass({ "light.kitchen": ["on", { friendly_name: "Kitchen" }] });
@@ -182,12 +182,12 @@ const cfg = {
   card.hass = h3;
   assert(!pres(1).classList.contains("warn"), "1 min → not yet");
   card._lastSeen["binary_sensor.k_occ"] = now - 12 * 60e3;
-  // Someone leaves the living room now → "0 min".
+  // Someone leaves the living room now → "0m".
   card.hass = hass();
   await tick(10);
   card.hass = hass({ "binary_sensor.lr_occ": ["off", {}, new Date().toISOString()] });
-  eq(pres(0).textContent, "0 min");
-  assert.strictEqual(pres(0).title, "Last seen 0 min ago");
+  eq(pres(0).textContent, "0m");
+  assert.strictEqual(pres(0).title, "Last seen 0m ago");
   card.hass = hass();
 
   // Window badge.
@@ -351,38 +351,16 @@ const cfg = {
   assert(/\.all:active, \.room:active \{ filter: brightness\(\.92\)/.test(css), "press feedback .92");
   const all = [css, er.querySelector("style").textContent].join("");
   assert(!/text-overflow:\s*ellipsis|line-clamp/.test(all), "no clipped text (card, editor)");
-  assert(!/11\.5px|@container/.test(css), "no narrow-tile shrink: fitting replaces it");
+  assert(!/11\.5px/.test(css), "no off-scale text on narrow tiles");
   assert(/\.v \{[^}]*white-space: nowrap/.test(css) && /\.m \{[^}]*flex-wrap: wrap/.test(css), "readings wrap between parts");
 
-  // Room names are fitted, never cut: the grid takes as many columns (≤ columns) as the widest
-  // name allows (presence isn't counted – it drops under the name in a narrow tile), then two
-  // uneven columns, then one. jsdom has no layout, so the measurements are given here.
-  const def = (el, k, v) => Object.defineProperty(el, k, { value: v, configurable: true });
-  const NM = { "Living Room": 80, Kitchen: 50, Corridor: 60 };
-  const fitAt = (W, c = card) => {
-    const cr = c.shadowRoot;
-    def(cr.querySelector(".rooms"), "clientWidth", W);
-    cr.querySelectorAll(".room").forEach((el) => {
-      def(el.querySelector(".nm"), "scrollWidth", NM[el.querySelector(".nm").textContent]);
-      const p = el.querySelector(".pres");
-      def(p, "scrollWidth", p.textContent ? 40 : 16);
-      el.querySelectorAll(".v").forEach((v) => def(v, "scrollWidth", 50));
-    });
-    c._fitRooms();
-    return cr.querySelector(".rooms").style.gridTemplateColumns;
-  };
-  // Tiles need max(name, widest reading 50) + 66: 146, 116 and 126px – presence doesn't count.
-  eq(fitAt(400), "repeat(2, minmax(0, 1fr))", "two even columns while the widest fits");
-  eq(fitAt(280), "minmax(146px, 1fr) minmax(116px, 1fr)", "else two columns, each as wide as its own widest");
-  eq(fitAt(260), "minmax(0, 1fr)", "else one column");
-  assert(!r.querySelector("ha-card").classList.contains("measure"), "measuring leaves no trace");
-  card.setConfig({ ...cfg, columns: 3 });
-  card.hass = hass();
-  await tick(10);
-  eq(fitAt(540), "repeat(3, minmax(0, 1fr))", "columns: 3 → three when they fit");
-  eq(fitAt(400), "repeat(2, minmax(0, 1fr))", "… two when three don't");
-  card.setConfig(cfg);
-  card.hass = hass();
+  // Presence stays on the name's line (never drops under it); a long name wraps instead of
+  // being cut; columns are fixed (two by default); phone tiles get 6px sides.
+  assert(/\.top \{ display: flex; align-items: flex-start; gap: 6px; min-width: 0; \}/.test(css), "presence on the name's line");
+  assert(!/\.top \{[^}]*flex-wrap: wrap/.test(css), "presence never wraps under the name");
+  assert(/\.room \.nm \{ flex: 1; min-width: 0;[^}]*overflow-wrap: break-word/.test(css), "a long name wraps");
+  assert(/@container \(max-width: 175px\) \{ \.tile \{ padding: 11px 6px; gap: 6px; \} \}/.test(css), "phone tile spacing as before");
+  assert(!("_fitRooms" in card), "no column fitting: columns are fixed");
 
   // Missing room entity: no crash, shown dimmed.
   card.setConfig({ rooms: [{ name: "Ghost", entity: "light.nope" }] });

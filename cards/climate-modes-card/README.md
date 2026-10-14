@@ -13,8 +13,9 @@
   `switch_tap_action` instead – which can ask first (see below). The switch is teal
   when on, unless you give it a `switch_color`.
 - The label icon takes the **active mode's colour**, and is grey when no mode is on
-  (or the active one has no colour, like an Off tile). Set `icon_color` to keep it
-  one colour instead.
+  (or the active one has no colour, like an Off tile) – teal instead when it is
+  tappable (`header_tap_action`), since a tap target is never grey. Set `icon_color`
+  to keep it one colour instead.
 - Or, with `status: activity`, the line under the title says **what the heating is
   doing**, and the icon follows: "Heating · Living Room, Study" (orange, or your
   `icon_color`) while rooms call for heat (`hvac_action: heating`; "Heating · 3 rooms"

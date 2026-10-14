@@ -24,8 +24,13 @@ decorate it (decided 14 Oct 2026):
   Red only when the action would throw away something running (cutting a printer's power
   mid-print). Otherwise a warning goes in the words ("This ends the current clean").
 - **Literal colours** are the exception: clean water blue, dirty water brown, weather icons.
-- Tinted circle = tap target: `tint(colour, 20)` behind a full-colour icon. A plain (untinted)
-  icon is decoration and stays grey unless it shows a state.
+- Tinted circle = tap target: `tint(colour, 20)` behind a full-colour icon. **A tap target is
+  never grey**: a circle whose state colour would be grey (cloudy weather, heating idle or
+  locked) is teal. A device that is off (a room with its lights off, a docked robot) keeps its
+  grey – that grey is its state. A plain (untinted) icon is decoration and stays grey unless it
+  shows a state.
+- Room tiles keep the compact presence time beside the name ("12m", "3h", "2d"); everywhere
+  else durations use the spaced form.
 
 Use HA's theme variables with fallbacks, so dark mode and custom themes just work:
 
