@@ -6346,7 +6346,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== vacuum-maintenance-card 2.2.0 ===== */
+/* ===== vacuum-maintenance-card 2.2.1 ===== */
 (() => {
 /*
  * Vacuum maintenance card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -6362,7 +6362,7 @@ registerRoomLightsCard();
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.2.0";
+const VMC_VERSION = "2.2.1";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -6508,19 +6508,20 @@ const SHEET_CSS = `
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
 `;
 
-/* A water tank glyph: the tank, its cap, and the water in it with a wave on top. The level
-   illustrates the state the dock reports – the clean tank full unless it's empty, the dirty
-   tank low unless it's full – there is no level sensor. */
-function tankSvg(level) {
-  const top = 7.5, bot = 19.5;
-  const y = +(bot - (bot - top) * level).toFixed(2);
-  const water = `M6.6 ${y} q1.35 -1.1 2.7 0 t2.7 0 t2.7 0 t2.7 0 V18 a2 2 0 0 1 -2 2 h-6.8 a2 2 0 0 1 -2 -2 Z`;
-  return `<svg viewBox="0 0 24 24" aria-hidden="true"><path class="w" d="${water}"/>` +
-    `<rect class="b" x="5.6" y="5" width="12.8" height="16" rx="3"/><rect class="c" x="9.5" y="2.6" width="5" height="2.4" rx="1"/></svg>`;
+/* A water tank glyph: the tank and its cap, with a drop for clean water or a speckled drop for
+   dirty water. It never shows a level – the dock only reports OK / empty / full – so the state
+   is carried by the colour and the words alone. */
+function tankSvg(kind) {
+  const drop = "M12 8.6c-1.8 2.3-2.9 3.9-2.9 5.4a2.9 2.9 0 0 0 5.8 0c0-1.5-1.1-3.1-2.9-5.4z";
+  const inner = kind === "dirty"
+    ? `<path class="d" d="${drop}" style="opacity:.45"/><circle class="d" cx="11" cy="14.6" r=".9"/><circle class="d" cx="13.1" cy="13.2" r=".7"/><circle class="d" cx="12.6" cy="15.9" r=".6"/>`
+    : `<path class="d" d="${drop}"/>`;
+  return `<svg viewBox="0 0 24 24" aria-hidden="true"><rect class="b" x="5.6" y="5" width="12.8" height="16" rx="3"/>` +
+    `<rect class="c" x="9.5" y="2.6" width="5" height="2.4" rx="1"/>${inner}</svg>`;
 }
 const TANKS = {
-  clean: { name: "Clean water", color: C.blue, ok: "OK", bad: "Empty – refill it", okLevel: 0.78, badLevel: 0.04 },
-  dirty: { name: "Dirty water", color: C.brown, ok: "OK", bad: "Full – empty it", okLevel: 0.22, badLevel: 0.92 },
+  clean: { name: "Clean water", color: C.blue, ok: "OK", bad: "Empty – refill it" },
+  dirty: { name: "Dirty water", color: C.brown, ok: "OK", bad: "Full – empty it" },
 };
 
 /* ------------------------------------------------------------------------ */
@@ -6554,7 +6555,7 @@ const CSS = `
   .tank.bad { background: ${tint(C.red, 10)}; }
   .tank .shape { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
   .tank svg { width: 24px; height: 24px; }
-  .tank svg .w { fill: currentColor; opacity: .6; }
+  .tank svg .d { fill: currentColor; }
   .tank svg .b { fill: none; stroke: currentColor; stroke-width: 1.6; }
   .tank svg .c { fill: currentColor; }
   .tank .tx { min-width: 0; }
@@ -6704,7 +6705,7 @@ class VacuumMaintenanceCard extends HTMLElement {
       const shape = b.querySelector(".shape");
       shape.style.background = tint(color, 20);
       shape.style.color = color;
-      const svg = tankSvg(x.bad ? spec.badLevel : spec.okLevel);
+      const svg = tankSvg(k);
       if (shape.dataset.svg !== svg) {
         shape.dataset.svg = svg;
         shape.innerHTML = svg;

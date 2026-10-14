@@ -18,10 +18,9 @@
 ```
 
 - **Water tanks** come first: Clean water and Dirty water as tiles with a tank glyph in a
-  circle – blue water for the clean tank, brown for the dirty one. A tank that needs you
-  glows red and says what to do: "Empty – refill it", "Full – empty it". The water drawn in
-  the glyph shows that state (the dock reports empty / full, not a level). Tap a tank for
-  its more-info.
+  circle – a drop for clean water (blue), a speckled drop for dirty water (brown). A tank that
+  needs you glows red and says what to do: "Empty – refill it", "Full – empty it". The glyph
+  never shows a level: the dock only reports OK / empty / full. Tap a tank for its more-info.
 - **Numbers**: main brush, side brush, filter and sensors as the share of life left (from
   the hours left and each part's life); the dock's brush and strainer in hours, as their life
   isn't known (set `lives` to see them as %). Amber under `due_soon` hours, **Now** in red at
