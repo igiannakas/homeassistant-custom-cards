@@ -321,13 +321,19 @@ const cfg = {
 
     // A switch the robot refuses: HA's message, and the card is back on the robot's floor at once
     // (not "Loading map…" with the other floor's rooms until the 45 s run out).
-    const refusing = { ...full(states()), callService: async (d, sv, data) => { calls.push([d, sv, data]); throw { code: "home_assistant_error", message: "Error while calling load_multi_map" }; } };
+    const notify = [];
+    const refusing = { ...full(states()), callService: async (d, sv, data, target, notifyOnError) => {
+      calls.push([d, sv, data]);
+      notify.push(notifyOnError);
+      throw { code: "home_assistant_error", message: "Error while calling load_multi_map", translation_domain: "roborock", translation_key: "command_failed", translation_placeholders: { command: "load_multi_map" } };
+    } };
     card.hass = refusing;
     all(".floors button")[1].click();
     await yes("Switch to Ground floor");
     await tick();
     eq(calls.pop(), ["select", "select_option", { entity_id: "select.vacuum_cleaner_selected_map", option: "Ground floor" }]);
-    eq(notes.pop(), "Error while calling load_multi_map");
+    eq(notes.pop(), "Couldn't switch to the Ground floor: the robot didn't accept it.", "plain words, not the internal command");
+    eq(notify, [false], "one message: Home Assistant's own toast is off");
     eq(all(".floors button").map((b) => b.getAttribute("aria-pressed")), ["true", "false"], "back on the First floor");
     eq(roomNames()[0], "Second Bedroom");
     assert(q(".map .loading").hidden);
@@ -442,20 +448,27 @@ const cfg = {
   eq(tabs(), ["Vac & mop", "Mop", "Vacuum"]);
   mc.hass = full(states());
   eq(tabs(), ["Vac & mop*", "Mop", "Vacuum"]);
-  // A setting the robot refuses goes back to the robot's own value at once, with HA's message.
+  // A setting the robot refuses goes back to the robot's own value at once; any message from Home
+  // Assistant other than the generic command failure is shown as it is.
   {
     const notes = [];
     mc.addEventListener("hass-notification", (e) => notes.push(e.detail.message));
     delete mc._pending.fan;
-    mc.hass = { ...full(states()), callService: async (d, sv, data) => { calls.push([d, sv, data]); throw { message: "Error while calling set_custom_mode" }; } };
+    let fail = { message: "Error while calling set_custom_mode", translation_domain: "roborock", translation_key: "command_failed" };
+    mc.hass = { ...full(states()), callService: async (d, sv, data) => { calls.push([d, sv, data]); throw fail; } };
     assert.strictEqual(value("fan"), "Turbo");
     rowOf("fan").querySelector('[data-v="quiet"]').click();
     await tick();
     await tick();
     eq(calls.pop(), ["vacuum", "set_fan_speed", { entity_id: "vacuum.vacuum_cleaner", fan_speed: "quiet" }]);
-    eq(notes, ["Error while calling set_custom_mode"]);
+    eq(notes, ["Couldn't change the suction power: the robot didn't accept it."]);
     assert(!mc._pending.fan, "not left pending");
     eq(opts("fan"), ["quiet", "balanced", "turbo*", "max"], "back on the robot's Turbo");
+    fail = { message: "Option quiet is not valid for Suction power", translation_domain: "vacuum", translation_key: "not_valid_fan_speed" };
+    rowOf("fan").querySelector('[data-v="quiet"]').click();
+    await tick();
+    await tick();
+    eq(notes.pop(), "Option quiet is not valid for Suction power", "Home Assistant's own words otherwise");
     mc.hass = full(states());
   }
 

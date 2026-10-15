@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.7.3";
+const RVC_VERSION = "2.7.4";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -166,6 +166,14 @@ function imageFor(hass, images, mapName) {
     images.find((id) => id.endsWith(`_${slug(mapName)}`)) ||
     null
   );
+}
+
+/* What a failed call says. Home Assistant's own message, except the integration's generic
+   "Error while calling load_multi_map" (Roborock's command_failed), which names an internal
+   command: it says what you tried instead. */
+function errorText(err, what) {
+  if (err?.translation_key === "command_failed") return `Couldn't ${what}: the robot didn't accept it.`;
+  return err?.message || `Couldn't ${what}.`;
 }
 
 /* Room icons: your own (rooms: in the config), else the Home Assistant area with that name
@@ -1519,13 +1527,14 @@ class RobotVacuumCard extends HTMLElement {
     }
   }
 
-  /* A service call; true when it went through, else the error is shown and it is false. */
+  /* A service call; true when it went through, else the error is shown (once: Home Assistant's
+     own toast is off) and it is false. */
   async _call(domain, service, data, what = "do that") {
     try {
-      await this._hass.callService(domain, service, data);
+      await this._hass.callService(domain, service, data, undefined, false);
       return true;
     } catch (err) {
-      this._notify(err?.message || `Couldn't ${what}.`);
+      this._notify(errorText(err, what));
       return false;
     }
   }

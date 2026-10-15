@@ -201,7 +201,11 @@ cells) and 8px gaps, never through extra height.
   (`15p/h`, `0.2p/h`, `£1.20/h`). Euros and dollars use cents the same way; other currencies are
   always money. Every card and every dashboard chart label follows it.
 - **Errors:** HA's own message when there is one, else "Couldn't <what you tried>." with the
-  friendly name – never an entity id.
+  friendly name – never an entity id. An integration's generic failure that names an internal
+  command (Roborock's `command_failed`, "Error while calling load_multi_map") reads
+  "Couldn't <what you tried>: the robot didn't accept it." One message per failure: call with
+  `notifyOnError` off (`callService(domain, service, data, undefined, false)`) so Home Assistant's
+  own toast doesn't show first.
 - Text sizes: 20 / 16 / 15 (dialog title / rows / body text), 14 (names, titles, values), 13 (pill
   text), 12 (readings, status, chips), 11 (captions under numbers, legends). Nothing in between.
 
