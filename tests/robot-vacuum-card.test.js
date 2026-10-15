@@ -294,6 +294,48 @@ const cfg = {
   card.hass = full(states());
   eq(roomNames()[0], "Second Bedroom");
 
+  // The robot won't change maps while it is busy with the dock (it answers "Error while calling
+  // load_multi_map"), so the floors are hidden then: emptying the bin, washing the mop.
+  {
+    const notes = [];
+    const onNote = (e) => notes.push(e.detail.message);
+    card.addEventListener("hass-notification", onNote);
+    card.hass = full(states({ "sensor.vacuum_cleaner_status": st("emptying_the_bin"), "switch.vacuum_cleaner_dock_dust_emptying": st("on") }));
+    assert(q(".floors").hidden, "no floor switch while the dock empties the bin");
+    card.hass = full(states({ "switch.vacuum_cleaner_dock_mop_washing": st("on") }));
+    assert(q(".floors").hidden, "nor while it washes the mop");
+    card.hass = full(states({ "sensor.vacuum_cleaner_status": st("going_to_wash_the_mop") }));
+    assert(q(".floors").hidden);
+    card.hass = full(states({ "switch.vacuum_cleaner_dock_mop_drying": st("on") }));
+    assert(!q(".floors").hidden, "drying doesn't stop a floor switch");
+
+    // The dock starts while the dialog is open: nothing is sent, and the card says why.
+    card.hass = full(states());
+    all(".floors button")[1].click();
+    await tick();
+    card.hass = full(states({ "sensor.vacuum_cleaner_status": st("emptying_the_bin") }));
+    const n = calls.length;
+    await yes("Switch to Ground floor");
+    assert.strictEqual(calls.length, n, "no call");
+    eq(notes.pop(), "Couldn't switch to the Ground floor: the robot is busy. Try again once it has finished.");
+
+    // A switch the robot refuses: HA's message, and the card is back on the robot's floor at once
+    // (not "Loading map…" with the other floor's rooms until the 45 s run out).
+    const refusing = { ...full(states()), callService: async (d, sv, data) => { calls.push([d, sv, data]); throw { code: "home_assistant_error", message: "Error while calling load_multi_map" }; } };
+    card.hass = refusing;
+    all(".floors button")[1].click();
+    await yes("Switch to Ground floor");
+    await tick();
+    eq(calls.pop(), ["select", "select_option", { entity_id: "select.vacuum_cleaner_selected_map", option: "Ground floor" }]);
+    eq(notes.pop(), "Error while calling load_multi_map");
+    eq(all(".floors button").map((b) => b.getAttribute("aria-pressed")), ["true", "false"], "back on the First floor");
+    eq(roomNames()[0], "Second Bedroom");
+    assert(q(".map .loading").hidden);
+    assert(card._mapKey.startsWith("image.study_vacuum_cleaner_first_floor|"));
+    card.removeEventListener("hass-notification", onNote);
+    card.hass = full(states());
+  }
+
   // Values open their own more-info.
   q(".batt").click();
   eq(events.pop(), ["more-info", "sensor.vacuum_cleaner_battery"]);
@@ -400,6 +442,22 @@ const cfg = {
   eq(tabs(), ["Vac & mop", "Mop", "Vacuum"]);
   mc.hass = full(states());
   eq(tabs(), ["Vac & mop*", "Mop", "Vacuum"]);
+  // A setting the robot refuses goes back to the robot's own value at once, with HA's message.
+  {
+    const notes = [];
+    mc.addEventListener("hass-notification", (e) => notes.push(e.detail.message));
+    delete mc._pending.fan;
+    mc.hass = { ...full(states()), callService: async (d, sv, data) => { calls.push([d, sv, data]); throw { message: "Error while calling set_custom_mode" }; } };
+    assert.strictEqual(value("fan"), "Turbo");
+    rowOf("fan").querySelector('[data-v="quiet"]').click();
+    await tick();
+    await tick();
+    eq(calls.pop(), ["vacuum", "set_fan_speed", { entity_id: "vacuum.vacuum_cleaner", fan_speed: "quiet" }]);
+    eq(notes, ["Error while calling set_custom_mode"]);
+    assert(!mc._pending.fan, "not left pending");
+    eq(opts("fan"), ["quiet", "balanced", "turbo*", "max"], "back on the robot's Turbo");
+    mc.hass = full(states());
+  }
 
   // Cleaning count ×2: shared with the vacuum card's Clean, remembered in this browser, and sent
   // with the clean – every room on the floor when none are picked.

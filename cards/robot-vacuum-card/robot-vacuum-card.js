@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.7.2";
+const RVC_VERSION = "2.7.3";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -209,6 +209,9 @@ const STATES = {
   offline: { word: "Offline", color: C.grey, icon: "mdi:robot-vacuum-off" },
 };
 const BUSY = ["cleaning", "returning", "paused"];
+/* The robot busy with the dock: it refuses to change maps until it has finished. */
+const DOCK_BUSY = ["emptying_the_bin", "washing_the_mop", "going_to_wash_the_mop", "back_to_dock_washing_duster", "returning_home",
+  "docking", "attaching_the_mop", "detaching_the_mop"];
 const STATUS_LINE = {
   washing_the_mop: "Washing the mop",
   going_to_wash_the_mop: "Going to wash the mop",
@@ -305,6 +308,7 @@ function model(hass, cfg, found, maps, shownMap) {
     time: seconds(st("time")),
     room,
     floors: mapNames.length > 1 ? mapNames : [],
+    dockBusy: DOCK_BUSY.includes(status) || ["empty_sw", "wash_sw"].some((k) => s(k) === "on"),
     mapName,
     rooms: map ? map.rooms.filter((r) => !cfg.rooms?.[r.name]?.hide) : [],
     image: pictureUrl(imgState) ? { id: img, url: pictureUrl(imgState) } : null,
@@ -1016,9 +1020,9 @@ class RobotVacuumCard extends HTMLElement {
       bar.style.background = m.state.color;
     }
 
-    // Floors (the robot's loaded map): only while it isn't on a job. A switch shows at once.
+    // Floors (the robot's loaded map): only while it isn't on a job, at the dock included. A switch shows at once.
     const floors = root.querySelector(".floors");
-    floors.hidden = !m.floors.length || busy || !this._found.map_select;
+    floors.hidden = !m.floors.length || busy || m.dockBusy || !this._found.map_select;
     if (!floors.hidden) {
       const fk = m.floors.join("|");
       if (fk !== this._keys.floors) {
@@ -1300,7 +1304,7 @@ class RobotVacuumCard extends HTMLElement {
     this._sheet = null;
   }
 
-  _clickMode(e) {
+  async _clickMode(e) {
     const b = e.target.closest("button[data-set]");
     if (!b || b.disabled || b.getAttribute("aria-pressed") === "true") return;
     const k = b.dataset.set;
@@ -1308,12 +1312,18 @@ class RobotVacuumCard extends HTMLElement {
     const f = this._found;
     const id = this._config.entity;
     if (k === "count") return setCount(id, Number(v));
-    // Show the choice at once; the robot's answer confirms it (or it falls back after a while).
+    // Show the choice at once; the robot's answer confirms it (or it falls back after a while,
+    // or at once if the robot refuses it).
     this._pend(k, v);
     this._render();
-    if (k === "fan") return this._call("vacuum", "set_fan_speed", { entity_id: id, fan_speed: v }, "change the suction power");
     const ent = { mode: f.mode, water: f.mop_water, route: f.mop_route }[k];
-    if (ent) return this._call("select", "select_option", { entity_id: ent, option: v }, "change the cleaning mode");
+    const done = k === "fan"
+      ? this._call("vacuum", "set_fan_speed", { entity_id: id, fan_speed: v }, "change the suction power")
+      : ent ? this._call("select", "select_option", { entity_id: ent, option: v }, "change the cleaning mode") : null;
+    if (done && !(await done) && this._pending[k]?.v === v) {
+      delete this._pending[k];
+      this._render();
+    }
   }
 
   /* Rooms and segment ids per map, from roborock.get_maps (or the maps: option). */
@@ -1443,10 +1453,17 @@ class RobotVacuumCard extends HTMLElement {
   async _switchFloor(name) {
     const ok = await this._ask(`Switch to ${name}`, "mdi:layers-outline", C.teal, `Place the robot on the ${name}, then confirm.`, "Confirm");
     if (!ok) return;
+    // The robot may have started a job while the dialog was open; it would refuse the new map.
+    if (BUSY.includes(this._m?.key) || this._m?.dockBusy)
+      return this._notify(`Couldn't switch to the ${name}: the robot is busy. Try again once it has finished.`);
     this._sel.clear();
     this._pend("floor", name);
     this._render();
-    return this._call("select", "select_option", { entity_id: this._found.map_select, option: name }, `switch to the ${name}`);
+    if (!(await this._call("select", "select_option", { entity_id: this._found.map_select, option: name }, `switch to the ${name}`))) {
+      // Back to the floor the robot is really on, at once.
+      delete this._pending.floor;
+      this._render();
+    }
   }
 
   /* Every button asks first except Pause (the user's choice). */
@@ -1502,12 +1519,19 @@ class RobotVacuumCard extends HTMLElement {
     }
   }
 
+  /* A service call; true when it went through, else the error is shown and it is false. */
   async _call(domain, service, data, what = "do that") {
     try {
       await this._hass.callService(domain, service, data);
+      return true;
     } catch (err) {
-      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || `Couldn't ${what}.` }, bubbles: true, composed: true }));
+      this._notify(err?.message || `Couldn't ${what}.`);
+      return false;
     }
+  }
+
+  _notify(message) {
+    this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message }, bubbles: true, composed: true }));
   }
 }
 

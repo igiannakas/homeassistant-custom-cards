@@ -104,6 +104,7 @@ Most of them generalise to any dashboard.
 - Never truncate a label, and never wrap a short label (a name) inside a pill either. Rows of buttons: `display:flex; flex-wrap:wrap`, each pill `flex:1 1 0; min-width:max-content` – equal while everything fits, a longer label takes what it needs. Even grids of names: measure the names and set the columns – even columns as wide as the longest pill while two fit; else two columns each as wide as its own longest; else one. Check at 320, 360, 375 and desktop widths – the user's phone and font differ from yours.
 - Rank a card's controls by its purpose before styling them. Secondary actions are quieter, not just different: text buttons (grey 12px, 16px icon, no fill, 30px) in one row under the primary pills. A bigger or tinted container makes them compete. Same pill + same size = same rank, to the eye.
 - A short label still names its object when the verb alone is ambiguous next to its neighbours ("Dry mop", like "Wash mop").
+- Offer a control only while the device will accept it: the robot refuses a map switch while the dock empties the bin or washes the mop, so the floors hide then too. A change shown before the device confirms it goes back at once when the call fails – never left showing for the timeout.
 
 ## Appliances (Oct 2026)
 

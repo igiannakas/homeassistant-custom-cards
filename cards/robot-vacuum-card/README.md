@@ -41,8 +41,10 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 - **Floors**: one segment per map (`select.*_selected_map`), the pressed one being the map
   loaded on the robot. Tapping another asks ("Place the robot on the Ground floor, then
   confirm."), then switches the card to that floor at once –
-  its map and rooms – with "Loading map…" until the robot has loaded it. Every floor's map
-  is loaded ahead. Hidden during a job.
+  its map and rooms – with "Loading map…" until the robot has loaded it. If the robot refuses,
+  the card goes straight back to its floor and shows Home Assistant's message. Every floor's map
+  is loaded ahead. Hidden during a job, and while the robot is busy at the dock (emptying the
+  bin, washing the mop) – it won't change maps then.
 - **Map**: the floor's image entity, cropped to what is drawn and fitted to the card, live
   while cleaning: each new picture replaces the last as soon as it has loaded, on every device
   (the iOS app included) without reloading the page. Roborock publishes a new picture about
