@@ -3637,7 +3637,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.7.2 ===== */
+/* ===== printer-status-card 1.7.3 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3660,7 +3660,7 @@ registerMmuLanesCard();
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.7.2";
+const PSC_VERSION = "1.7.3";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -3762,7 +3762,14 @@ function model(hass, cfg) {
     jobs: num(s("totals_jobs")),
     hours: hoursFrom(s("totals_print_time")),
     km: num(s("totals_filament_used")) === null ? null : num(s("totals_filament_used")) / 1000,
-    thumb: st(cfg.thumbnail || `camera.${p}_thumbnail`)?.attributes?.entity_picture || "",
+    // The job's file in the address: the camera's token only rotates every 5 minutes and Safari
+    // reuses a picture it has loaded for the same address, so a new job showed the last one's.
+    thumb: (() => {
+      const pic = st(cfg.thumbnail || `camera.${p}_thumbnail`)?.attributes?.entity_picture;
+      const f = s("filename");
+      if (!pic) return "";
+      return f && !["unknown", "unavailable"].includes(f) ? `${pic}${pic.includes("?") ? "&" : "?"}v=${encodeURIComponent(f)}` : pic;
+    })(),
     light: lightModel(st(cfg.light), cfg.light),
     // For the compact layout: when the last job ended, chamber temperature, MMU lanes loaded.
     ended: (() => {
@@ -4956,7 +4963,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 2.7.1 ===== */
+/* ===== robot-vacuum-card 2.7.2 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -4982,7 +4989,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.7.1";
+const RVC_VERSION = "2.7.2";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -5107,6 +5114,17 @@ function discover(hass, cfg) {
 }
 
 const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+/* An image entity's picture with its version (the entity's state, when the picture last
+   changed) in the address. The access token in entity_picture only rotates every 5 minutes, and
+   Safari – the iOS app – hands back the picture it already has for an address it has loaded, so
+   without the version a live map stood still until the page was reloaded. */
+function pictureUrl(s) {
+  const pic = s?.attributes?.entity_picture;
+  if (!pic) return "";
+  return `${pic}${pic.includes("?") ? "&" : "?"}v=${encodeURIComponent(s.state)}`;
+}
+
 function imageFor(hass, images, mapName) {
   if (!mapName) return images.length === 1 ? images[0] : null;
   const n = String(mapName).toLowerCase();
@@ -5256,7 +5274,7 @@ function model(hass, cfg, found, maps, shownMap) {
     floors: mapNames.length > 1 ? mapNames : [],
     mapName,
     rooms: map ? map.rooms.filter((r) => !cfg.rooms?.[r.name]?.hide) : [],
-    image: imgState?.attributes?.entity_picture ? { id: img, url: `${imgState.attributes.entity_picture}${imgState.attributes.entity_picture.includes("?") ? "&" : "?"}s=${encodeURIComponent(imgState.state)}` } : null,
+    image: pictureUrl(imgState) ? { id: img, url: pictureUrl(imgState) } : null,
     mode: s("mode"),
     fan: v?.attributes?.fan_speed,
     water: s("mop_water"),
@@ -6297,27 +6315,32 @@ class RobotVacuumCard extends HTMLElement {
   }
 
   /* Every floor's picture, loaded once per version of the map (the URL's token rotates, the
-     picture doesn't), so a floor switch paints from memory. */
+     picture doesn't), so a floor switch paints from memory. A picture that fails to load is
+     tried again on a later update, at most every 10 s. */
   _preload() {
     if (typeof Image === "undefined" || this._config.hide_map) return;
     for (const id of this._found.images || []) {
       const s = this._hass.states[id];
-      const pic = s?.attributes?.entity_picture;
-      if (!pic) continue;
+      const src = pictureUrl(s);
+      if (!src) continue;
       const key = `${id}|${s.state}`;
-      if (this._imgs[key]) continue;
+      const had = this._imgs[key];
+      if (had && !(had.failed && Date.now() - had.failed > 10000)) continue;
       const img = new Image();
       img.decoding = "async";
-      const entry = { img, crop: null, ready: false };
+      const entry = { img, crop: null, ready: false, failed: 0 };
       this._imgs[key] = entry;
+      img.onerror = () => {
+        if (this._imgs[key] === entry) entry.failed = Date.now();
+      };
       img.onload = () => {
         entry.crop = cropBox(img);
         entry.ready = true;
         // Older versions of this floor's picture are no longer needed.
         for (const k of Object.keys(this._imgs)) if (k.startsWith(`${id}|`) && k !== key && this._imgs[k].ready) delete this._imgs[k];
-        if (this._mapKey === key) this._paintMap();
+        if (this._mapKey === key || this._nextKey === key) this._paintMap();
       };
-      img.src = pic;
+      img.src = src;
     }
   }
 

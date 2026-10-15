@@ -44,7 +44,9 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
   its map and rooms – with "Loading map…" until the robot has loaded it. Every floor's map
   is loaded ahead. Hidden during a job.
 - **Map**: the floor's image entity, cropped to what is drawn and fitted to the card, live
-  while cleaning. Tap it for the full image.
+  while cleaning: each new picture replaces the last as soon as it has loaded, on every device
+  (the iOS app included) without reloading the page. Roborock publishes a new picture about
+  every 30 s while cleaning – the integration's own pace. Tap it for the full image.
 - **Rooms**: the loaded map's rooms in an even grid (from `roborock.get_maps`), with your
   Home Assistant area icons – an area of the same name, or one whose name is inside the
   room's ("Corridor" in "Upstairs Corridor"), else a guess from the name; set your own

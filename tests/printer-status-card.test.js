@@ -152,7 +152,11 @@ const cfg = {
   assert.strictEqual(txt(q(".l1")), "Layer 141 / 230 · 12.3 m filament");
   eq([...r.querySelectorAll(".l1 .p")].map((x) => x.textContent), ["Layer 141 / 230", "12.3 m filament"]);
   assert.strictEqual(q(".l2").textContent, "250 mm/s");
-  assert.strictEqual(q(".thumb img").getAttribute("src"), "/api/camera_proxy/camera.voron_thumbnail?token=a");
+  assert.strictEqual(q(".thumb img").getAttribute("src"), "/api/camera_proxy/camera.voron_thumbnail?token=a&v=bracket_v3.gcode");
+  // A new job's thumbnail gets its own address (same token), so a cached picture can't stand in.
+  card.hass = hass(states({ ...printing(), ...Object.fromEntries([p("filename", "lid v2.gcode")]) }));
+  assert.strictEqual(q(".thumb img").getAttribute("src"), "/api/camera_proxy/camera.voron_thumbnail?token=a&v=lid%20v2.gcode");
+  card.hass = hass(states(printing()));
   assert.strictEqual(q(".stats").style.display, "none");
   eq(acts(), []);
   assert.strictEqual(q(".acts").childNodes.length, 0, "empty, so .acts:empty hides the row");

@@ -167,6 +167,39 @@ const cfg = {
   eq(Object.keys(card._imgs).map((k) => k.split("|")[0]).sort(), ["image.study_vacuum_cleaner_first_floor", "image.study_vacuum_cleaner_ground_floor"]);
   assert(q(".map .loading").hidden);
 
+  // A live map: every version of a floor's picture has its own address (the token stays the same
+  // for 5 minutes, and Safari hands back a picture it already has for an address), and a new
+  // version replaces the shown one as soon as it has loaded – not on the next update.
+  {
+    const id = "image.study_vacuum_cleaner_first_floor";
+    const pic = (v) => st(v, { friendly_name: "Vacuum cleaner First floor", entity_picture: `/api/image_proxy/${id}?token=a` });
+    t.window.HTMLCanvasElement.prototype.getContext = () => null; // jsdom has no canvas: crop = whole picture
+    const k0 = card._mapKey;
+    assert(card._imgs[k0].img.src.endsWith(`/api/image_proxy/${id}?token=a&v=2026-10-14T11%3A34%3A44Z`), card._imgs[k0].img.src);
+    card._imgs[k0].img.onload();
+    card.hass = full(states({ [id]: pic("2026-10-15T02:21:05Z") }));
+    const k1 = `${id}|2026-10-15T02:21:05Z`;
+    assert(card._imgs[k1].img.src.endsWith(`?token=a&v=2026-10-15T02%3A21%3A05Z`), "same token, new address");
+    eq(card._mapKey, k0, "the shown picture stays until the new one has loaded");
+    card._imgs[k1].img.onload();
+    eq(card._mapKey, k1, "then it replaces it at once");
+    assert(!card._imgs[k0], "the old version is let go");
+    // A picture that fails to load is tried again on a later update, at most every 10 s.
+    card.hass = full(states({ [id]: pic("2026-10-15T02:21:36Z") }));
+    const k2 = `${id}|2026-10-15T02:21:36Z`;
+    const failed = card._imgs[k2];
+    failed.img.onerror();
+    card.hass = full(states({ [id]: pic("2026-10-15T02:21:36Z") }));
+    assert.strictEqual(card._imgs[k2], failed, "not retried at once");
+    const now = t.window.Date.now;
+    t.window.Date.now = () => now() + 11000;
+    card.hass = full(states({ [id]: pic("2026-10-15T02:21:36Z") }));
+    t.window.Date.now = now;
+    assert(card._imgs[k2] !== failed && !card._imgs[k2].failed, "retried after 10 s");
+    eq(card._mapKey, k1, "the last good picture stays meanwhile");
+    card.hass = full(states());
+  }
+
   // Rooms of the loaded map in an even grid, with area icons (exact, contained, guessed) or your own.
   const roomNames = () => all(".rooms .chip").map((b) => b.textContent.trim());
   eq(roomNames(), ["Second Bedroom", "Master Bedroom", "En-suite Bathroom", "Bathroom", "Upstairs Corridor", "Study"]);

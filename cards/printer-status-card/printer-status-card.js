@@ -19,7 +19,7 @@
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.7.2";
+const PSC_VERSION = "1.7.3";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -121,7 +121,14 @@ function model(hass, cfg) {
     jobs: num(s("totals_jobs")),
     hours: hoursFrom(s("totals_print_time")),
     km: num(s("totals_filament_used")) === null ? null : num(s("totals_filament_used")) / 1000,
-    thumb: st(cfg.thumbnail || `camera.${p}_thumbnail`)?.attributes?.entity_picture || "",
+    // The job's file in the address: the camera's token only rotates every 5 minutes and Safari
+    // reuses a picture it has loaded for the same address, so a new job showed the last one's.
+    thumb: (() => {
+      const pic = st(cfg.thumbnail || `camera.${p}_thumbnail`)?.attributes?.entity_picture;
+      const f = s("filename");
+      if (!pic) return "";
+      return f && !["unknown", "unavailable"].includes(f) ? `${pic}${pic.includes("?") ? "&" : "?"}v=${encodeURIComponent(f)}` : pic;
+    })(),
     light: lightModel(st(cfg.light), cfg.light),
     // For the compact layout: when the last job ended, chamber temperature, MMU lanes loaded.
     ended: (() => {
