@@ -43,7 +43,8 @@ src.match(/\/\* ===== .* ===== \*\//g);                                     // v
 
 - **Check the served version header, not just `installed_version`.** Right after a push, HACS can
   download a stale file (GitHub's raw cache) yet record the new sha. If the header is old, wait a
-  couple of minutes and download again. Browsers that already loaded the stale copy keep it under
+  couple of minutes and download again – naming the sha (`version: "<sha>"`): a plain re-download
+  of the sha HACS already recorded is skipped and leaves the stale file in place. Browsers that already loaded the stale copy keep it under
   the same `?hacstag=`, so add a cache-buster to the resource (`…?hacstag=…&v=131`) to force a reload.
 - First-time add: `hacs/repositories/add {repository: "owner/repo", category: "plugin"}`.
   HACS then creates the `/hacsfiles/...?hacstag=` resource itself.
