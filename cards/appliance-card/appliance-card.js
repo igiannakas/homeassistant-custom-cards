@@ -24,7 +24,7 @@
  * split by straight dividers. Anywhere but the pill opens the appliance's own dashboard.
  */
 
-const AC_VERSION = "1.0.2";
+const AC_VERSION = "1.0.3";
 const AC_TAG = "appliance-card";
 
 const C = {
@@ -133,7 +133,9 @@ const MINOR = { GBP: "p", EUR: "c", USD: "¢" };
 function cost(v, currency) {
   if (v === null || v === undefined || !Number.isFinite(v) || !currency) return null;
   const unit = MINOR[currency];
-  if (!unit || Math.abs(v) >= 0.995) return money(v, currency);
+  // Rounded to the penny first, so 99.5p reads £1.00 (never "100p", nor £0.99 from 0.995).
+  const q = Math.round(Math.abs(v) * 100);
+  if (!unit || q >= 100) return money((v < 0 ? -q : q) / 100, currency);
   const c = v * 100;
   return `${c > 0 && c < 0.95 ? c.toFixed(1) : Math.round(c)}${unit}`;
 }

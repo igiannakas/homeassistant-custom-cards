@@ -11,7 +11,7 @@
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.4.0";
+const ESC_VERSION = "1.4.1";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -72,7 +72,9 @@ const MINOR = { GBP: "p", EUR: "c", USD: "¢" };
 function cost(v, currency, locale) {
   if (v === null || v === undefined || !Number.isFinite(v) || !currency) return "";
   const unit = MINOR[currency];
-  if (!unit || Math.abs(v) >= 0.995) return money(v, currency, locale);
+  // Rounded to the penny first, so 99.5p reads £1.00 (never "100p", nor £0.99 from 0.995).
+  const q = Math.round(Math.abs(v) * 100);
+  if (!unit || q >= 100) return money((v < 0 ? -q : q) / 100, currency, locale);
   const c = v * 100;
   return `${c > 0 && c < 0.95 ? c.toFixed(1) : Math.round(c)}${unit}`;
 }

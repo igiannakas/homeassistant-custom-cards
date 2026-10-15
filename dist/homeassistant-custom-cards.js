@@ -505,7 +505,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== appliance-card 1.0.2 ===== */
+/* ===== appliance-card 1.0.3 ===== */
 (() => {
 /*
  * Appliance card – a plug-powered appliance (dehumidifier, air purifier, dryer…) in one card.
@@ -533,7 +533,7 @@ registerAirQualityCard();
  * split by straight dividers. Anywhere but the pill opens the appliance's own dashboard.
  */
 
-const AC_VERSION = "1.0.2";
+const AC_VERSION = "1.0.3";
 const AC_TAG = "appliance-card";
 
 const C = {
@@ -642,7 +642,9 @@ const MINOR = { GBP: "p", EUR: "c", USD: "¢" };
 function cost(v, currency) {
   if (v === null || v === undefined || !Number.isFinite(v) || !currency) return null;
   const unit = MINOR[currency];
-  if (!unit || Math.abs(v) >= 0.995) return money(v, currency);
+  // Rounded to the penny first, so 99.5p reads £1.00 (never "100p", nor £0.99 from 0.995).
+  const q = Math.round(Math.abs(v) * 100);
+  if (!unit || q >= 100) return money((v < 0 ? -q : q) / 100, currency);
   const c = v * 100;
   return `${c > 0 && c < 0.95 ? c.toFixed(1) : Math.round(c)}${unit}`;
 }
@@ -2158,7 +2160,7 @@ async function registerEnclosureFilterCard() {
 registerEnclosureFilterCard();
 })();
 
-/* ===== energy-summary-card 1.4.0 ===== */
+/* ===== energy-summary-card 1.4.1 ===== */
 (() => {
 /*
  * Energy summary card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2173,7 +2175,7 @@ registerEnclosureFilterCard();
  * See cards/energy-summary-card/README.md for every option.
  */
 
-const ESC_VERSION = "1.4.0";
+const ESC_VERSION = "1.4.1";
 const ESC_TAG = "energy-summary-card";
 const REFRESH_MS = 120000;
 
@@ -2234,7 +2236,9 @@ const MINOR = { GBP: "p", EUR: "c", USD: "¢" };
 function cost(v, currency, locale) {
   if (v === null || v === undefined || !Number.isFinite(v) || !currency) return "";
   const unit = MINOR[currency];
-  if (!unit || Math.abs(v) >= 0.995) return money(v, currency, locale);
+  // Rounded to the penny first, so 99.5p reads £1.00 (never "100p", nor £0.99 from 0.995).
+  const q = Math.round(Math.abs(v) * 100);
+  if (!unit || q >= 100) return money((v < 0 ? -q : q) / 100, currency, locale);
   const c = v * 100;
   return `${c > 0 && c < 0.95 ? c.toFixed(1) : Math.round(c)}${unit}`;
 }

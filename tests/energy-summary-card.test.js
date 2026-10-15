@@ -223,6 +223,16 @@ const cfg = { power: "sensor.power", energy: "sensor.daily", navigation_path: "/
   assert.strictEqual(c9.shadowRoot.querySelector(".stat.today .c").textContent, "59p");
   assert.strictEqual(c9.shadowRoot.querySelector(".stat.now .c").textContent, "0.1p/h");
 
+  // 99.6p rounds to a pound: "£1.00", never "100p" nor "£0.99"; the same for the running cost.
+  changes.day0 = 4.2;
+  const c10 = document.createElement("energy-summary-card");
+  document.body.appendChild(c10);
+  c10.setConfig({ ...cfg, price: 0.2372 });
+  c10.hass = hass("4200", "4.2");
+  await tick(10);
+  assert.strictEqual(c10.shadowRoot.querySelector(".stat.today .c").textContent, "£1.00");
+  assert.strictEqual(c10.shadowRoot.querySelector(".stat.now .c").textContent, "£1.00/h");
+
   assert.throws(() => new Card().setConfig({}));
   console.log("ALL ENERGY-SUMMARY TESTS PASSED");
   process.exit(0);
