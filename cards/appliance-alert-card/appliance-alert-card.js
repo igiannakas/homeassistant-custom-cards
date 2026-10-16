@@ -13,13 +13,13 @@
  *
  * One row, on one centre line: the glyph (red, a call for attention; decorative, so no circle),
  * the message with "Stopped at 20:34" under it (from `since`, ink-aligned with the message), and
- * the Cleared pill, which turns the entity off at once (clearing an alert is benign, so no
+ * the Clear pill, which turns the entity off at once (clearing an alert is benign, so no
  * dialog). Only the glyph and the stop time are red; the card keeps the theme's own background.
  * The pill stays beside the message while both fit on one line and moves to a full-width row of
  * its own when they don't (measured, not a breakpoint).
  */
 
-const AAC_VERSION = "1.3.0";
+const AAC_VERSION = "1.3.1";
 const AAC_TAG = "appliance-alert-card";
 
 const C = {
@@ -32,7 +32,7 @@ const esc = (s) =>
 const LIVE = (s) => s && s !== "unavailable" && s !== "unknown";
 const DEFAULT_MESSAGE = "Water tank full, please empty";
 const DEFAULT_ICON = "mdi:water-alert";
-const DEFAULT_CLEAR = "Cleared";
+const DEFAULT_CLEAR = "Clear";
 
 /* Clock parts of a moment in a time zone (undefined = the browser's). */
 function zoned(ms, tz) {
@@ -196,7 +196,7 @@ class ApplianceAlertCard extends HTMLElement {
         })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
-          entity: "Cleared turns it off. Usually an input_boolean that an automation turns on.",
+          entity: "Clear turns it off. Usually an input_boolean that an automation turns on.",
           since: "An input_datetime (or timestamp sensor) with when the appliance stopped.",
           message: `Default: "${DEFAULT_MESSAGE}".`,
           clear_label: `Default: "${DEFAULT_CLEAR}".`,
@@ -348,7 +348,7 @@ class ApplianceAlertCard extends HTMLElement {
     wrap.classList.toggle("stacked", ApplianceAlertCard.stacks(wrap.clientWidth, head, px(wrap, "columnGap"), pill));
   }
 
-  /* Cleared turns the alert off at once. The pill rests until the state changes or the call fails. */
+  /* Clear turns the alert off at once. The pill rests until the state changes or the call fails. */
   async _clear() {
     const m = this._m;
     if (!m?.active || this._pending) return;
@@ -374,7 +374,7 @@ async function registerApplianceAlertCard() {
   window.customCards.push({
     type: AAC_TAG,
     name: "Appliance alert",
-    description: "An appliance that needs you (a water tank to empty): shown only while its alert is on, with a Cleared button.",
+    description: "An appliance that needs you (a water tank to empty): shown only while its alert is on, with a Clear button.",
   });
   console.info(`%c APPLIANCE-ALERT-CARD %c ${AAC_VERSION} `, "background:#f44336;color:#fff", "");
 }

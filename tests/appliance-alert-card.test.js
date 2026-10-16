@@ -93,8 +93,8 @@ const view = (card) => {
   await tick(10);
   eq(view(card), {
     hidden: false, nm: "Water tank full, please empty", sc: "Stopped at 20:34", one: false,
-    icon: "mdi:water-alert", pill: "Cleared", disabled: "false",
-  }, "alert on: message, stop time, Cleared");
+    icon: "mdi:water-alert", pill: "Clear", disabled: "false",
+  }, "alert on: message, stop time, Clear");
   eq(card.ev, [], "visible from the start: no visibility event needed");
   assert(card.shadowRoot.querySelector(".wrap").getAttribute("role") === "alert", "announced as an alert");
 
@@ -115,7 +115,7 @@ const view = (card) => {
   assert.strictEqual(card.shadowRoot.querySelector(".pill"), pill, "same pill node");
   assert.strictEqual(card.shadowRoot.querySelector(".nm").firstChild, nm, "message text not rewritten");
 
-  // 4. Cleared turns the alert off at once (no dialog); a second tap while it settles does nothing.
+  // 4. Clear turns the alert off at once (no dialog); a second tap while it settles does nothing.
   pill.click();
   await tick();
   eq(calls, [["input_boolean", "turn_off", { entity_id: "input_boolean.clothes_dryer_tank_alert" }]], "one turn_off");
@@ -155,7 +155,7 @@ const view = (card) => {
   card.hass = hass({ "input_datetime.clothes_dryer_tank_full_since": st("unknown") });
   eq([card.hidden, view(card).sc, view(card).one], [false, "", true], "no stop time");
 
-  // 9. In the dashboard editor (preview) the card shows while off and says when it appears; Cleared is inert.
+  // 9. In the dashboard editor (preview) the card shows while off and says when it appears; Clear is inert.
   calls.length = 0;
   const pre = mount({ entity: "input_boolean.dehumidifier_tank_alert" }, hass(), evening);
   assert.strictEqual(pre.hidden, true, "off: hidden on the dashboard");

@@ -1,7 +1,7 @@
 # Appliance alert card
 
 `custom:appliance-alert-card` – an appliance that needs you, at the top of its page: "Water tank
-full, please empty", when it stopped, and a **Cleared** button.
+full, please empty", when it stopped, and a **Clear** button.
 
 <p>
   <img src="../../docs/screenshots/appliance-alert-card.png" alt="appliance-alert-card" width="384">
@@ -13,9 +13,9 @@ full, please empty", when it stopped, and a **Cleared** button.
   dashboard editor it stays visible as a preview ("Shows while … is on").
 - **One row:** the glyph (red – a call for attention), the message, and under it **Stopped at
   20:34** ("at Thu 20:34" within the week, "on 15 Oct" before that) from the `since` helper,
-  then the Cleared pill. Only the glyph and the stop time are red; the card keeps the theme's
+  then the Clear pill. Only the glyph and the stop time are red; the card keeps the theme's
   own background, like the cards around it.
-- **Cleared** turns the entity off at once (clearing an alert is harmless, so there is no
+- **Clear** turns the entity off at once (clearing an alert is harmless, so there is no
   dialog). It rests until the state changes; if the call fails, Home Assistant's message (or
   "Couldn't clear …") shows and it works again.
 - Nothing is cut off: the message wraps, and when message and pill don't fit on one line the
@@ -31,11 +31,11 @@ since: input_datetime.clothes_dryer_tank_full_since
 
 | Option | What it is |
 |---|---|
-| `entity` | The alert: shown while on, turned off by Cleared (`input_boolean` or `switch`). Required. |
+| `entity` | The alert: shown while on, turned off by Clear (`input_boolean` or `switch`). Required. |
 | `since` | When the appliance stopped: an `input_datetime` with date and time (its `timestamp` is read, not its zone-less state), or a timestamp sensor. Optional – without it the message stands alone. |
 | `message` | Default "Water tank full, please empty". |
 | `icon` | Default `mdi:water-alert`. |
-| `clear_label` | Default "Cleared". |
+| `clear_label` | Default "Clear". |
 
 Place it first on the appliance's page (the first card of the first section), so it is the first
 thing you see when a phone notification opens that page. To show the alert on another dashboard
@@ -55,5 +55,5 @@ automation – this is how the clothes dryer and the bedroom dehumidifier are se
 The automation, on the tank-full sensor turning on: stamp the time, turn the alert on and push to
 the phones (tapping the push opens the appliance's page). On the appliance drawing power again
 for a minute (the tank was emptied): turn the alert off. On the alert turning off (that, or
-Cleared): clear the pushes. The card is the alert in Home Assistant itself, so there is no
+Clear): clear the pushes. The card is the alert in Home Assistant itself, so there is no
 sidebar notification as well.
