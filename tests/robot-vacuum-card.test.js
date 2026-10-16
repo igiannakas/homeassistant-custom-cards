@@ -9,6 +9,7 @@ const REG = {
   "vacuum.vacuum_cleaner": [DEV, "roborock"],
   "sensor.vacuum_cleaner_battery": [DEV, null],
   "binary_sensor.vacuum_cleaner_charging": [DEV, null],
+  "binary_sensor.vacuum_cleaner_cleaning": [DEV, "in_cleaning"],
   "sensor.vacuum_cleaner_status": [DEV, "status"],
   "sensor.vacuum_cleaner_vacuum_error": [DEV, "vacuum_error"],
   "binary_sensor.vacuum_cleaner_water_shortage": [DEV, "water_shortage"],
@@ -43,6 +44,7 @@ function states(over = {}) {
     "vacuum.vacuum_cleaner": st("docked", { friendly_name: "Vacuum cleaner", fan_speed: "turbo", fan_speed_list: ["quiet", "balanced", "turbo", "max", "max_plus", "off", "custom"] }),
     "sensor.vacuum_cleaner_battery": st(100, { device_class: "battery", unit_of_measurement: "%" }),
     "binary_sensor.vacuum_cleaner_charging": st("on", { device_class: "battery_charging" }),
+    "binary_sensor.vacuum_cleaner_cleaning": st("off", { device_class: "running" }),
     "sensor.vacuum_cleaner_status": st("charging"),
     "sensor.vacuum_cleaner_vacuum_error": st("none"),
     "binary_sensor.vacuum_cleaner_water_shortage": st("off", { device_class: "problem" }),
@@ -270,6 +272,16 @@ const cfg = {
   assert.strictEqual(await yes("Clean entire floor"), "Every room on the First floor, Vac & mop · Turbo · Standard mop.");
   eq(calls.pop(), ["vacuum", "start", { entity_id: "vacuum.vacuum_cleaner" }]);
 
+  // Auto clean says its state: "Auto clean" glowing while on, "Auto clean off" while off.
+  assert.strictEqual(q('[data-k="auto"] ha-icon').getAttribute("icon"), "mdi:account-arrow-right");
+  card.hass = full(states({ "automation.vacuum_when_away": st("off", { friendly_name: "Vacuum when everyone has left" }) }));
+  eq(acts(), ["Clean entire floor", "Auto clean off"]);
+  assert(!q('[data-k="auto"]').classList.contains("on"));
+  assert.strictEqual(q('[data-k="auto"]').getAttribute("aria-pressed"), "false");
+  assert.strictEqual(q('[data-k="auto"] ha-icon').getAttribute("icon"), "mdi:account-cancel");
+  card.hass = full(states());
+  eq(acts(), ["Clean entire floor", "Auto clean"]);
+  assert.strictEqual(q('[data-k="auto"] ha-icon').getAttribute("icon"), "mdi:account-arrow-right");
   // Auto clean asks, then toggles the automation.
   q('[data-k="auto"]').click();
   await yes("Turn off Auto clean");
@@ -528,6 +540,40 @@ const cfg = {
   eq(calls.pop(), ["vacuum", "return_to_base", { entity_id: "vacuum.vacuum_cleaner" }]);
   card.hass = full(states({ ...cleaning, "sensor.vacuum_cleaner_status": st("washing_the_mop") }));
   assert.strictEqual(text(".line"), "Washing the mop");
+
+  // A clean washing its mop at the dock – before it starts or between rooms – is still the clean:
+  // the vacuum entity says Docked, but the robot's own "cleaning" flag is on and the counters have
+  // started again. Never "Last clean 14:40 · 0.0 m² · 0 min" (the last clean's start with the new
+  // clean's zeros).
+  const prewash = {
+    "vacuum.vacuum_cleaner": st("docked", { friendly_name: "Vacuum cleaner", fan_speed: "turbo", fan_speed_list: ["quiet", "turbo"] }),
+    "sensor.vacuum_cleaner_status": st("washing_the_mop"),
+    "binary_sensor.vacuum_cleaner_cleaning": st("on", { device_class: "running" }),
+    "switch.vacuum_cleaner_dock_mop_washing": st("on"),
+    "sensor.vacuum_cleaner_cleaning_progress": st(0),
+    "sensor.vacuum_cleaner_cleaning_area": st("0.0"),
+    "sensor.vacuum_cleaner_cleaning_time": st(0, { unit_of_measurement: "s" }),
+  };
+  card.hass = full(states(prewash));
+  assert.strictEqual(text(".nm"), "Vacuum cleaner · Cleaning");
+  assert.strictEqual(text(".line"), "Washing the mop");
+  assert(!/Last clean/.test(text(".line")));
+  eq(acts(), ["Pause", "Dock", "Auto clean"]);
+  assert(q(".floors").hidden);
+  // Going back to wash the mop between rooms: still the clean, saying so.
+  card.hass = full(states({ ...cleaning, "vacuum.vacuum_cleaner": st("returning", { friendly_name: "Vacuum cleaner" }),
+    "sensor.vacuum_cleaner_status": st("going_to_wash_the_mop"), "binary_sensor.vacuum_cleaner_cleaning": st("on") }));
+  assert.strictEqual(text(".nm"), "Vacuum cleaner · Cleaning");
+  assert.strictEqual(text(".line"), "Going to wash the mop");
+  // After the clean (flag off): returning for the last wash says so too.
+  card.hass = full(states({ ...cleaning, "vacuum.vacuum_cleaner": st("returning", { friendly_name: "Vacuum cleaner" }),
+    "sensor.vacuum_cleaner_status": st("going_to_wash_the_mop") }));
+  assert.strictEqual(text(".nm"), "Vacuum cleaner · Returning");
+  assert.strictEqual(text(".line"), "Going to wash the mop");
+  // A dock job on its own (Wash mop, Empty) while docked: Docked, with what the dock is doing.
+  card.hass = full(states({ "sensor.vacuum_cleaner_status": st("emptying_the_bin"), "switch.vacuum_cleaner_dock_dust_emptying": st("on") }));
+  assert.strictEqual(text(".nm"), "Vacuum cleaner · Docked");
+  assert.strictEqual(text(".line"), "Emptying the bin");
 
   // Paused: Resume + Dock.
   card.hass = full(states({ ...cleaning, "vacuum.vacuum_cleaner": st("paused", { friendly_name: "Vacuum cleaner" }) }));

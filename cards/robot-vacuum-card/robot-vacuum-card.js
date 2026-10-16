@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.7.4";
+const RVC_VERSION = "2.7.5";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -82,6 +82,9 @@ const KEYS = {
   battery: { domain: "sensor", dc: "battery", main: true },
   charging: { domain: "binary_sensor", dc: "battery_charging", main: true },
   status: { domain: "sensor", tk: ["status"], sfx: ["_status"] },
+  // On from the start of a clean to its end, including the mop washes at the dock before, between
+  // and after rooms, while the vacuum entity itself says docked or returning.
+  job: { domain: "binary_sensor", tk: ["in_cleaning"], sfx: ["_cleaning"] },
   error: { domain: "sensor", tk: ["vacuum_error"], sfx: ["_vacuum_error"] },
   dock_error: { domain: "sensor", tk: ["dock_error"], sfx: ["_dock_error"] },
   dirty_box: { domain: "binary_sensor", tk: ["dirty_box_full", "dock_dirty_water_box"], sfx: ["_dirty_water_box"] },
@@ -168,6 +171,11 @@ function imageFor(hass, images, mapName) {
   );
 }
 
+/* The Auto clean pill says its state – "Auto clean when away" glowing while on, "Auto clean off"
+   while off – not just its colour. Both labels are configurable. */
+const autoLabel = (cfg, on) => (on ? cfg.auto_clean_name || "Auto clean" : cfg.auto_clean_off_name || "Auto clean off");
+const autoIcon = (on) => (on ? "mdi:account-arrow-right" : "mdi:account-cancel");
+
 /* What a failed call says. Home Assistant's own message, except the integration's generic
    "Error while calling load_multi_map" (Roborock's command_failed), which names an internal
    command: it says what you tried instead. */
@@ -250,6 +258,8 @@ function model(hass, cfg, found, maps, shownMap) {
   const s = (k) => st(k)?.state;
   const raw = v ? v.state : "unavailable";
   let key = DEAD.includes(raw) ? "offline" : STATES[raw] ? raw : "idle";
+  // A clean washing its mop at the dock (before it starts, between rooms) is still the clean.
+  if (st("job")?.state === "on" && ["docked", "idle", "returning"].includes(key)) key = "cleaning";
 
   // What needs you: errors and the dock's tanks. None of it blocks a clean.
   const msgs = [];
@@ -277,10 +287,13 @@ function model(hass, cfg, found, maps, shownMap) {
   if (key === "offline") line = [{ t: "Can't reach the vacuum" }];
   else if (key === "cleaning")
     line = [{ t: STATUS_LINE[status] || (room ? `Cleaning ${room}` : "Cleaning"), e: STATUS_LINE[status] ? found.status : found.room }];
-  else if (key === "returning") line = [{ t: "Returning to the dock", e: found.status }];
+  else if (key === "returning") line = [{ t: STATUS_LINE[status] || "Returning to the dock", e: found.status }];
   else if (key === "paused") line = [{ t: room ? `Paused in ${room}` : "Paused", e: found.room }];
   else if (key === "error") line = msgs.length ? [] : [{ t: human(status) || "Error", e: found.status }];
+  else if (DOCK_BUSY.includes(status) && STATUS_LINE[status]) line = [{ t: STATUS_LINE[status], e: found.status }];
   else {
+    // The last clean's area and time: the counters keep them until the next clean starts (and
+    // a clean that has started is shown as one above, so they never mix with a new clean's zeros).
     const dry = seconds(st("drying"));
     if (dry) line = [{ t: `Drying the mop · ${mins(dry)} left`, e: found.drying }];
     else {
@@ -764,6 +777,10 @@ class RobotVacuumCard extends HTMLElement {
         ] },
         { name: "auto_clean", selector: { entity: { domain: ["automation", "input_boolean", "switch"] } } },
         { type: "grid", name: "", schema: [
+          { name: "auto_clean_name", selector: { text: {} } },
+          { name: "auto_clean_off_name", selector: { text: {} } },
+        ] },
+        { type: "grid", name: "", schema: [
           { name: "hide_map", selector: { boolean: {} } },
           { name: "hide_rooms", selector: { boolean: {} } },
           { name: "hide_mode", selector: { boolean: {} } },
@@ -777,6 +794,8 @@ class RobotVacuumCard extends HTMLElement {
           layout: "Layout",
           name: "Name",
           auto_clean: "Auto clean (automation or switch)",
+          auto_clean_name: "Auto clean label while on",
+          auto_clean_off_name: "Auto clean label while off",
           hide_map: "Hide the map",
           hide_rooms: "Hide the rooms",
           hide_mode: "Hide the Cleaning mode tile",
@@ -787,6 +806,8 @@ class RobotVacuumCard extends HTMLElement {
         ({
           layout: "Cleaning mode shows the mode panel (also in the vacuum card's Cleaning mode sheet) as a card of its own.",
           auto_clean: "Shows an Auto clean pill that turns this on and off, glowing while it is on.",
+          auto_clean_name: "Default: Auto clean",
+          auto_clean_off_name: "Default: Auto clean off",
           rooms: "Per room, by the robot's room name: icon, name and hide. E.g. En-suite Bathroom: { icon: mdi:shower }",
         })[s.name],
     };
@@ -1102,7 +1123,7 @@ class RobotVacuumCard extends HTMLElement {
       // One control per job: Dock only while the robot is away from the dock.
       if (hass.states[this._config.entity]?.state !== "docked") acts.push(["dock", "Dock", "mdi:home-import-outline", C.grey]);
     }
-    if (this._config.auto_clean) acts.push(["auto", this._config.auto_clean_name || "Auto clean", "mdi:account-arrow-right", null]);
+    if (this._config.auto_clean) acts.push(["auto", autoLabel(this._config, m.auto?.state === "on"), autoIcon(m.auto?.state === "on"), null]);
     const ak = acts.map((a) => a[0]).join();
     const box = root.querySelector(".acts");
     if (ak !== this._keys.acts) {
@@ -1122,6 +1143,8 @@ class RobotVacuumCard extends HTMLElement {
       if (b.disabled !== offline) b.disabled = offline;
       if (k === "auto") {
         const on = m.auto?.state === "on";
+        const ic = b.querySelector("ha-icon");
+        if (ic.getAttribute("icon") !== autoIcon(on)) ic.setAttribute("icon", autoIcon(on));
         b.classList.toggle("on", on);
         b.setAttribute("aria-pressed", String(on));
         b.disabled = !m.auto || DEAD.includes(m.auto.state);

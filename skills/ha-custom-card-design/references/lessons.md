@@ -108,6 +108,8 @@ Most of them generalise to any dashboard.
 - Rank a card's controls by its purpose before styling them. Secondary actions are quieter, not just different: text buttons (grey 12px, 16px icon, no fill, 30px) in one row under the primary pills. A bigger or tinted container makes them compete. Same pill + same size = same rank, to the eye.
 - A short label still names its object when the verb alone is ambiguous next to its neighbours ("Dry mop", like "Wash mop").
 - Offer a control only while the device will accept it: the robot refuses a map switch while the dock empties the bin or washes the mop, so the floors hide then too. A change shown before the device confirms it goes back at once when the call fails – never left showing for the timeout.
+- A toggle says its state in words, not only in colour: "Auto clean when away" glowing while on, "Auto clean off" while off. Not a negated command ("Don't auto clean…") in a row of action buttons – it reads as what a tap does.
+- Trust the device's own job flag over its headline state: a Roborock washing its mop before or between rooms reports Docked, but its in-cleaning flag is on and its counters have restarted, so the card shows the clean, not "Last clean · 0 m² · 0 min".
 
 ## Appliances (Oct 2026)
 

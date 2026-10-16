@@ -29,8 +29,11 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 - **Header**: the state in its colour (Docked, Cleaning, Returning, Paused, Idle, Error,
   Needs you, Offline) and a line that says something useful: "Last clean Sat 10:00 ·
   22.6 m² · 28 min" when docked, "Drying the mop · 2 h 10 min left" while the dock dries
-  it, "Cleaning Study" / "Washing the mop" / "Emptying the bin" during a clean. The line
-  wraps only between its parts. The battery pill shows the level with a charging icon, and
+  it, "Cleaning Study" / "Washing the mop" / "Going to wash the mop" during a clean, and
+  "Emptying the bin" while the dock works. A clean washing its mop at the dock – before it
+  starts or between rooms – shows as Cleaning (the robot's own cleaning flag), even though the
+  vacuum entity says Docked, so the last clean's line never mixes with the new clean's zeros.
+  The line wraps only between its parts. The battery pill shows the level with a charging icon, and
   glows red at 15% or less when it isn't charging. Tap the circle for the vacuum's
   more-info, and any value for its own.
 - **Needs you**: red rows for robot errors, dock errors and the dock's tanks (empty the
@@ -67,8 +70,9 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
   confirmation names the rooms, the cleaning count and the settings it will use ("Study
   and Upstairs Corridor, twice, Vac & mop · Turbo · Standard mop"). Dock warns when it
   ends a clean.
-- **Auto clean** (optional, `auto_clean`): a pill that glows teal while your automation
-  (or switch) is on; a tap asks, then turns it off or on; a hold opens its more-info.
+- **Auto clean** (optional, `auto_clean`): a pill that says its state – "Auto clean", glowing
+  teal, while your automation (or switch) is on, "Auto clean off" in grey with a crossed-out
+  icon while it is off; a tap asks, then turns it off or on; a hold opens its more-info.
 - **Dock jobs** (only while the robot is docked): **Empty**, **Wash mop** and **Dry mop** as the
   card's footer – under a full-width rule, quiet grey text buttons split by short dividers –
   the dock's own switches, handy after stopping a clean early with Dock, without competing
@@ -112,7 +116,8 @@ rooms:
 | `name` | friendly name | Name in the header. |
 | `title` | Cleaning mode | Title of the mode panel. |
 | `auto_clean` | – | An automation, `input_boolean` or switch for the Auto clean pill. |
-| `auto_clean_name` | Auto clean | The pill's label. |
+| `auto_clean_name` | Auto clean | The pill's label while it is on. |
+| `auto_clean_off_name` | Auto clean off | The pill's label while it is off. |
 | `rooms` | – | Per room (by the robot's room name): `icon`, `name`, `hide: true`. |
 | `hide_map`, `hide_rooms`, `hide_mode`, `hide_dock_actions` | false | Leave a part out (`hide_mode`: the Cleaning mode tile; `hide_dock_actions`: Empty / Wash mop / Dry mop). |
 | `maps` | from `roborock.get_maps` | Your own rooms per map: `- name: First floor`, `rooms: {16: Bedroom, 17: Study}`. |
