@@ -186,6 +186,11 @@ const view = (card) => {
   assert(/ha-card \{ padding: 12px 10px;/.test(css), "plain padding");
   assert(css.includes(".wrap { display: flex; align-items: center; gap: 10px; margin: 0 calc(-1 * var(--ha-card-border-width, 1px)); }"), "border offset as a margin");
   assert(!/padding:[^;]*var\(--ha-card-border-width/.test(css), "no border variable inside a padding");
+  // No red highlight on the card itself: the theme's card background, with the glyph and the
+  // stop time in red.
+  assert(!/ha-card \{[^}]*background/.test(css), "the card keeps the theme's background");
+  assert(css.includes(".slot ha-icon { --mdc-icon-size: 24px; color: var(--red-color, #f44336); }"), "red glyph");
+  assert(/\.sc \{[^}]*color: color-mix\(in srgb, var\(--red-color, #f44336\) 85%/.test(css), "red stop time");
 
   // 12. Text is escaped.
   const x = mount({ entity: "input_boolean.clothes_dryer_tank_alert", message: "<b>Tank</b> & co" }, hass(), evening);

@@ -13,7 +13,8 @@ full, please empty", when it stopped, and a **Cleared** button.
   dashboard editor it stays visible as a preview ("Shows while … is on").
 - **One row:** the glyph (red – a call for attention), the message, and under it **Stopped at
   20:34** ("at Thu 20:34" within the week, "on 15 Oct" before that) from the `since` helper,
-  then the Cleared pill. The whole card glows red.
+  then the Cleared pill. Only the glyph and the stop time are red; the card keeps the theme's
+  own background, like the cards around it.
 - **Cleared** turns the entity off at once (clearing an alert is harmless, so there is no
   dialog). It rests until the state changes; if the call fails, Home Assistant's message (or
   "Couldn't clear …") shows and it works again.

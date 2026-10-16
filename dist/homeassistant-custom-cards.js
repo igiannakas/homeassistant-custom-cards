@@ -505,7 +505,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== appliance-alert-card 1.2.0 ===== */
+/* ===== appliance-alert-card 1.3.0 ===== */
 (() => {
 /*
  * Appliance alert card – an appliance that needs you (a water tank to empty), at the top of its page.
@@ -523,19 +523,19 @@ registerAirQualityCard();
  * One row, on one centre line: the glyph (red, a call for attention; decorative, so no circle),
  * the message with "Stopped at 20:34" under it (from `since`, ink-aligned with the message), and
  * the Cleared pill, which turns the entity off at once (clearing an alert is benign, so no
- * dialog). The whole card glows red. The pill stays beside the message while both fit on one
- * line and moves to a full-width row of its own when they don't (measured, not a breakpoint).
+ * dialog). Only the glyph and the stop time are red; the card keeps the theme's own background.
+ * The pill stays beside the message while both fit on one line and moves to a full-width row of
+ * its own when they don't (measured, not a breakpoint).
  */
 
-const AAC_VERSION = "1.2.0";
+const AAC_VERSION = "1.3.0";
 const AAC_TAG = "appliance-alert-card";
 
 const C = {
   teal: "var(--teal-color, #009688)",
   red: "var(--red-color, #f44336)",
 };
-const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
-const tx = (c, p = 70) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-color))`;
+const tx =(c, p = 70) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-color))`;
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const LIVE = (s) => s && s !== "unavailable" && s !== "unknown";
@@ -595,9 +595,9 @@ const CSS = `
   :host { display: block; }
   :host([hidden]) { display: none; }
   /* A single-block card: content 10px from the sides like Mushroom, 12px top and bottom for air.
-     The whole card glows red – it is only here because the appliance needs you. */
-  ha-card { padding: 12px 10px; container-type: inline-size;
-    background: color-mix(in srgb, ${C.red} 10%, var(--ha-card-background, var(--card-background-color, #fff))); }
+     No red highlight on the card: it sits on the theme's card background like its neighbours, and
+     the red glyph and red stop time carry the alert. */
+  ha-card { padding: 12px 10px; container-type: inline-size; }
   /* One centre line: glyph, text block and pill.
      Mushroom measures its 10px from the card's outer edge (its content overlaps the border), so the
      row moves out by the border width. A negative margin, never calc(10px - border) on the padding:

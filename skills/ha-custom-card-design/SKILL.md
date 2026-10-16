@@ -83,6 +83,8 @@ exactly rather than "close enough".
 - **Glow means "active or needs you":** the tile background takes the state colour at
   about 10% (a lit room, a heater that is on, a room that needs air in red). Keep
   everything else neutral (`rgba(primary-text-rgb, .04)`) so the glow carries meaning.
+  Glow is for tiles and rows inside a card, never a whole card: an alert card keeps the theme's
+  card background and puts its colour on the glyph and the status line.
 - **Coloured text** is mixed toward the text colour so it stays readable:
   `color-mix(in srgb, var(--amber-color) 70%, var(--primary-text-color))`.
 - **Pills come in two sizes only:** primary 36px – the icon circle's height, on every screen – for a

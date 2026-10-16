@@ -33,6 +33,7 @@ Most of them generalise to any dashboard.
 - Tiles in a grid are equal height (`grid-auto-rows: 1fr`). Add content by wrapping inside the tile, not by growing one tile.
 - Mushroom's 10px are from the card's outer edge: its content overlaps the card border, so on a view with bordered cards (the subviews here; the Home view's theme has none) a plain 10px padding sits 1px right of Mushroom. Move the content row out with `margin: 0 calc(-1 * var(--ha-card-border-width, 1px))`. Never `calc(10px - var(--ha-card-border-width))` in a padding: themes set the width to a bare `0`, the calc goes invalid and the padding drops to 0 (the alert card on the home view, "looks horrendous"). Check every card on both a bordered and a borderless view.
 - The same alert in two places is the same card with the same config – not a variant with its own text, links or circle ("It should be the exact same card… Not a new card").
+- A card whose whole job is an alert doesn't glow: it keeps the theme's card background, and red goes on the glyph and the status line only ("I don't like it being red background. Keep the red icon and text"). Glow stays for tiles and rows inside a card.
 
 ## Interaction
 
