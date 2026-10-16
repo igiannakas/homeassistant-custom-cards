@@ -91,9 +91,11 @@ Everything inherits `var(--ha-font-family-body, Roboto, sans-serif)`.
   card). Card padding 10px (single-block cards 12px 10px); everything inside – header icons,
   tile edges, pills, switches – starts and ends on that edge. Gap between tiles 8px; tile
   padding 11px 10px (8px horizontal when narrow).
-  Mushroom counts the 10px from the card's **outer** edge (its content overlaps the border), so the side
-  padding is `calc(10px - var(--ha-card-border-width, 1px))`: right on a bordered view (1px default
-  border) and a borderless one (the Home view's theme sets the width to 0).
+  Mushroom counts the 10px from the card's **outer** edge (its content overlaps the border): keep the
+  10px padding and move the content row out with `margin: 0 calc(-1 * var(--ha-card-border-width, 1px))`
+  – right on a bordered view (1px default border) and a borderless one. Never subtract the variable
+  inside the padding: a theme's bare `0` (the Home view's) makes that calc invalid and the padding 0,
+  whereas the margin's own fallback, 0, is correct there.
 - **Label row:** `min-height: 40px; padding: 0 0 8px; gap: 10px` inside the 10px card padding.
   The icon is Mushroom-sized: a 36px slot on the content edge (`flex: 0 0 36px`, centred) holding
   a 24px glyph – plain in the card's colour, or a filled circle only when tappable (All lights).

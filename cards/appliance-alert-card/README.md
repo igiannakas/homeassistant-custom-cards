@@ -14,9 +14,6 @@ full, please empty", when it stopped, and a **Cleared** button.
 - **One row:** the glyph (red – a call for attention), the message, and under it **Stopped at
   20:34** ("at Thu 20:34" within the week, "on 15 Oct" before that) from the `since` helper,
   then the Cleared pill. The whole card glows red.
-- **On the home dashboard too:** with `navigation_path`, the glyph and message are one tap
-  target that opens the appliance's page (so the glyph gets the tinted circle), and the message
-  should name the appliance. Cleared still only clears.
 - **Cleared** turns the entity off at once (clearing an alert is harmless, so there is no
   dialog). It rests until the state changes; if the call fails, Home Assistant's message (or
   "Couldn't clear …") shows and it works again.
@@ -31,28 +28,17 @@ entity: input_boolean.clothes_dryer_tank_alert
 since: input_datetime.clothes_dryer_tank_full_since
 ```
 
-On another dashboard (here the home view, first in its first section), name the appliance and
-link its page:
-
-```yaml
-type: custom:appliance-alert-card
-entity: input_boolean.clothes_dryer_tank_alert
-since: input_datetime.clothes_dryer_tank_full_since
-message: "Clothes dryer: water tank full, please empty"
-navigation_path: /lovelace/clothes-dryer
-```
-
 | Option | What it is |
 |---|---|
 | `entity` | The alert: shown while on, turned off by Cleared (`input_boolean` or `switch`). Required. |
 | `since` | When the appliance stopped: an `input_datetime` with date and time (its `timestamp` is read, not its zone-less state), or a timestamp sensor. Optional – without it the message stands alone. |
 | `message` | Default "Water tank full, please empty". |
-| `navigation_path` | The appliance's page. Set it when the card is anywhere but that page: glyph and message then open it. |
 | `icon` | Default `mdi:water-alert`. |
 | `clear_label` | Default "Cleared". |
 
 Place it first on the appliance's page (the first card of the first section), so it is the first
-thing you see when a phone notification opens that page.
+thing you see when a phone notification opens that page. To show the alert on another dashboard
+too (here the top of the home view), add the very same card with the same config.
 
 ## The automation behind it
 

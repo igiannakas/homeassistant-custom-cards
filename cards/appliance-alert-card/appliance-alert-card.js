@@ -5,23 +5,20 @@
  *   entity: input_boolean.clothes_dryer_tank_alert
  *   since: input_datetime.clothes_dryer_tank_full_since
  *   message: Water tank full, please empty
- *   navigation_path: /lovelace/clothes-dryer      (optional – on a dashboard other than its page)
  *
  * The card shows only while `entity` is on, and takes no room otherwise: it hides itself the way
  * Home Assistant's conditional cards do, so the section closes up around it (in the dashboard
  * editor it stays visible, as a preview). An automation turns the entity on when the appliance
  * stops with its plug on, and off again the next time the appliance runs.
  *
- * One row, on one centre line: the glyph (red, a call for attention), the message with "Stopped at
- * 20:34" under it (from `since`, ink-aligned with the message), and the Cleared pill, which turns
- * the entity off at once (clearing an alert is benign, so no dialog). On the appliance's own page
- * the glyph is decorative (no circle). With `navigation_path` – the same alert elsewhere, e.g. on
- * the home dashboard – glyph and message are one tap target that opens the page, so the glyph gets
- * the tinted circle. The whole card glows red. The pill stays beside the message while both fit on
- * one line and moves to a full-width row of its own when they don't (measured, not a breakpoint).
+ * One row, on one centre line: the glyph (red, a call for attention; decorative, so no circle),
+ * the message with "Stopped at 20:34" under it (from `since`, ink-aligned with the message), and
+ * the Cleared pill, which turns the entity off at once (clearing an alert is benign, so no
+ * dialog). The whole card glows red. The pill stays beside the message while both fit on one
+ * line and moves to a full-width row of its own when they don't (measured, not a breakpoint).
  */
 
-const AAC_VERSION = "1.1.0";
+const AAC_VERSION = "1.2.0";
 const AAC_TAG = "appliance-alert-card";
 
 const C = {
@@ -89,26 +86,21 @@ const CSS = `
   :host { display: block; }
   :host([hidden]) { display: none; }
   /* A single-block card: content 10px from the sides like Mushroom, 12px top and bottom for air.
-     Mushroom measures those 10px from the card's outer edge (its content overlaps the border), so
-     the border width comes off the padding: glyph and message then line up with a Mushroom card on
-     a bordered view and a borderless one alike (measured). The whole card glows red – it is only
-     here because the appliance needs you. */
-  ha-card { padding: 12px calc(10px - var(--ha-card-border-width, 1px)); container-type: inline-size;
+     The whole card glows red – it is only here because the appliance needs you. */
+  ha-card { padding: 12px 10px; container-type: inline-size;
     background: color-mix(in srgb, ${C.red} 10%, var(--ha-card-background, var(--card-background-color, #fff))); }
-  /* One centre line: glyph, text block and pill. */
-  .wrap { display: flex; align-items: center; gap: 10px; }
+  /* One centre line: glyph, text block and pill.
+     Mushroom measures its 10px from the card's outer edge (its content overlaps the border), so the
+     row moves out by the border width. A negative margin, never calc(10px - border) on the padding:
+     themes set --ha-card-border-width to a bare 0 (the home view's does), which makes such a calc
+     invalid and the padding drop to 0. Here the same 0 only makes the margin invalid, and a margin's
+     fallback, 0, is right for a card without a border. */
+  .wrap { display: flex; align-items: center; gap: 10px; margin: 0 calc(-1 * var(--ha-card-border-width, 1px)); }
   .head { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
   /* Mushroom-sized slot: a 24px glyph in 36px, so it sits where a Mushroom shape's glyph does and the
      message starts at edge + 46. Decorative (the pill is the only action), so no circle. */
   .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
   .slot ha-icon { --mdc-icon-size: 24px; color: ${C.red}; }
-  /* With navigation_path, glyph and message are one button to the appliance's page; a tap target
-     gets the Mushroom circle (the icon's colour at 20%). */
-  button.head { all: unset; box-sizing: border-box; flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
-    cursor: pointer; border-radius: 18px; -webkit-tap-highlight-color: transparent; }
-  button.head .slot { border-radius: 50%; background: ${tint(C.red, 20)}; }
-  button.head:active { filter: brightness(.92); }
-  button.head:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .txt { flex: 1; min-width: 0; }
   .txt > span { display: block; }
   /* Never cut off: the message wraps. */
@@ -189,7 +181,6 @@ class ApplianceAlertCard extends HTMLElement {
         { name: "entity", required: true, selector: { entity: { domain: ["input_boolean", "switch"] } } },
         { name: "since", selector: { entity: { domain: ["input_datetime", "sensor", "datetime"] } } },
         { name: "message", selector: { text: {} } },
-        { name: "navigation_path", selector: { navigation: {} } },
         { type: "grid", name: "", schema: [
           { name: "icon", selector: { icon: {} } },
           { name: "clear_label", selector: { text: {} } },
@@ -200,7 +191,6 @@ class ApplianceAlertCard extends HTMLElement {
           entity: "Alert (shown while on)",
           since: "Stopped at",
           message: "Message",
-          navigation_path: "Tap opens",
           icon: "Icon",
           clear_label: "Button label",
         })[s.name] ?? s.name,
@@ -208,8 +198,7 @@ class ApplianceAlertCard extends HTMLElement {
         ({
           entity: "Cleared turns it off. Usually an input_boolean that an automation turns on.",
           since: "An input_datetime (or timestamp sensor) with when the appliance stopped.",
-          message: `Default: "${DEFAULT_MESSAGE}". Name the appliance when the card isn't on its own page.`,
-          navigation_path: "The appliance's page, when the card is elsewhere (e.g. the home dashboard). Leave empty on the page itself.",
+          message: `Default: "${DEFAULT_MESSAGE}".`,
           clear_label: `Default: "${DEFAULT_CLEAR}".`,
         })[s.name],
     };
@@ -266,15 +255,12 @@ class ApplianceAlertCard extends HTMLElement {
 
   _build() {
     const root = this.shadowRoot || this.attachShadow({ mode: "open" });
-    const nav = this._config.navigation_path;
-    const head = `<span class="slot"><ha-icon></ha-icon></span><span class="txt"><span class="nm"></span><span class="sc"></span></span>`;
     root.innerHTML = `<style>${CSS}</style><ha-card>
       <div class="wrap" role="alert">
-        ${nav ? `<button class="head">${head}</button>` : `<div class="head">${head}</div>`}
+        <div class="head"><span class="slot"><ha-icon></ha-icon></span><span class="txt"><span class="nm"></span><span class="sc"></span></span></div>
         <button class="pill"><ha-icon icon="mdi:check"></ha-icon><span></span></button>
       </div></ha-card>`;
     root.querySelector(".pill").addEventListener("click", () => this._clear());
-    if (nav) root.querySelector("button.head").addEventListener("click", () => this._open());
     this._built = true;
     this._observe();
     this.ownerDocument.fonts?.ready?.then(() => this._fit());
@@ -360,15 +346,6 @@ class ApplianceAlertCard extends HTMLElement {
     const p = root.querySelector(".pill");
     const pill = contentW(p) + px(p, "paddingLeft") + px(p, "paddingRight");
     wrap.classList.toggle("stacked", ApplianceAlertCard.stacks(wrap.clientWidth, head, px(wrap, "columnGap"), pill));
-  }
-
-  /* Glyph and message open the appliance's page (only with navigation_path). In the editor's
-     preview a tap does nothing, as the Cleared pill there. */
-  _open() {
-    const path = this._config.navigation_path;
-    if (!path || this.preview) return;
-    history.pushState(null, "", path);
-    this.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false }, bubbles: true, composed: true }));
   }
 
   /* Cleared turns the alert off at once. The pill rests until the state changes or the call fails. */
