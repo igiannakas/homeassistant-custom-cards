@@ -1,7 +1,8 @@
 # Appliance alert card
 
-`custom:appliance-alert-card` – an appliance that needs you, at the top of its page: "Water tank
-full, please empty", when it stopped, and a **Clear** button.
+`custom:appliance-alert-card` – an appliance that needs you, at the top of its page: which one
+("Clothes dryer tank full"), since when and what to do ("Since 20:34 · please empty it"), and a
+**Clear** button.
 
 <p>
   <img src="../../docs/screenshots/appliance-alert-card.png" alt="appliance-alert-card" width="384">
@@ -11,10 +12,10 @@ full, please empty", when it stopped, and a **Clear** button.
   an automation turns on) is on. Otherwise it hides itself the way Home Assistant's conditional
   cards do, so the section closes up around it – no visibility conditions to set up. In the
   dashboard editor it stays visible as a preview ("Shows while … is on").
-- **One row:** the glyph (red – a call for attention), the message, and under it **Stopped at
-  20:34** ("at Thu 20:34" within the week, "on 15 Oct" before that) from the `since` helper,
-  then the Clear pill. Only the glyph and the stop time are red; the card keeps the theme's
-  own background, like the cards around it.
+- **One row:** the glyph (red – a call for attention), the title naming the appliance (worded as
+  the phone push), and under it **Since 20:34 · please empty it** ("Since Thu 20:34" within the
+  week, "Since 15 Oct" before that) from the `since` helper, then the Clear pill. Only the glyph
+  and that line are red; the card keeps the theme's own background, like the cards around it.
 - **Clear** turns the entity off at once (clearing an alert is harmless, so there is no
   dialog). It rests until the state changes; if the call fails, Home Assistant's message (or
   "Couldn't clear …") shows and it works again.
@@ -27,13 +28,16 @@ full, please empty", when it stopped, and a **Clear** button.
 type: custom:appliance-alert-card
 entity: input_boolean.clothes_dryer_tank_alert
 since: input_datetime.clothes_dryer_tank_full_since
+name: Clothes dryer
 ```
 
 | Option | What it is |
 |---|---|
 | `entity` | The alert: shown while on, turned off by Clear (`input_boolean` or `switch`). Required. |
-| `since` | When the appliance stopped: an `input_datetime` with date and time (its `timestamp` is read, not its zone-less state), or a timestamp sensor. Optional – without it the message stands alone. |
-| `message` | Default "Water tank full, please empty". |
+| `since` | When the appliance stopped: an `input_datetime` with date and time (its `timestamp` is read, not its zone-less state), or a timestamp sensor. Optional – without it the line under the title is just what to do ("Please empty it"). |
+| `name` | The appliance, named in the title: "Clothes dryer tank full". Without it the title is "Water tank full". |
+| `message` | Replaces the whole title (for an alert that isn't a water tank). Your own title has no hint unless you set one. |
+| `hint` | What to do, after the time. Default "please empty it" with the default title. |
 | `icon` | Default `mdi:water-alert`. |
 | `clear_label` | Default "Clear". |
 

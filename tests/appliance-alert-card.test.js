@@ -47,7 +47,8 @@ function hass(over = {}) {
     },
   };
 }
-const DRYER = { entity: "input_boolean.clothes_dryer_tank_alert", since: "input_datetime.clothes_dryer_tank_full_since" };
+// The live config, the same on the home view and the clothes dryer's page.
+const DRYER = { entity: "input_boolean.clothes_dryer_tank_alert", since: "input_datetime.clothes_dryer_tank_full_since", name: "Clothes dryer" };
 
 function mount(cfg, h, now) {
   const card = document.createElement("appliance-alert-card");
@@ -80,31 +81,32 @@ const view = (card) => {
   assert(Card, "defined after home-assistant");
   assert.throws(() => new Card().setConfig({}), /entity/);
   const form = JSON.stringify(Card.getConfigForm().schema);
-  for (const k of ["entity", "since", "message", "icon", "clear_label"]) assert(form.includes(`"name":"${k}"`), `editor field ${k}`);
+  for (const k of ["entity", "since", "name", "message", "hint", "icon", "clear_label"]) assert(form.includes(`"name":"${k}"`), `editor field ${k}`);
   assert.strictEqual(
     Card.getStubConfig({ states: { "input_boolean.home_master": {}, "input_boolean.dehumidifier_tank_alert": {} } }).entity,
     "input_boolean.dehumidifier_tank_alert",
   );
   assert(window.customCards.some((c) => c.type === "appliance-alert-card"), "listed in the card picker");
 
-  // 1. The dryer's tank filled at 20:34; six minutes later the card is up, with the stop time.
+  // 1. The dryer's tank filled at 20:34; six minutes later the card is up: the appliance in the
+  //    title (as the phone push), the time and what to do under it.
   const evening = T("2026-10-15T20:40:00+01:00");
   const card = mount(DRYER, hass(), evening);
   await tick(10);
   eq(view(card), {
-    hidden: false, nm: "Water tank full, please empty", sc: "Stopped at 20:34", one: false,
+    hidden: false, nm: "Clothes dryer tank full", sc: "Since 20:34 · please empty it", one: false,
     icon: "mdi:water-alert", pill: "Clear", disabled: "false",
-  }, "alert on: message, stop time, Clear");
+  }, "alert on: appliance, time, what to do, Clear");
   eq(card.ev, [], "visible from the start: no visibility event needed");
   assert(card.shadowRoot.querySelector(".wrap").getAttribute("role") === "alert", "announced as an alert");
 
   // 2. Next morning it says the day; after a week, the date.
   card._now = () => T("2026-10-16T07:40:00+01:00");
   card.hass = hass();
-  assert.strictEqual(view(card).sc, "Stopped at Thu 20:34");
+  assert.strictEqual(view(card).sc, "Since Thu 20:34 · please empty it");
   card._now = () => T("2026-10-24T07:40:00+01:00");
   card.hass = hass();
-  assert.strictEqual(view(card).sc, "Stopped on 15 Oct");
+  assert.strictEqual(view(card).sc, "Since 15 Oct · please empty it");
   card._now = () => evening;
   card.hass = hass();
 
@@ -149,11 +151,17 @@ const view = (card) => {
   await tick();
   eq(card.ev.slice(-1), [["notification", "Unauthorized"]], "Home Assistant's own message");
 
-  // 8. Unavailable alert: hidden. Unknown stop time: no second line, the message nudged to centre.
+  // 8. Unavailable alert: hidden. Unknown stop time: what to do alone, as a sentence.
   card.hass = hass({ "input_boolean.clothes_dryer_tank_alert": st("unavailable") });
   assert.strictEqual(card.hidden, true, "hidden while unavailable");
   card.hass = hass({ "input_datetime.clothes_dryer_tank_full_since": st("unknown") });
-  eq([card.hidden, view(card).sc, view(card).one], [false, "", true], "no stop time");
+  eq([card.hidden, view(card).sc, view(card).one], [false, "Please empty it", false], "no stop time");
+  //    Without a name the title is generic; with no time and no hint there is no second line and
+  //    the title is nudged to centre.
+  const bare = mount({ entity: "input_boolean.clothes_dryer_tank_alert", since: "input_datetime.clothes_dryer_tank_full_since" }, hass(), evening);
+  eq([view(bare).nm, view(bare).sc], ["Water tank full", "Since 20:34 · please empty it"], "no name");
+  const alone = mount({ entity: "input_boolean.clothes_dryer_tank_alert", message: "Descale the kettle" }, hass(), evening);
+  eq([view(alone).nm, view(alone).sc, view(alone).one], ["Descale the kettle", "", true], "one line");
 
   // 9. In the dashboard editor (preview) the card shows while off and says when it appears; Clear is inert.
   calls.length = 0;
@@ -167,14 +175,17 @@ const view = (card) => {
   pre.preview = false;
   assert.strictEqual(pre.hidden, true, "hidden again after editing");
 
-  // 10. Options: message, icon, button label; a switch is turned off through its own domain; a
-  //     timestamp sensor works as the stop time.
+  // 10. Options: your own title replaces "<name> tank full" and drops the tank hint; icon, button
+  //     label and hint; a switch is turned off through its own domain; a timestamp sensor works
+  //     as the stop time.
   const sw = mount(
-    { entity: "switch.study_lamp", since: "sensor.dryer_stopped", message: "Filter needs cleaning", icon: "mdi:air-filter", clear_label: "Done" },
+    { entity: "switch.study_lamp", since: "sensor.dryer_stopped", name: "Air purifier", message: "Filter needs cleaning", icon: "mdi:air-filter", clear_label: "Done" },
     hass(),
     evening,
   );
-  eq([view(sw).nm, view(sw).icon, view(sw).pill, view(sw).sc], ["Filter needs cleaning", "mdi:air-filter", "Done", "Stopped at 20:34"]);
+  eq([view(sw).nm, view(sw).icon, view(sw).pill, view(sw).sc], ["Filter needs cleaning", "mdi:air-filter", "Done", "Since 20:34"]);
+  sw.setConfig({ ...sw._config, hint: "clean it" });
+  assert.strictEqual(view(sw).sc, "Since 20:34 · clean it", "own hint");
   sw.shadowRoot.querySelector(".pill").click();
   await tick();
   eq(calls.slice(-1), [["switch", "turn_off", { entity_id: "switch.study_lamp" }]], "switch.turn_off");
@@ -196,6 +207,9 @@ const view = (card) => {
   const x = mount({ entity: "input_boolean.clothes_dryer_tank_alert", message: "<b>Tank</b> & co" }, hass(), evening);
   assert.strictEqual(view(x).nm, "<b>Tank</b> & co");
   assert.strictEqual(x.shadowRoot.querySelector(".nm b"), null, "no markup injected");
+  const y = mount({ entity: "input_boolean.clothes_dryer_tank_alert", name: "<i>Dryer</i>", hint: "<u>now</u>" }, hass(), evening);
+  eq([view(y).nm, view(y).sc], ["<i>Dryer</i> tank full", "<u>now</u>"], "name and hint shown as text");
+  assert.strictEqual(y.shadowRoot.querySelector(".nm i, .sc u"), null, "no markup injected from name or hint");
 
   console.log("ALL APPLIANCE-ALERT-CARD TESTS PASSED");
   process.exit(0);

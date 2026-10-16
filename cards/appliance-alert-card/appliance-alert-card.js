@@ -4,7 +4,7 @@
  *   type: custom:appliance-alert-card
  *   entity: input_boolean.clothes_dryer_tank_alert
  *   since: input_datetime.clothes_dryer_tank_full_since
- *   message: Water tank full, please empty
+ *   name: Clothes dryer
  *
  * The card shows only while `entity` is on, and takes no room otherwise: it hides itself the way
  * Home Assistant's conditional cards do, so the section closes up around it (in the dashboard
@@ -12,14 +12,15 @@
  * stops with its plug on, and off again the next time the appliance runs.
  *
  * One row, on one centre line: the glyph (red, a call for attention; decorative, so no circle),
- * the message with "Stopped at 20:34" under it (from `since`, ink-aligned with the message), and
- * the Clear pill, which turns the entity off at once (clearing an alert is benign, so no
+ * the title naming the appliance ("Clothes dryer tank full", as the phone push says) with
+ * "Since 20:34 · please empty it" under it (the time from `since`, ink-aligned with the title),
+ * and the Clear pill, which turns the entity off at once (clearing an alert is benign, so no
  * dialog). Only the glyph and the stop time are red; the card keeps the theme's own background.
  * The pill stays beside the message while both fit on one line and moves to a full-width row of
  * its own when they don't (measured, not a breakpoint).
  */
 
-const AAC_VERSION = "1.3.1";
+const AAC_VERSION = "1.4.0";
 const AAC_TAG = "appliance-alert-card";
 
 const C = {
@@ -30,7 +31,9 @@ const tx =(c, p = 70) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-colo
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const LIVE = (s) => s && s !== "unavailable" && s !== "unknown";
-const DEFAULT_MESSAGE = "Water tank full, please empty";
+/* The defaults are a water-tank alert: "<name> tank full", then "Since 20:34 · please empty it". */
+const DEFAULT_MESSAGE = "Water tank full";
+const DEFAULT_HINT = "please empty it";
 const DEFAULT_ICON = "mdi:water-alert";
 const DEFAULT_CLEAR = "Clear";
 
@@ -44,14 +47,17 @@ function zoned(ms, tz) {
   return { day: `${parts.year}-${parts.month}-${parts.day}`, hm: `${parts.hour}:${parts.minute}` };
 }
 
-/* "at 20:34" today, "at Thu 20:34" within the week, "on 4 Oct" before that (as the appliance card). */
+/* "20:34" today, "Thu 20:34" within the week, "4 Oct" before that (as the appliance card). */
 function when(ms, now, tz) {
   const a = zoned(ms, tz);
-  if (a.day === zoned(now, tz).day) return `at ${a.hm}`;
+  if (a.day === zoned(now, tz).day) return a.hm;
   const days = (now - ms) / 864e5;
-  if (days < 6.5) return `at ${new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: tz }).format(new Date(ms))} ${a.hm}`;
-  return `on ${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: tz }).format(new Date(ms))}`;
+  if (days < 6.5) return `${new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: tz }).format(new Date(ms))} ${a.hm}`;
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: tz }).format(new Date(ms));
 }
+
+/* A line that starts with the hint (no time to put before it) starts with a capital. */
+const sentence = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /* The moment a `since` entity holds: an input_datetime's timestamp attribute (its state is local
    time without a zone), else a timestamp sensor's or datetime entity's ISO state. */
@@ -63,19 +69,26 @@ function momentOf(s) {
   return Number.isFinite(t) && /[zZ]|[+-]\d\d:?\d\d$/.test(s.state) ? t : null;
 }
 
-/* The card's whole view: everything the DOM shows, as plain values. */
+/* The card's whole view: everything the DOM shows, as plain values.
+   Title: `message` if set, else "<name> tank full" (as the phone push), else "Water tank full".
+   Line under it: "Since <time> · <hint>". The hint defaults to "please empty it" for the default
+   title; your own `message` has no hint unless you set one. */
 function model(hass, cfg, now) {
   const s = hass.states[cfg.entity];
   const active = s?.state === "on";
   const tz = hass.locale?.time_zone === "server" ? hass.config?.time_zone : undefined;
   const at = cfg.since ? momentOf(hass.states[cfg.since]) : null;
+  const name = String(cfg.name ?? "").trim();
+  const title = cfg.message || (name ? `${name} tank full` : DEFAULT_MESSAGE);
+  const hint = String(cfg.hint ?? (cfg.message ? "" : DEFAULT_HINT)).trim();
+  const since = at !== null && at <= now + 60000 ? `Since ${when(at, now, tz)}` : "";
   return {
     active,
-    message: cfg.message || DEFAULT_MESSAGE,
+    title,
     icon: cfg.icon || DEFAULT_ICON,
     clear: cfg.clear_label || DEFAULT_CLEAR,
-    sub: at !== null && at <= now + 60000 ? `Stopped ${when(at, now, tz)}` : "",
-    name: s?.attributes?.friendly_name || cfg.entity,
+    sub: since && hint ? `${since} · ${hint}` : since || (hint ? sentence(hint) : ""),
+    alertName: s?.attributes?.friendly_name || cfg.entity,
   };
 }
 
@@ -180,8 +193,10 @@ class ApplianceAlertCard extends HTMLElement {
       schema: [
         { name: "entity", required: true, selector: { entity: { domain: ["input_boolean", "switch"] } } },
         { name: "since", selector: { entity: { domain: ["input_datetime", "sensor", "datetime"] } } },
-        { name: "message", selector: { text: {} } },
+        { name: "name", selector: { text: {} } },
         { type: "grid", name: "", schema: [
+          { name: "message", selector: { text: {} } },
+          { name: "hint", selector: { text: {} } },
           { name: "icon", selector: { icon: {} } },
           { name: "clear_label", selector: { text: {} } },
         ] },
@@ -189,8 +204,10 @@ class ApplianceAlertCard extends HTMLElement {
       computeLabel: (s) =>
         ({
           entity: "Alert (shown while on)",
-          since: "Stopped at",
-          message: "Message",
+          since: "Full since",
+          name: "Appliance",
+          message: "Title",
+          hint: "What to do",
           icon: "Icon",
           clear_label: "Button label",
         })[s.name] ?? s.name,
@@ -198,7 +215,9 @@ class ApplianceAlertCard extends HTMLElement {
         ({
           entity: "Clear turns it off. Usually an input_boolean that an automation turns on.",
           since: "An input_datetime (or timestamp sensor) with when the appliance stopped.",
-          message: `Default: "${DEFAULT_MESSAGE}".`,
+          name: 'Named in the title: "Clothes dryer tank full".',
+          message: `Replaces the whole title. Default: "<appliance> tank full", or "${DEFAULT_MESSAGE}" without one.`,
+          hint: `After the time. Default: "${DEFAULT_HINT}" (none with your own title).`,
           clear_label: `Default: "${DEFAULT_CLEAR}".`,
         })[s.name],
     };
@@ -236,7 +255,7 @@ class ApplianceAlertCard extends HTMLElement {
   }
 
   connectedCallback() {
-    // "Stopped at 20:34" becomes "Stopped at Thu 20:34" after midnight.
+    // "Since 20:34" becomes "Since Thu 20:34" after midnight.
     clearInterval(this._timer);
     this._timer = setInterval(() => this._render(), 60000);
     this._observe();
@@ -293,9 +312,9 @@ class ApplianceAlertCard extends HTMLElement {
     };
     const ic = root.querySelector(".slot ha-icon");
     if (ic.getAttribute("icon") !== m.icon) ic.setAttribute("icon", m.icon);
-    set(".nm", esc(m.message));
-    // In the editor while the alert is off, the line under the message says when the card shows.
-    const sub = m.active ? m.sub : `Shows while ${m.name} is on`;
+    set(".nm", esc(m.title));
+    // In the editor while the alert is off, the line under the title says when the card shows.
+    const sub = m.active ? m.sub : `Shows while ${m.alertName} is on`;
     set(".sc", esc(sub));
     root.querySelector(".txt").classList.toggle("one", !sub);
     set(".pill span", esc(m.clear));
@@ -361,7 +380,7 @@ class ApplianceAlertCard extends HTMLElement {
     } catch (err) {
       this._pending = false;
       this._render();
-      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || `Couldn't clear ${m.name}.` }, bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent("hass-notification", { detail: { message: err?.message || `Couldn't clear ${m.alertName}.` }, bubbles: true, composed: true }));
     }
   }
 }
