@@ -4753,7 +4753,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.7.3 ===== */
+/* ===== printer-status-card 1.7.4 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -4776,7 +4776,7 @@ registerMmuLanesCard();
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.7.3";
+const PSC_VERSION = "1.7.4";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -5245,6 +5245,7 @@ class PrinterStatusCard extends HTMLElement {
         { type: "grid", name: "", schema: [
           { name: "light", selector: { entity: { domain: ["light", "switch", "input_boolean", "number", "input_number"] } } },
           { name: "light_name", selector: { text: {} } },
+          { name: "light_off_name", selector: { text: {} } },
         ] },
         { name: "camera_card", selector: { object: {} } },
         { name: "camera_entity", selector: { entity: { domain: "camera" } } },
@@ -5264,6 +5265,7 @@ class PrinterStatusCard extends HTMLElement {
           camera_entity: "Camera to check (default: from the camera card)",
           light: "Chamber light",
           light_name: "Light button label",
+          light_off_name: "Light button label while off",
         })[s.name] ?? s.name,
       computeHelper: (s) =>
         ({
@@ -5572,9 +5574,10 @@ class PrinterStatusCard extends HTMLElement {
       const icon = m.light.on ? "mdi:led-strip-variant" : "mdi:led-strip-variant-off";
       const ic = lb.querySelector("ha-icon");
       if (ic.getAttribute("icon") !== icon) ic.setAttribute("icon", icon);
-      const name = esc(this._config.light_name || "Light");
+      // The state in words, not only the glow: "Light 40%" while on, "Light off" while off.
+      const name = this._config.light_name || "Light";
       const lvl = m.light.on && m.light.level !== null && m.light.level < 100 ? ` <span class="lvl">${m.light.level}%</span>` : "";
-      set(".act.light .lbl", `${name}${lvl}`, true);
+      set(".act.light .lbl", m.light.on ? `${esc(name)}${lvl}` : esc(this._config.light_off_name || `${name} off`), true);
     }
   }
 

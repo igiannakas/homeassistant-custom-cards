@@ -330,7 +330,7 @@ const cfg = {
   lc.hass = hass(states(led(0)));
   assert.strictEqual(lr.querySelector(".act.light"), lb, "light button updates in place");
   assert(!lb.classList.contains("on"));
-  assert.strictEqual(lb.textContent, "Light");
+  assert.strictEqual(lb.textContent, "Light off", "the state in words, not only the glow");
   assert.strictEqual(lb.querySelector("ha-icon").getAttribute("icon"), "mdi:led-strip-variant-off");
   lb.click();
   eq(calls.pop(), ["number", "set_value", { entity_id: LED, value: 25 }], "back to the level it had");
@@ -341,7 +341,11 @@ const cfg = {
   fresh.shadowRoot.querySelector(".act.light").click();
   eq(calls.pop(), ["number", "set_value", { entity_id: LED, value: 100 }]);
   const fixed = mount({ ...cfg, light: LED, light_on: 40, light_name: "LEDs" }, states(led(0)));
-  assert.strictEqual(fixed.shadowRoot.querySelector(".act.light").textContent, "LEDs");
+  assert.strictEqual(fixed.shadowRoot.querySelector(".act.light").textContent, "LEDs off");
+  const named = mount({ ...cfg, light: LED, light_name: "LEDs", light_off_name: "Dark" }, states(led(0)));
+  assert.strictEqual(named.shadowRoot.querySelector(".act.light").textContent, "Dark");
+  named.hass = hass(states(led(60)));
+  assert.strictEqual(named.shadowRoot.querySelector(".act.light").textContent, "LEDs 60%");
   fixed.shadowRoot.querySelector(".act.light").click();
   eq(calls.pop(), ["number", "set_value", { entity_id: LED, value: 40 }]);
   // Hold opens the light's more-info instead of toggling.

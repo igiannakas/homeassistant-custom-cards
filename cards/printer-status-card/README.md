@@ -46,7 +46,7 @@
   homing, pause, resume, cancel, emergency stop – are left out on purpose: do those on the
   printer.
 - **Chamber light** (optional, `light`): an extra button that glows while the light is
-  on and shows its level when dimmed ("Light 25%"). A tap toggles it at once. For a
+  on and shows its level when dimmed ("Light 25%"), and says "Light off" while off. A tap toggles it at once. For a
   Klipper output pin (a 0–100 `number`), on returns to the last level it had, or to
   `light_on` (default full). Hold the button for the light's more-info.
 - **Tap any value** (progress, time left, finish time, layer, filament, speed,
@@ -114,6 +114,7 @@ camera_card:
 | `power_off_script` | A `script` or `button` that shuts the printer down safely and then cuts the plug. Without it there is no Power off button. |
 | `light` | Chamber light: a `light`, `switch`, `input_boolean`, or a 0–100 `number` / `input_number` (e.g. Moonraker's `number.<prefix>_output_pin_chamber_leds`). Hidden while unavailable. |
 | `light_name` | Button label. Default `Light`. |
+| `light_off_name` | Button label while the light is off. Default: the label + " off" (`Light off`). |
 | `light_on` | For a number: the level "on" sets when the card hasn't seen an earlier level. Default the maximum (100). |
 | `camera_card` | Any card config, rendered inside the card. |
 | `camera_entity` | Camera to test for a picture. Default: taken from `camera_card` (`cameras[0].camera_entity`, `camera_entity` or `entity`). |
