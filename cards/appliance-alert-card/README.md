@@ -58,6 +58,6 @@ automation – this is how the clothes dryer and the bedroom dehumidifier are se
 
 The automation, on the tank-full sensor turning on: stamp the time, turn the alert on and push to
 the phones (tapping the push opens the appliance's page). On the appliance drawing power again
-for a minute (the tank was emptied): turn the alert off. On the alert turning off (that, or
+for 10 seconds (the tank was emptied): turn the alert off. On the alert turning off (that, or
 Clear): clear the pushes. The card is the alert in Home Assistant itself, so there is no
 sidebar notification as well.
