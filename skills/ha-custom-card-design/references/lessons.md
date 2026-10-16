@@ -117,6 +117,20 @@ Most of them generalise to any dashboard.
 - Say what the automation does in its own words: "On at 17:30", "Off at 09:00", "On above 62%" – never a vague "Auto".
 - Times and thresholds live in helpers (input_datetime time-only, input_number) used by the automation's triggers and conditions; the card reads the same helpers. No copied numbers in the card config. A window that crosses midnight needs from/until time helpers, not a schedule helper (its blocks stop at midnight and it can't be read by non-admins).
 
+## Bin day (Oct 2026)
+
+- An alert's title says what to do, in the user's words: "Take the bins out tonight", not "Bins out
+  tonight". When there is nothing to do, it states the fact: "Bins collected today".
+- Two alerts about the same event (the evening before and the day itself) are dismissed
+  independently. Each has its own Done helper, and the card refuses one shared helper.
+- Shared dismissal goes in a helper keyed to the event (the collection's date), so it holds on
+  every phone and resets itself for the next one, without an automation.
+- Data that changes from outside (the council's dates, bank holidays) comes from an integration
+  into a standard entity (a calendar). Don't copy the schedule into the card config.
+- A fit check (does the pill stay beside the text?) compares exact sub-pixel widths, with no
+  slack and no rounded `clientWidth`. A line 0.1px too wide wraps in the browser, and a 0.5px
+  tolerance left "Garden" alone on a second line at 360px.
+
 ## Process
 
 - Show ideas and a mock-up first, with every reading the old view had. Implement after the go-ahead.

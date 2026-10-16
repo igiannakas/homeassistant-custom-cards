@@ -23,7 +23,9 @@ decorate it (decided 14 Oct 2026):
   (teal Auto clean pill → teal dialog to turn it on or off; orange power pill → orange dialog).
   Red only when the action would throw away something running (cutting a printer's power
   mid-print). Otherwise a warning goes in the words ("This ends the current clean").
-- **Literal colours** are the exception: clean water blue, dirty water brown, weather icons.
+- **Literal colours** are the exception: clean water blue, dirty water brown, weather icons, and
+  each bin in its real colour (brown refuse, green caddy). A literal black follows
+  `--primary-text-color`, so it still shows on a dark theme.
 - Tinted circle = tap target: `tint(colour, 20)` behind a full-colour icon. **A tap target is
   never grey**: a circle whose state colour would be grey (cloudy weather, heating idle or
   locked) is teal. A device that is off (a room with its lights off, a docked robot, an appliance

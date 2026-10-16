@@ -4,6 +4,12 @@
 tonight** the evening before a collection, **Bins collected today** on the day, each bin with its
 glyph in the bin's own colour, and a **Done** button on each alert.
 
+<p>
+  <img src="../../docs/screenshots/bin-day-card.png" alt="bin-day-card: the evening alert and the collection-day alert" width="384">
+</p>
+
+*Example dates: the evening before a refuse week, and a recycling week's collection day.*
+
 - **Only there while it matters.** The card shows from the evening before a collection (18:00 by
   default, read from a time helper) until the end of collection day. The rest of the week it hides
   itself the way Home Assistant's conditional cards do, so the section closes up around it. In the

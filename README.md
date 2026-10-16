@@ -59,6 +59,10 @@ Taken from a live dashboard at phone width, light theme. A few show example valu
     <td valign="top" width="50%"><a href="cards/appliance-card/README.md"><b>Appliance</b></a><br><img src="docs/screenshots/appliance-card.png" alt="Appliance" width="384"></td>
     <td valign="top" width="50%"><a href="cards/appliance-alert-card/README.md"><b>Appliance alert</b></a><br><img src="docs/screenshots/appliance-alert-card.png" alt="Appliance alert" width="384"></td>
   </tr>
+  <tr>
+    <td valign="top" width="50%"><a href="cards/bin-day-card/README.md"><b>Bin day</b></a><br><img src="docs/screenshots/bin-day-card.png" alt="Bin day" width="384"></td>
+    <td valign="top" width="50%"></td>
+  </tr>
 </table>
 
 ## Dependencies
