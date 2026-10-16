@@ -8,7 +8,7 @@ its glyph in the bin's own colour, and a **Done** button on each alert.
   <img src="../../docs/screenshots/bin-day-card.png" alt="bin-day-card: the evening alert and the collection-day alert" width="384">
 </p>
 
-*Example dates: the evening before a refuse week, and a recycling week's collection day.*
+*Example dates: the evening before a refuse week, and a recycling week's collection day from 07:00.*
 
 - **Only there while it matters.** The card shows from the evening before a collection (18:00 by
   default) until the end of collection day. Both times come from time helpers. The rest of the week it hides
