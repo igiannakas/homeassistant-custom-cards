@@ -366,6 +366,9 @@ const row = (card, k) => rowView(card.shadowRoot.querySelector(`.wrap.${k}`));
   // 16. Layout rule: the pill stacks only when the natural widths don't fit.
   assert.strictEqual(Card.stacks(339, 46 + 180, 10, 80), false);
   assert.strictEqual(Card.stacks(339, 46 + 210, 10, 90), true);
+  //     Sub-pixel exact: 0.1px too wide stacks (the browser would wrap the bins); an exact fit doesn't.
+  assert.strictEqual(Card.stacks(324.09, 46 + 189.19, 10, 78.91), true, "189.19px of bins in 189.09px");
+  assert.strictEqual(Card.stacks(324.09, 46 + 189.18, 10, 78.91), false, "exact fit");
 
   for (const c of document.querySelectorAll("bin-day-card")) c.remove(); // stop the minute timers
   console.log("ALL BIN-DAY-CARD TESTS PASSED");

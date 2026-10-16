@@ -1527,7 +1527,7 @@ async function registerApplianceCard() {
 registerApplianceCard();
 })();
 
-/* ===== bin-day-card 1.0.0 ===== */
+/* ===== bin-day-card 1.0.1 ===== */
 (() => {
 /*
  * Bin day card – which bins go out, the evening before and on collection day, at the top of the home view.
@@ -1564,7 +1564,7 @@ registerApplianceCard();
  * card keeps the theme's own background.
  */
 
-const BDC_VERSION = "1.0.0";
+const BDC_VERSION = "1.0.1";
 const BDC_TAG = "bin-day-card";
 
 const C = {
@@ -2149,9 +2149,11 @@ class BinDayCard extends HTMLElement {
 
   /* Does the pill need its own row? Not while the glyph, the title and the bins each on one line,
      and the pill at its natural width all fit in the row. Natural widths, so the answer is the
-     same whichever layout is showing (no flip-flop). */
+     same whichever layout is showing (no flip-flop). Exact, sub-pixel widths: the browser wraps a
+     line that is 0.1px too wide, so any tolerance here would let the bins wrap beside the pill
+     ("Garden" alone on a second line at 360px) instead of giving the pill its own row. */
   static stacks(available, head, gap, pill) {
-    return head + gap + pill > available + 0.5;
+    return head + gap + pill > available + 0.01;
   }
 
   _fit() {
@@ -2161,7 +2163,8 @@ class BinDayCard extends HTMLElement {
     const contentW = (node) => (range.selectNodeContents(node), range.getBoundingClientRect().width);
     const px = (el, prop) => parseFloat(getComputedStyle(el)[prop]) || 0;
     for (const wrap of Object.values(this._rows)) {
-      if (wrap.hidden || !wrap.clientWidth) continue; // not laid out
+      const available = wrap.getBoundingClientRect().width; // not clientWidth: that is rounded
+      if (wrap.hidden || !available) continue; // not laid out
       const p = wrap.querySelector(".pill");
       if (p.hidden) {
         wrap.classList.remove("stacked");
@@ -2175,7 +2178,7 @@ class BinDayCard extends HTMLElement {
       const headEl = wrap.querySelector(".head");
       const head = wrap.querySelector(".slot").offsetWidth + px(headEl, "columnGap") + text;
       const pill = contentW(p) + px(p, "paddingLeft") + px(p, "paddingRight");
-      wrap.classList.toggle("stacked", BinDayCard.stacks(wrap.clientWidth, head, px(wrap, "columnGap"), pill));
+      wrap.classList.toggle("stacked", BinDayCard.stacks(available, head, px(wrap, "columnGap"), pill));
     }
   }
 
