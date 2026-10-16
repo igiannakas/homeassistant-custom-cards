@@ -24,6 +24,7 @@ first in a confirmation dialog.
 | [Vacuum maintenance](cards/vacuum-maintenance-card/README.md) | The dock's clean and dirty water tanks up front (red when one needs you), then consumables as % of life left (or hours) and what's due next; Reset after replacing asks first. |
 | [Appliance](cards/appliance-card/README.md) | A plug-powered appliance (dehumidifier, air purifier, dryer): Running / Idle / Off, what its automation does next (read from the same helpers), a power pill like the printer's, and today's reading, run time, energy and cost. |
 | [Appliance alert](cards/appliance-alert-card/README.md) | An appliance that needs you (a water tank to empty) at the top of its page: shown only while its alert is on, when it stopped, and a Clear button. |
+| [Bin day](cards/bin-day-card/README.md) | Which bins go out, from a collections calendar: "Take the bins out tonight" the evening before, "Bins collected today" on the day, each bin in its own colour, and a Done on each alert. |
 
 Related: the Tado X room card (`custom:tadox-room-card`) ships with the
 [Tado X Proxy integration](https://github.com/igiannakas/ha-tadox-proxy), because it reads
