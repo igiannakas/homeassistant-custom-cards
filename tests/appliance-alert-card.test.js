@@ -80,7 +80,7 @@ const view = (card) => {
   assert(Card, "defined after home-assistant");
   assert.throws(() => new Card().setConfig({}), /entity/);
   const form = JSON.stringify(Card.getConfigForm().schema);
-  for (const k of ["entity", "since", "message", "icon", "clear_label"]) assert(form.includes(`"name":"${k}"`), `editor field ${k}`);
+  for (const k of ["entity", "since", "message", "navigation_path", "icon", "clear_label"]) assert(form.includes(`"name":"${k}"`), `editor field ${k}`);
   assert.strictEqual(
     Card.getStubConfig({ states: { "input_boolean.home_master": {}, "input_boolean.dehumidifier_tank_alert": {} } }).entity,
     "input_boolean.dehumidifier_tank_alert",
@@ -179,7 +179,31 @@ const view = (card) => {
   await tick();
   eq(calls.slice(-1), [["switch", "turn_off", { entity_id: "switch.study_lamp" }]], "switch.turn_off");
 
-  // 11. Text is escaped.
+  // 11. On the home dashboard: the message names the appliance, and glyph + message are one tap
+  //     target to its page (a button, with the circle); Cleared still only clears. On the page
+  //     itself (no navigation_path) the head is not a button and a tap goes nowhere.
+  assert.strictEqual(card.shadowRoot.querySelector("button.head"), null, "no tap target on the page itself");
+  const nav = [];
+  window.addEventListener("location-changed", () => nav.push(window.location.pathname));
+  calls.length = 0;
+  const home = mount({ ...DRYER, message: "Clothes dryer: water tank full, please empty", navigation_path: "/lovelace/clothes-dryer" }, hass(), evening);
+  const head = home.shadowRoot.querySelector("button.head");
+  assert(head, "head is a button");
+  assert(head.querySelector(".slot ha-icon") && head.querySelector(".nm"), "glyph and message inside it");
+  assert(home.shadowRoot.innerHTML.includes("button.head .slot { border-radius: 50%"), "a tap target gets the circle");
+  eq([view(home).nm, view(home).sc], ["Clothes dryer: water tank full, please empty", "Stopped at 20:34"]);
+  head.click();
+  eq(nav, ["/lovelace/clothes-dryer"], "opens the appliance's page");
+  eq(calls, [], "opening the page doesn't clear the alert");
+  home.shadowRoot.querySelector(".pill").click();
+  await tick();
+  eq(calls, [["input_boolean", "turn_off", { entity_id: "input_boolean.clothes_dryer_tank_alert" }]], "Cleared still clears");
+  eq(nav, ["/lovelace/clothes-dryer"], "Cleared doesn't navigate");
+  home.preview = true;
+  head.click();
+  eq(nav, ["/lovelace/clothes-dryer"], "no navigation from the editor preview");
+
+  // 12. Text is escaped.
   const x = mount({ entity: "input_boolean.clothes_dryer_tank_alert", message: "<b>Tank</b> & co" }, hass(), evening);
   assert.strictEqual(view(x).nm, "<b>Tank</b> & co");
   assert.strictEqual(x.shadowRoot.querySelector(".nm b"), null, "no markup injected");
