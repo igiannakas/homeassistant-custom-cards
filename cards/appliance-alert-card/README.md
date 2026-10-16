@@ -51,7 +51,8 @@ automation – this is how the clothes dryer and the bedroom dehumidifier are se
 - `input_boolean.clothes_dryer_tank_alert` – the latched alert this card shows.
 - `input_datetime.clothes_dryer_tank_full_since` – when the power dropped to zero.
 
-The automation, on the tank-full sensor turning on: stamp the time, turn the alert on, post a
-Home Assistant notification and push to the phones (tapping it opens the appliance's page). On
-the appliance drawing power again for a minute (the tank was emptied): turn the alert off. On
-the alert turning off (that, or Cleared): dismiss the notification and clear the pushes.
+The automation, on the tank-full sensor turning on: stamp the time, turn the alert on and push to
+the phones (tapping the push opens the appliance's page). On the appliance drawing power again
+for a minute (the tank was emptied): turn the alert off. On the alert turning off (that, or
+Cleared): clear the pushes. The card is the alert in Home Assistant itself, so there is no
+sidebar notification as well.
