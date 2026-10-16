@@ -31,6 +31,7 @@ Most of them generalise to any dashboard.
 - Icons share a left edge, not a centre line. Measure every card's insets; adopt the insets of the stock cards on the same dashboard (Mushroom: 10px) and add air vertically instead.
 - Header icons use Mushroom's 24px glyph in a 36px slot, so glyph and title positions match Mushroom cards exactly. Compare glyph rects (svg), not element boxes.
 - Tiles in a grid are equal height (`grid-auto-rows: 1fr`). Add content by wrapping inside the tile, not by growing one tile.
+- Mushroom's 10px are from the card's outer edge: its content overlaps the card border. Pad `calc(10px - var(--ha-card-border-width, 1px))` sideways, or on a view with bordered cards (the subviews here; the Home view's theme has none) glyph and title sit 1px right of Mushroom. Measure on a bordered view too.
 
 ## Interaction
 

@@ -505,7 +505,7 @@ async function registerAirQualityCard() {
 registerAirQualityCard();
 })();
 
-/* ===== appliance-alert-card 1.0.0 ===== */
+/* ===== appliance-alert-card 1.0.1 ===== */
 (() => {
 /*
  * Appliance alert card – an appliance that needs you (a water tank to empty), at the top of its page.
@@ -527,7 +527,7 @@ registerAirQualityCard();
  * line and moves to a full-width row of its own when they don't (measured, not a breakpoint).
  */
 
-const AAC_VERSION = "1.0.0";
+const AAC_VERSION = "1.0.1";
 const AAC_TAG = "appliance-alert-card";
 
 const C = {
@@ -595,8 +595,11 @@ const CSS = `
   :host { display: block; }
   :host([hidden]) { display: none; }
   /* A single-block card: content 10px from the sides like Mushroom, 12px top and bottom for air.
-     The whole card glows red – it is only here because the appliance needs you. */
-  ha-card { padding: 12px 10px; container-type: inline-size;
+     Mushroom measures those 10px from the card's outer edge (its content overlaps the border), so
+     the border width comes off the padding: glyph and message then line up with a Mushroom card on
+     a bordered view and a borderless one alike (measured). The whole card glows red – it is only
+     here because the appliance needs you. */
+  ha-card { padding: 12px calc(10px - var(--ha-card-border-width, 1px)); container-type: inline-size;
     background: color-mix(in srgb, ${C.red} 10%, var(--ha-card-background, var(--card-background-color, #fff))); }
   /* One centre line: glyph, text block and pill. */
   .wrap { display: flex; align-items: center; gap: 10px; }
