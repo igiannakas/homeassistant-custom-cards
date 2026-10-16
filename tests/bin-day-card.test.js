@@ -34,6 +34,7 @@ function states(over = {}) {
   return {
     "calendar.bin_collections": st("off", { message: "Food", all_day: true, start_time: "2026-10-21 00:00:00", friendly_name: "Bin collections" }),
     "input_datetime.bins_tonight_alert_from": st("18:00:00", { has_date: false, has_time: true, hour: 18, minute: 0, second: 0, timestamp: 64800, friendly_name: "Bins tonight alert from" }),
+    "input_datetime.bins_today_alert_from": st("07:00:00", { has_date: false, has_time: true, hour: 7, minute: 0, second: 0, timestamp: 25200, friendly_name: "Bins today alert from" }),
     "input_datetime.bins_tonight_alert_done_for": st("2026-10-16", { has_date: true, has_time: false, year: 2026, month: 10, day: 16, friendly_name: "Bins tonight alert done for" }),
     "input_datetime.bins_today_alert_done_for": st("2026-10-16", { has_date: true, has_time: false, year: 2026, month: 10, day: 16, friendly_name: "Bins today alert done for" }),
     "time.dehumidifier_off": st("17:30:00", { friendly_name: "Off at" }),
@@ -69,6 +70,7 @@ function hass(over = {}) {
 const LIVE_CFG = {
   calendar: "calendar.bin_collections",
   tonight_from: "input_datetime.bins_tonight_alert_from",
+  today_from: "input_datetime.bins_today_alert_from",
   tonight_done: "input_datetime.bins_tonight_alert_done_for",
   today_done: "input_datetime.bins_today_alert_done_for",
   bins: [
@@ -125,7 +127,7 @@ const row = (card, k) => rowView(card.shadowRoot.querySelector(`.wrap.${k}`));
   assert.throws(() => new Card().setConfig({ calendar: "calendar.x", bins: [{ icon: "mdi:leaf" }] }), /match/);
   assert.throws(() => new Card().setConfig({ calendar: "calendar.x", bins: "Food" }), /match/);
   const form = JSON.stringify(Card.getConfigForm().schema);
-  for (const k of ["calendar", "tonight_from", "tonight_done", "today_done", "today_only", "bins", "tonight_title", "today_title", "icon"])
+  for (const k of ["calendar", "tonight_from", "today_from", "tonight_done", "today_done", "today_only", "bins", "tonight_title", "morning_title", "today_title", "icon"])
     assert(form.includes(`"name":"${k}"`), `editor field ${k}`);
   assert.strictEqual(Card.getStubConfig({ states: states() }).calendar, "calendar.bin_collections", "stub picks the bins calendar");
 
@@ -184,17 +186,36 @@ const row = (card, k) => rowView(card.shadowRoot.querySelector(`.wrap.${k}`));
   at(card, "2026-10-20T18:01:00+01:00", hass(doneTonight));
   eq([card.hidden, shown(card)], [true, []], "done for tonight: hidden");
 
-  // 5. Independent: Wednesday is collection day – its own alert shows although tonight's was done.
-  at(card, "2026-10-21T00:00:00+01:00", hass(doneTonight));
+  // 5. Without a Done the evening alert carries on through the night – "Take the bins out now"
+  //    after midnight – until the collection-day alert takes over at 07:00 (the lorry comes 07–09);
+  //    never both. Done after midnight is the same Done: the collection's date in the evening helper.
+  at(card, "2026-10-21T00:00:00+01:00");
   await tick(5);
-  eq(shown(card), ["today"], "collection day after midnight");
+  eq([shown(card), row(card, "tonight").title, row(card, "tonight").bins], [["tonight"], "Take the bins out now", ["Food", "Refuse"]], "after midnight");
+  at(card, "2026-10-21T06:59:00+01:00");
+  eq(shown(card), ["tonight"], "06:59: still take them out");
+  at(card, "2026-10-21T07:00:00+01:00");
+  eq(shown(card), ["today"], "07:00: the collection-day alert takes over");
+  at(card, "2026-10-21T05:00:00+01:00");
+  calls.length = 0;
+  card.shadowRoot.querySelector(".wrap.tonight .pill").click();
+  await tick();
+  eq(calls, [["input_datetime", "set_datetime", { entity_id: "input_datetime.bins_tonight_alert_done_for", date: "2026-10-21" }, false]], "the evening helper, the collection's date");
+
+  //    Independent: with tonight's alert done, nothing until 07:00, then the collection-day alert.
+  at(card, "2026-10-21T05:01:00+01:00", hass(doneTonight));
+  assert.strictEqual(card.hidden, true, "done: hidden through the night");
+  at(card, "2026-10-21T06:59:00+01:00", hass(doneTonight));
+  assert.strictEqual(card.hidden, true, "06:59: not yet");
+  at(card, "2026-10-21T07:00:00+01:00", hass(doneTonight));
+  eq(shown(card), ["today"], "07:00: collection day");
   eq(row(card, "today"), {
-    title: "Bins collected today", bins: ["Food", "Refuse"], icons: ["mdi:food-apple", "mdi:trash-can"],
+    title: "Bins to be collected today", bins: ["Food", "Refuse"], icons: ["mdi:food-apple", "mdi:trash-can"],
     colors: ["color:var(--green-color, #4caf50)", "color:var(--brown-color, #795548)"],
     sc: "Food · Refuse", pill: "Done", disabled: "false",
   }, "today: Food and Refuse, Done");
   at(card, "2026-10-21T23:59:00+01:00", hass(doneTonight));
-  eq(shown(card), ["today"], "all day");
+  eq(shown(card), ["today"], "until midnight");
 
   // 6. Done on today writes only the day helper.
   calls.length = 0;
@@ -238,10 +259,26 @@ const row = (card, k) => rowView(card.shadowRoot.querySelector(`.wrap.${k}`));
   assert.strictEqual(card.hidden, true, "time entity: 17:30 not yet");
   at(card, "2026-10-20T17:30:00+01:00");
   eq(shown(card), ["tonight"], "time entity: 17:30");
+  //    The collection-day time works the same way; until it, the evening alert stays up.
+  card.setConfig({ ...LIVE_CFG, today_from: "08:30" });
+  at(card, "2026-10-21T08:29:00+01:00");
+  eq(shown(card), ["tonight"], "08:29: still take them out");
+  at(card, "2026-10-21T08:30:00+01:00");
+  eq(shown(card), ["today"], "literal 08:30");
+  card.setConfig(LIVE_CFG);
+  at(card, "2026-10-21T06:59:00+01:00", hass({ "input_datetime.bins_today_alert_from": st("unknown") }));
+  eq(shown(card), ["tonight"], "unknown helper: 07:00 (06:59)");
+  at(card, "2026-10-21T07:00:00+01:00", hass({ "input_datetime.bins_today_alert_from": st("unknown") }));
+  eq(shown(card), ["today"], "unknown helper: 07:00");
+  card.setConfig({ ...LIVE_CFG, morning_title: "Bins out, quick" });
+  at(card, "2026-10-21T06:00:00+01:00");
+  eq(row(card, "tonight").title, "Bins out, quick", "own after-midnight title");
   //    Only on collection day: no evening alert at all.
   card.setConfig({ ...LIVE_CFG, today_only: true });
   at(card, "2026-10-20T21:00:00+01:00");
   assert.strictEqual(card.hidden, true, "today_only: no evening alert");
+  at(card, "2026-10-21T05:00:00+01:00");
+  assert.strictEqual(card.hidden, true, "today_only: nor after midnight");
   at(card, "2026-10-21T07:00:00+01:00");
   eq(shown(card), ["today"], "today_only: collection day");
   card.setConfig(LIVE_CFG);
@@ -294,7 +331,7 @@ const row = (card, k) => rowView(card.shadowRoot.querySelector(`.wrap.${k}`));
   at(card, "2026-11-04T00:01:00+00:00", fixed);
   await tick(5);
   assert.strictEqual(reads.length, n2 + 4, "a new day: read");
-  eq(shown(card), ["today"], "collection day");
+  eq([shown(card), row(card, "tonight").title], [["tonight"], "Take the bins out now"], "after midnight");
   //    The minute timer re-renders on its own (the evening time passes with no hass update).
   assert(card._timer != null, "a timer runs while connected");
   card.remove();
@@ -311,7 +348,7 @@ const row = (card, k) => rowView(card.shadowRoot.querySelector(`.wrap.${k}`));
   await tick(5);
   eq(shown(plain), ["today"]);
   eq(row(plain, "today"), {
-    title: "Bins collected today",
+    title: "Bins to be collected today",
     bins: ["Food waste", "Glass recycling", "Garden waste", "Bulky <b>items</b>", "Paper & card", "General waste"],
     icons: ["mdi:food-apple", "mdi:bottle-wine", "mdi:leaf", "mdi:trash-can-outline", "mdi:newspaper-variant-outline", "mdi:trash-can"],
     colors: ["color:var(--green-color, #4caf50)", "color:var(--cyan-color, #00bcd4)", "color:var(--green-color, #4caf50)",
@@ -335,7 +372,9 @@ const row = (card, k) => rowView(card.shadowRoot.querySelector(`.wrap.${k}`));
   EVENTS = [{ start: { dateTime: "2026-10-21T06:00:00+01:00" }, end: { dateTime: "2026-10-21T07:00:00+01:00" }, summary: "Food" }];
   const tzc = mount(LIVE_CFG, hass(), T("2026-10-20T23:30:00Z"));
   await tick(5);
-  eq(shown(tzc), ["today"], "London day, timed event");
+  eq([shown(tzc), row(tzc, "tonight").title], [["tonight"], "Take the bins out now"], "00:30 on the 21st in London, timed event");
+  at(tzc, "2026-10-21T06:00:00Z"); // 07:00 in London
+  eq(shown(tzc), ["today"], "07:00 London");
 
   // 14. In the dashboard editor (preview): with nothing due it shows when it appears and the next
   //     collection; a missing calendar says so; Done is not offered.

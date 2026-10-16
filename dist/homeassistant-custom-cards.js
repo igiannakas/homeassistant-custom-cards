@@ -1527,7 +1527,7 @@ async function registerApplianceCard() {
 registerApplianceCard();
 })();
 
-/* ===== bin-day-card 1.0.1 ===== */
+/* ===== bin-day-card 1.1.0 ===== */
 (() => {
 /*
  * Bin day card – which bins go out, the evening before and on collection day, at the top of the home view.
@@ -1535,6 +1535,7 @@ registerApplianceCard();
  *   type: custom:bin-day-card
  *   calendar: calendar.bin_collections
  *   tonight_from: input_datetime.bins_tonight_alert_from
+ *   today_from: input_datetime.bins_today_alert_from
  *   tonight_done: input_datetime.bins_tonight_alert_done_for
  *   today_done: input_datetime.bins_today_alert_done_for
  *   bins:
@@ -1550,8 +1551,10 @@ registerApplianceCard();
  * each a row like the appliance alert card's:
  *
  * - "Take the bins out tonight" from `tonight_from` (default 18:00) on the evening before a
- *   collection. Red glyph: something to do now.
- * - "Bins collected today" all through collection day. Amber glyph: a heads-up.
+ *   collection, and after midnight "Take the bins out now", until the collection-day alert takes
+ *   over. Red glyph: something to do now.
+ * - "Bins to be collected today" from `today_from` (default 07:00, when the lorry starts) until the
+ *   end of collection day. Amber glyph: a heads-up.
  *
  * Under the title, the bins collected, each with its glyph in the bin's own colour (brown refuse,
  * black recycling…), then a Done pill. Done stores that collection's date in the alert's own date
@@ -1564,7 +1567,7 @@ registerApplianceCard();
  * card keeps the theme's own background.
  */
 
-const BDC_VERSION = "1.0.1";
+const BDC_VERSION = "1.1.0";
 const BDC_TAG = "bin-day-card";
 
 const C = {
@@ -1578,9 +1581,11 @@ const esc = (s) =>
 const LIVE = (s) => s && s !== "unavailable" && s !== "unknown";
 
 const DEFAULT_ICON = "mdi:trash-can";
-const DEFAULT_FROM = "18:00";
+const DEFAULT_FROM = "18:00"; //     the evening alert starts, the day before
+const DEFAULT_DAY_FROM = "07:00"; // the collection-day alert takes over
 const TONIGHT_TITLE = "Take the bins out tonight";
-const TODAY_TITLE = "Bins collected today";
+const MORNING_TITLE = "Take the bins out now"; // the same alert after midnight
+const TODAY_TITLE = "Bins to be collected today";
 const DONE_LABEL = "Done";
 const DAY = 864e5;
 const REFRESH = 30 * 60e3; // re-read the calendar every half hour,
@@ -1706,19 +1711,28 @@ function model(hass, cfg, events, now) {
   }
   const binsOn = (d) => resolveBins(byDay.get(d) || [], cfgBins);
   const doneFor = (entity) => (entity ? dayOf(hass.states[entity]) : null);
+  // A time from its helper or literal, else the default (also while the helper is unavailable).
+  const timeOf = (v, def) => minutesOf(v ?? def, hass) ?? minutesOf(def, hass);
+  const tonightFrom = timeOf(cfg.tonight_from, DEFAULT_FROM);
+  const todayFrom = timeOf(cfg.today_from, DEFAULT_DAY_FROM);
+  const todayBins = binsOn(today);
+  const tomorrowBins = binsOn(tomorrow);
   const rows = [];
 
-  // The evening before: from the helper's time (18:00 if it isn't set or can't be read).
+  // Take the bins out: from the evening before (18:00) through the night, until the collection-day
+  // alert takes over (07:00) – "tonight" before midnight, "now" after it. One Done covers both
+  // halves (it stores the collection's date). After midnight it is today's collection; the evening
+  // alert for tomorrow's (collections on two days in a row) waits until this one is over.
   if (!cfg.today_only) {
-    const from = minutesOf(cfg.tonight_from ?? DEFAULT_FROM, hass) ?? minutesOf(DEFAULT_FROM, hass);
-    const bins = binsOn(tomorrow);
-    if (bins.length && z.min >= from && doneFor(cfg.tonight_done) !== tomorrow)
-      rows.push({ key: "tonight", title: cfg.tonight_title || TONIGHT_TITLE, day: tomorrow, bins, done: cfg.tonight_done || null });
+    const done = cfg.tonight_done || null;
+    if (todayBins.length && z.min < todayFrom && doneFor(done) !== today)
+      rows.push({ key: "tonight", title: cfg.morning_title || MORNING_TITLE, day: today, bins: todayBins, done });
+    else if (tomorrowBins.length && z.min >= tonightFrom && doneFor(done) !== tomorrow)
+      rows.push({ key: "tonight", title: cfg.tonight_title || TONIGHT_TITLE, day: tomorrow, bins: tomorrowBins, done });
   }
-  // Collection day, all day.
-  const bins = binsOn(today);
-  if (bins.length && doneFor(cfg.today_done) !== today)
-    rows.push({ key: "today", title: cfg.today_title || TODAY_TITLE, day: today, bins, done: cfg.today_done || null });
+  // Collection day, from the time the lorry starts until midnight.
+  if (todayBins.length && z.min >= todayFrom && doneFor(cfg.today_done) !== today)
+    rows.push({ key: "today", title: cfg.today_title || TODAY_TITLE, day: today, bins: todayBins, done: cfg.today_done || null });
 
   // The next collection, for the editor preview.
   const nextDay = [...byDay.keys()].sort().find((d) => binsOn(d).length);
@@ -1890,6 +1904,7 @@ class BinDayCard extends HTMLElement {
         { name: "calendar", required: true, selector: { entity: { domain: "calendar" } } },
         { type: "grid", name: "", schema: [
           { name: "tonight_from", selector: { entity: { domain: ["input_datetime", "time"] } } },
+          { name: "today_from", selector: { entity: { domain: ["input_datetime", "time"] } } },
           { name: "tonight_done", selector: { entity: { domain: DONE_DOMAIN } } },
           { name: "today_done", selector: { entity: { domain: DONE_DOMAIN } } },
           { name: "today_only", selector: { boolean: {} } },
@@ -1907,6 +1922,7 @@ class BinDayCard extends HTMLElement {
         } } },
         { type: "grid", name: "", schema: [
           { name: "tonight_title", selector: { text: {} } },
+          { name: "morning_title", selector: { text: {} } },
           { name: "today_title", selector: { text: {} } },
           { name: "icon", selector: { icon: {} } },
         ] },
@@ -1915,11 +1931,13 @@ class BinDayCard extends HTMLElement {
         ({
           calendar: "Collections calendar",
           tonight_from: "Evening alert from",
+          today_from: "Collection-day alert from",
           tonight_done: "Done helper – evening alert",
           today_done: "Done helper – collection day",
           today_only: "Only on collection day",
           bins: "Bins",
           tonight_title: "Evening title",
+          morning_title: "After-midnight title",
           today_title: "Collection day title",
           icon: "Icon",
         })[s.name] ?? s.name,
@@ -1927,10 +1945,12 @@ class BinDayCard extends HTMLElement {
         ({
           calendar: "One all-day event per bin, e.g. from Waste Collection Schedule.",
           tonight_from: `A time helper; ${DEFAULT_FROM} without one.`,
+          today_from: `A time helper; ${DEFAULT_DAY_FROM} without one. Until then the evening alert stays up.`,
           tonight_done: "A date helper. Done stores the collection's date in it. Without one there is no Done.",
           today_done: "A date helper of its own, so Done on one alert doesn't hide the other.",
           bins: "How each collection shows: the text its calendar event contains, and the bin's name, icon and colour.",
           tonight_title: `Default: "${TONIGHT_TITLE}".`,
+          morning_title: `The evening alert after midnight. Default: "${MORNING_TITLE}".`,
           today_title: `Default: "${TODAY_TITLE}".`,
         })[s.name],
     };

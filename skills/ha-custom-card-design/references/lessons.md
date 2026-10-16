@@ -120,7 +120,13 @@ Most of them generalise to any dashboard.
 ## Bin day (Oct 2026)
 
 - An alert's title says what to do, in the user's words: "Take the bins out tonight", not "Bins out
-  tonight". When there is nothing to do, it states the fact: "Bins collected today".
+  tonight". When there is nothing to do, it states the fact, also in the user's words: "Bins to be
+  collected today" (not "Bins collected today", and not "Take the bins back in").
+- Strength follows the action: red for "do it now" (take the bins out), amber for a lighter
+  heads-up on the day. Green would read as "nothing to do".
+- Time each alert to the real event, from a helper: the collection-day alert starts when the
+  lorry starts (07:00). Until then the take-out alert stays up, as "Take the bins out now" after
+  midnight. There is no gap at night and no overlap for one collection.
 - Two alerts about the same event (the evening before and the day itself) are dismissed
   independently. Each has its own Done helper, and the card refuses one shared helper.
 - Shared dismissal goes in a helper keyed to the event (the collection's date), so it holds on

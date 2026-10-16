@@ -1,8 +1,8 @@
 # Bin day card
 
 `custom:bin-day-card` – which bins go out, at the top of the home view: **Take the bins out
-tonight** the evening before a collection, **Bins collected today** on the day, each bin with its
-glyph in the bin's own colour, and a **Done** button on each alert.
+tonight** the evening before a collection, **Bins to be collected today** on the day, each bin with
+its glyph in the bin's own colour, and a **Done** button on each alert.
 
 <p>
   <img src="../../docs/screenshots/bin-day-card.png" alt="bin-day-card: the evening alert and the collection-day alert" width="384">
@@ -11,13 +11,17 @@ glyph in the bin's own colour, and a **Done** button on each alert.
 *Example dates: the evening before a refuse week, and a recycling week's collection day.*
 
 - **Only there while it matters.** The card shows from the evening before a collection (18:00 by
-  default, read from a time helper) until the end of collection day. The rest of the week it hides
+  default) until the end of collection day. Both times come from time helpers. The rest of the week it hides
   itself the way Home Assistant's conditional cards do, so the section closes up around it. In the
   dashboard editor it stays visible with the next collection ("Next Wed 21 Oct · Food · Refuse").
 - **Two alerts, one row each**, like the appliance alert card: the glyph, the title, the bins under
   it, then Done.
-  - *Take the bins out tonight*: red glyph, something to do now.
-  - *Bins collected today*: amber glyph, a heads-up for the day.
+  - *Take the bins out tonight*: red glyph, something to do now. It starts at 18:00 the evening
+    before. If nobody has tapped Done by midnight, it carries on as *Take the bins out now* until the
+    collection-day alert takes over.
+  - *Bins to be collected today*: amber glyph, a heads-up for the day. It starts when the lorry
+    starts (07:00 by default) and lasts until midnight. The two alerts never show for the same
+    collection at once.
 - **The bins** come from a calendar, one all-day event per bin. Each one shows its glyph in the
   bin's real colour (brown refuse, black recycling, green caddy and garden bin), then its name. Black
   follows the theme's text colour, so a black bin still shows on a dark theme. A collection the
@@ -36,6 +40,7 @@ glyph in the bin's own colour, and a **Done** button on each alert.
 type: custom:bin-day-card
 calendar: calendar.bin_collections
 tonight_from: input_datetime.bins_tonight_alert_from
+today_from: input_datetime.bins_today_alert_from
 tonight_done: input_datetime.bins_tonight_alert_done_for
 today_done: input_datetime.bins_today_alert_done_for
 bins:
@@ -57,12 +62,14 @@ bins:
 |---|---|
 | `calendar` | The collections calendar: one all-day event per bin. Required. |
 | `tonight_from` | When the evening alert starts: a time helper (`input_datetime` with a time, or a `time` entity), or a time such as `"18:00"`. Default 18:00, which is also used while the helper is unavailable. |
-| `tonight_done` | A date helper (`input_datetime` with a date) for the evening alert's Done. Without it, the alert has no Done. |
+| `today_from` | When the collection-day alert takes over from the evening one: a time helper or a time, like `tonight_from`. Default 07:00, which is also used while the helper is unavailable. |
+| `tonight_done` | A date helper (`input_datetime` with a date) for the evening alert's Done, before and after midnight. Without it, the alert has no Done. |
 | `today_done` | A date helper of its own for the collection-day alert's Done. It must be a different helper from `tonight_done`. |
-| `today_only` | `true` for no evening alert, only the collection-day one. |
+| `today_only` | `true` for no evening alert (and nothing after midnight), only the collection-day one. |
 | `bins` | How each collection shows, in this order. `match`: text the calendar event contains (any case; the first bin that matches wins). `name`: what to call it (default: the event's name). `icon`. `color`: a Home Assistant colour name (`brown`, `green`, `black`…) or a hex colour. |
 | `tonight_title` | Default "Take the bins out tonight". |
-| `today_title` | Default "Bins collected today". |
+| `morning_title` | The evening alert after midnight. Default "Take the bins out now". |
+| `today_title` | Default "Bins to be collected today". |
 | `icon` | The alert glyph. Default `mdi:trash-can`. |
 
 Without `bins`, names come straight from the calendar, and the glyphs and colours are guessed from
@@ -84,9 +91,11 @@ reaches it as soon as the calendar has it.
 - **By hand:** a **Local Calendar** with one repeating all-day event per bin (e.g. "Refuse", every
   2 weeks on Wednesday). Move a holiday collection by editing that one occurrence.
 
-The three helpers (**Settings → Devices & services → Helpers → Date and/or time**):
+The four helpers (**Settings → Devices & services → Helpers → Date and/or time**):
 
 - `input_datetime.bins_tonight_alert_from`: time only, set to when the evening alert should start.
+- `input_datetime.bins_today_alert_from`: time only, set to when the collection-day alert should
+  take over (when the lorry starts).
 - `input_datetime.bins_tonight_alert_done_for`: date only, written by Done on the evening alert.
 - `input_datetime.bins_today_alert_done_for`: date only, written by Done on the collection-day alert.
 
