@@ -3730,7 +3730,7 @@ async function registerEnergySummaryCard() {
 registerEnergySummaryCard();
 })();
 
-/* ===== heating-schedule-card 1.0.0 ===== */
+/* ===== heating-schedule-card 1.0.1 ===== */
 (() => {
 /*
  * Heating schedule card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3765,7 +3765,7 @@ registerEnergySummaryCard();
  * See cards/heating-schedule-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.0.0";
+const HSC_VERSION = "1.0.1";
 const HSC_TAG = "heating-schedule-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -5015,7 +5015,10 @@ class HeatingScheduleCard extends HTMLElement {
       sh.ro.observe(ebar);
     }
     this._paintSheet();
-    root.querySelector(".cancel").focus();
+    // Focus for the keyboard, without scrolling: on a phone the sheet is taller than the screen,
+    // and scrolling Cancel into view would open it at the bottom with the room's name hidden.
+    root.querySelector(".cancel").focus({ preventScroll: true });
+    root.querySelector(".dialog").scrollTop = 0;
   }
 
   _closeSheet() {

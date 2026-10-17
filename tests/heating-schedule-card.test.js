@@ -273,6 +273,8 @@ function makeHass(S, sched, calls, opts = {}) {
   let sr = sheet.shadowRoot;
   assert.strictEqual(sr.querySelector(".title").textContent, "Living Room");
   assert.strictEqual(sr.querySelector(".sub").textContent, "Every day");
+  assert.strictEqual(sr.querySelector(".dialog").scrollTop, 0, "opens at the top, with the room's name");
+  assert.strictEqual(sr.activeElement, sr.querySelector(".cancel"), "keyboard focus on Cancel");
   const times = () => [...sr.querySelectorAll(".blk")].map((b) => `${b.querySelector(".t").textContent}${b.querySelector(".to").textContent}=${b.querySelector('[aria-pressed="true"]').textContent}`);
   eq(times(), ["00:00– 06:00=Night", "06:00– 21:30=Day", "21:30– 00:00=Night"]);
   const chips = () => [...sr.querySelectorAll(".chip")].map((c) => `${c.textContent}${c.getAttribute("aria-pressed") === "true" ? "*" : ""}`);
