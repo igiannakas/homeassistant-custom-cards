@@ -186,6 +186,8 @@ const cfg = {
   // Paused: no buttons either.
   card.hass = hass(states({ ...printing(), ...Object.fromEntries([p("current_print_state", "paused")]) }));
   assert.strictEqual(nm(r), "Voron · Paused");
+  // A paused print waits for you: red, like an error.
+  assert.strictEqual(q(".shape ha-icon").style.color, "var(--red-color, #f44336)", "paused icon red");
   eq(acts(), []);
 
   // Complete: job stays visible as "Complete" (the state word, not "Done"), idle buttons back.

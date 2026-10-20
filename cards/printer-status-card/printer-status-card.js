@@ -19,12 +19,11 @@
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.8.0";
+const PSC_VERSION = "1.8.1";
 const PSC_TAG = "printer-status-card";
 
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
-  amber: "var(--amber-color, #ffc107)",
   green: "var(--green-color, #4caf50)",
   red: "var(--red-color, #f44336)",
   orange: "var(--orange-color, #ff9800)",
@@ -69,7 +68,8 @@ const STATES = {
   // A printer at work is an appliance that is on: orange, like the washing machine washing or the
   // purifier running on the same dashboard (the user's choice, 20 Oct 2026; blue until 1.7).
   printing: { word: "Printing", color: C.orange, icon: "mdi:printer-3d-nozzle" },
-  paused: { word: "Paused", color: C.amber, icon: "mdi:pause-circle-outline" },
+  // A paused print waits for you: red, like an error (the user's choice, 20 Oct 2026; amber until 1.8.0).
+  paused: { word: "Paused", color: C.red, icon: "mdi:pause-circle-outline" },
   complete: { word: "Complete", color: C.green, icon: "mdi:check-circle-outline" },
   cancelled: { word: "Cancelled", color: C.grey, icon: "mdi:close-circle-outline" },
   error: { word: "Error", color: C.red, icon: "mdi:alert-circle-outline" },

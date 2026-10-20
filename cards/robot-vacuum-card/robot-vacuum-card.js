@@ -22,12 +22,11 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.8.0";
+const RVC_VERSION = "2.9.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
-  blue: "var(--blue-color, #2196f3)",
   teal: "var(--teal-color, #009688)",
   amber: "var(--amber-color, #ffc107)",
   green: "var(--green-color, #4caf50)",
@@ -216,9 +215,12 @@ function roomIcon(hass, cfg, name) {
 
 const STATES = {
   docked: { word: "Docked", color: C.grey, icon: "mdi:robot-vacuum" },
-  cleaning: { word: "Cleaning", color: C.blue, icon: "mdi:robot-vacuum" },
-  returning: { word: "Returning", color: C.blue, icon: "mdi:robot-vacuum" },
-  paused: { word: "Paused", color: C.amber, icon: "mdi:robot-vacuum" },
+  // A robot at work is an appliance that is on: orange, like the washing machine washing and the
+  // printer printing; paused it waits for you, red like an error (the user's choice, 20 Oct 2026;
+  // blue and amber until 2.8).
+  cleaning: { word: "Cleaning", color: C.orange, icon: "mdi:robot-vacuum" },
+  returning: { word: "Returning", color: C.orange, icon: "mdi:robot-vacuum" },
+  paused: { word: "Paused", color: C.red, icon: "mdi:robot-vacuum" },
   idle: { word: "Idle", color: C.grey, icon: "mdi:robot-vacuum" },
   error: { word: "Error", color: C.red, icon: "mdi:robot-vacuum-alert" },
   needs: { word: "Needs you", color: C.red, icon: "mdi:robot-vacuum-alert" },
@@ -621,7 +623,7 @@ const CSS = `
   .chip ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; flex: none; }
   .chip.sel { background: ${tint(C.teal, 18)}; color: ${tx(C.teal)}; }
   .chip.sel ha-icon { color: ${C.teal}; }
-  .chip.now { box-shadow: inset 0 0 0 1.5px ${tint(C.blue, 60)}; }
+  .chip.now { box-shadow: inset 0 0 0 1.5px ${tint(C.orange, 60)}; }
   .chip[aria-disabled="true"] { cursor: default; }
   .chip[disabled] { opacity: .45; cursor: default; }
   /* The card's main buttons (Clean, Auto clean, Pause, Dock…) are call-to-action pills: 44px,
@@ -630,13 +632,14 @@ const CSS = `
   .acts { display: flex; flex-wrap: wrap; gap: 8px; }
   .acts .pill { flex: 1 1 0; min-width: max-content; height: 44px; border-radius: 22px; padding: 0 10px; gap: 8px; font-size: 14px; }
   .acts .pill ha-icon { --mdc-icon-size: 20px; }
-  /* The one that sets the robot going (Clean / Resume) is filled blue: the card's main action at
-     a glance, and unlike a state tint (Auto clean on, a running dock job) it never means "on". */
-  .acts .pill.go { background: ${C.blue}; color: var(--text-primary-color, #fff); }
+  /* The one that sets the robot going (Clean / Resume) is filled orange – the colour of the robot at
+     work: the card's main action at a glance, and unlike a state tint (Auto clean on, a running dock
+     job) it never means "on". */
+  .acts .pill.go { background: ${C.orange}; color: var(--text-primary-color, #fff); }
   .acts .pill.go ha-icon { color: var(--text-primary-color, #fff); }
   /* The dock's jobs are secondary: the card's footer – a full-width rule, then three quiet text
      buttons (grey 12px, no fill) split by short dividers. There while docked, never competing
-     with Clean. The one that runs is tinted blue. */
+     with Clean. The one that runs is tinted orange, like the robot at work. */
   .jobs { display: flex; flex-wrap: wrap; margin: 0 -10px -10px; padding: 4px 6px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
   .jobs:empty { display: none; }
   .jobs button { all: unset; box-sizing: border-box; position: relative; flex: 1 1 0; min-width: max-content; display: inline-flex; align-items: center; justify-content: center;
@@ -645,15 +648,13 @@ const CSS = `
   .jobs button + button::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 1px; background: var(--divider-color, rgba(0,0,0,.12)); }
   .jobs button.run::before, .jobs button.run + button::before { display: none; }
   .jobs ha-icon { --mdc-icon-size: 16px; color: ${C.grey}; }
-  .jobs button.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
-  .jobs button.run ha-icon { color: ${C.blue}; }
+  .jobs button.run { background: ${tint(C.orange, 18)}; color: ${tx(C.orange)}; }
+  .jobs button.run ha-icon { color: ${C.orange}; }
   .jobs button[disabled] { opacity: .45; cursor: default; }
   .jobs button:active { background: rgba(var(--rgb-primary-text-color, 33,33,33), .06); }
   @media (hover: hover) { .jobs button:not([disabled]):hover { background: rgba(var(--rgb-primary-text-color, 33,33,33), .04); } }
   .jobs button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
   .acts:empty { display: none; }
-  .pill.run { background: ${tint(C.blue, 18)}; color: ${tx(C.blue)}; }
-  .pill.run ha-icon { color: ${C.blue}; }
   /* Mode panel: label row, tabs, then a label + value line over each selector (as in the app). */
   .label { display: flex; align-items: center; gap: 10px; min-height: 40px; }
   .slot { flex: 0 0 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
@@ -1120,11 +1121,11 @@ class RobotVacuumCard extends HTMLElement {
     // Buttons for the state, rebuilt only when the set changes (taps are never lost).
     const n = this._sel.size;
     const acts = [];
-    if (m.key === "cleaning") acts.push(["pause", "Pause", "mdi:pause", C.amber], ["dock", "Dock", "mdi:home-import-outline", C.grey]);
-    else if (m.key === "paused") acts.push(["resume", "Resume", "mdi:play", C.blue], ["dock", "Dock", "mdi:home-import-outline", C.grey]);
-    else if (m.key === "returning") acts.push(["pause", "Pause", "mdi:pause", C.amber]);
+    if (m.key === "cleaning") acts.push(["pause", "Pause", "mdi:pause", C.red], ["dock", "Dock", "mdi:home-import-outline", C.grey]);
+    else if (m.key === "paused") acts.push(["resume", "Resume", "mdi:play", C.orange], ["dock", "Dock", "mdi:home-import-outline", C.grey]);
+    else if (m.key === "returning") acts.push(["pause", "Pause", "mdi:pause", C.red]);
     else {
-      acts.push(["clean", n ? `Clean ${n} room${n > 1 ? "s" : ""}` : "Clean entire floor", "mdi:play", C.blue]);
+      acts.push(["clean", n ? `Clean ${n} room${n > 1 ? "s" : ""}` : "Clean entire floor", "mdi:play", C.orange]);
       // One control per job: Dock only while the robot is away from the dock.
       if (hass.states[this._config.entity]?.state !== "docked") acts.push(["dock", "Dock", "mdi:home-import-outline", C.grey]);
     }
@@ -1208,8 +1209,8 @@ class RobotVacuumCard extends HTMLElement {
     const on = this._hass.states[id]?.state === "on";
     const c = DOCK_CONFIRM[k]?.[on ? "stop" : "start"];
     const icon = JOBS.find((j) => j[0] === k)?.[1] || "mdi:robot-vacuum";
-    // The dialog takes the colour of the button you tapped (a job glows blue while it runs).
-    if (c && !(await this._ask(c.title, on ? "mdi:stop-circle-outline" : icon, C.blue, c.text, c.label))) return;
+    // The dialog takes the colour of the button you tapped (a job glows orange while it runs).
+    if (c && !(await this._ask(c.title, on ? "mdi:stop-circle-outline" : icon, C.orange, c.text, c.label))) return;
     return this._call("switch", on ? "turn_off" : "turn_on", { entity_id: id }, `${on ? "stop" : "start"} the dock`);
   }
 
@@ -1517,7 +1518,7 @@ class RobotVacuumCard extends HTMLElement {
       const times = twice ? ", twice" : "";
       const ok = await this._ask(
         segs.length ? `Clean ${segs.length} room${segs.length > 1 ? "s" : ""}` : "Clean entire floor",
-        "mdi:play", C.blue,
+        "mdi:play", C.orange,
         segs.length ? `${list}${times}${how ? `, ${how}` : ""}.` : `Every room${m.mapName ? ` on the ${m.mapName}` : ""}${times}${how ? `, ${how}` : ""}.`,
         "Clean",
       );
@@ -1530,13 +1531,13 @@ class RobotVacuumCard extends HTMLElement {
     }
     if (k === "pause") return this._call("vacuum", "pause", { entity_id: id }, "pause the robot");
     if (k === "resume") {
-      if (await this._ask("Resume", "mdi:play", C.blue, "The robot carries on with the paused clean.", "Resume")) this._call("vacuum", "start", { entity_id: id }, "resume the clean");
+      if (await this._ask("Resume", "mdi:play", C.orange, "The robot carries on with the paused clean.", "Resume")) this._call("vacuum", "start", { entity_id: id }, "resume the clean");
       return;
     }
     if (k === "dock") {
       const ends = ["cleaning", "paused"].includes(m.key);
-      // Blue like every robot action; the warning is in the words (orange means lights / heat).
-      const ok = await this._ask("Return to the dock", "mdi:home-import-outline", C.blue,
+      // Orange like every action that sets the robot moving; the warning is in the words.
+      const ok = await this._ask("Return to the dock", "mdi:home-import-outline", C.orange,
         ends ? "This ends the current clean. The robot goes back to the dock." : "The robot goes back to the dock.", "Dock");
       if (ok) this._call("vacuum", "return_to_base", { entity_id: id }, "send the robot to the dock");
       return;

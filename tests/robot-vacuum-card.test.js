@@ -136,10 +136,13 @@ const cfg = {
   const all = (s) => [...r.querySelectorAll(s)];
   const acts = () => all(".acts .pill").map((b) => b.textContent.trim());
   const text = (s) => q(s).textContent.replace(/\s+/g, " ").trim();
+  const styles = () => all("style").map((x) => x.textContent).join("\n");
   const dlg = () => document.querySelector("rvc-confirm-dialog");
-  const yes = async (title) => {
+  // A dialog takes the colour of the button that opened it; `color` checks it when given.
+  const yes = async (title, color) => {
     await tick();
     assert(dlg(), `${title} asks first`);
+    if (color) assert(dlg().shadowRoot.querySelector(".confirm").getAttribute("style").includes(color), `${title}: ${color}`);
     if (title) assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, title);
     const msg = dlg().shadowRoot.querySelector(".text").textContent;
     assert.strictEqual(load.assertCancel(dlg().shadowRoot, `${title || "confirm"} dialog`), dlg().shadowRoot.querySelector(".cancel"), "Cancel is the way out");
@@ -221,6 +224,8 @@ const cfg = {
   eq(jobs(), ["Empty", "Wash mop", "Dry mop"]);
   assert.strictEqual(q(".jobs").style.getPropertyValue("--n"), "3");
   assert(q('.acts .pill[data-k="clean"]').classList.contains("go") && !q('.acts .pill[data-k="auto"]').classList.contains("go"), "Clean is the filled main action");
+  assert(/\.acts \.pill\.go \{ background: var\(--orange-color, #ff9800\);/.test(styles()), "filled orange, the robot at work");
+  assert(!/blue-color/.test(styles()), "no blue left on the robot card");
   assert(all(".jobs button").every((b) => !b.classList.contains("pill")) && !q(".jobs").classList.contains("acts"), "dock jobs are a tile of their own, not more action pills");
   {
     const n1 = calls.length;
@@ -232,13 +237,14 @@ const cfg = {
     assert(!dlg() && calls.length === n1, "Cancel: nothing happens");
     for (const [i, title, id] of [[0, "Empty the bin", "dust_emptying"], [1, "Wash the mop", "mop_washing"], [2, "Dry the mop", "mop_drying"]]) {
       all(".jobs button")[i].click();
-      await yes(title);
+      await yes(title, "--orange-color");
       eq(calls.pop(), ["switch", "turn_on", { entity_id: `switch.vacuum_cleaner_dock_${id}` }]);
     }
     card.hass = full(states({ "switch.vacuum_cleaner_dock_mop_drying": st("on") }));
     eq(jobs(), ["Empty", "Wash mop", "Drying*"]);
+    assert(/\.jobs button\.run \{ background: color-mix\(in srgb, var\(--orange-color, #ff9800\) 18%, transparent\);/.test(styles()), "a running dock job glows orange");
     all(".jobs button")[2].click();
-    await yes("Stop drying");
+    await yes("Stop drying", "--orange-color");
     eq(calls.pop(), ["switch", "turn_off", { entity_id: "switch.vacuum_cleaner_dock_mop_drying" }]);
     card.hass = full(states());
   }
@@ -523,6 +529,10 @@ const cfg = {
   card.hass = full(states(cleaning));
   assert.strictEqual(text(".nm"), "Vacuum cleaner · Cleaning");
   assert.strictEqual(text(".line"), "Cleaning Study");
+  // At work the robot is orange, like every appliance that is on; Pause leads to paused, so red.
+  assert.strictEqual(q(".shape ha-icon").style.color, "var(--orange-color, #ff9800)", "cleaning icon orange");
+  assert.strictEqual(q('[data-k="pause"] ha-icon').style.color, "var(--red-color, #f44336)", "Pause red");
+  assert(/\.chip\.now \{ box-shadow: inset 0 0 0 1\.5px color-mix\(in srgb, var\(--orange-color, #ff9800\) 60%/.test(styles()), "the room being cleaned in orange");
   assert(!q(".jt").hidden);
   assert.strictEqual(text(".pct"), "45%18 min · 12.4 m²");
   eq(acts(), ["Pause", "Dock", "Auto clean"]);
@@ -571,6 +581,7 @@ const cfg = {
   card.hass = full(states({ ...cleaning, "vacuum.vacuum_cleaner": st("returning", { friendly_name: "Vacuum cleaner" }),
     "sensor.vacuum_cleaner_status": st("going_to_wash_the_mop") }));
   assert.strictEqual(text(".nm"), "Vacuum cleaner · Returning");
+  assert.strictEqual(q(".shape ha-icon").style.color, "var(--orange-color, #ff9800)", "returning icon orange");
   assert.strictEqual(text(".line"), "Going to wash the mop");
   // A dock job on its own (Wash mop, Empty) while docked: Docked, with what the dock is doing.
   card.hass = full(states({ "sensor.vacuum_cleaner_status": st("emptying_the_bin"), "switch.vacuum_cleaner_dock_dust_emptying": st("on") }));
@@ -580,9 +591,11 @@ const cfg = {
   // Paused: Resume + Dock.
   card.hass = full(states({ ...cleaning, "vacuum.vacuum_cleaner": st("paused", { friendly_name: "Vacuum cleaner" }) }));
   assert.strictEqual(text(".nm"), "Vacuum cleaner · Paused");
+  assert.strictEqual(q(".shape ha-icon").style.color, "var(--red-color, #f44336)", "paused icon red, like an error");
   eq(acts(), ["Resume", "Dock", "Auto clean"]);
+  assert(q('[data-k="resume"]').classList.contains("go"), "Resume is the filled main action");
   q('[data-k="resume"]').click();
-  await yes("Resume");
+  await yes("Resume", "--orange-color");
   eq(calls.pop(), ["vacuum", "start", { entity_id: "vacuum.vacuum_cleaner" }]);
 
   // Needs you: a full dirty tank says so, but never blocks a clean.

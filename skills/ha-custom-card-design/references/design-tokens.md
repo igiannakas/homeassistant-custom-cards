@@ -12,11 +12,11 @@ decorate it (decided 14 Oct 2026):
 | Colour | Means | Examples |
 |---|---|---|
 | Teal | **You can tap or pick this** – the accent for anything interactive that has no state colour of its own | The energy card's circle, a link pill's icon, the Cleaning mode tile, rooms picked for the next clean, current values in a sheet, a toggle that's on, Auto clean when away |
-| Blue | **Something running**, and the button that starts it | Cleaning / Returning, Clean + Resume (filled), a dock job while it runs, the room the robot is cleaning; cooling (literally cold) |
+| Blue | **Cold and water** – literal only (since 20 Oct 2026 no longer "running") | Cooling, a cooling fan running, clean water, rain |
 | Green | **Good, and someone home** (Home Assistant colours a person at home green) | Battery above 30%, VOC under 150, dry filament, a room or the house occupied, the Home pill |
-| Amber | **Early warning** – needs attention soon | Paused, a part due soon, battery ≤ 30%, VOC 150+, mop not attached |
-| Orange | **Lights, heat and power – and the step before red on a scale** | A lit room, heating, a plug / watts, the printer's power, an appliance that is on – a printer printing included, like the washing machine washing; Poor air, VOC 250+, wet filament, presence lost within the hour |
-| Red | **A call for attention** | An error, a tank to empty, a part due now, battery ≤ 15%, door open, alarm armed, house empty for over an hour, heating on while away |
+| Amber | **Early warning** – needs attention soon | A part due soon, battery ≤ 30%, VOC 150+, mop not attached |
+| Orange | **Lights, heat, power and a machine at work – and the step before red on a scale** | A lit room, heating, a plug / watts, an appliance that is on; a machine at work and the button that sets it going: washing, printing, the robot cleaning or returning, the room it is cleaning, a dock job running, Clean / Resume (filled); Poor air, VOC 250+, wet filament, presence lost within the hour |
+| Red | **A call for attention** | An error, a paused print or clean (it waits for you) and the Pause button, a tank to empty, a part due now, battery ≤ 15%, door open, alarm armed, house empty for over an hour, heating on while away |
 | Grey | **Off, idle or neutral** – and every purely decorative icon | Docked, Idle, a part that's fine, a header icon that isn't tappable and shows no state |
 
 - **Confirmations** take the colour of the control that opened it – its "on" colour, both ways
@@ -41,11 +41,11 @@ Use HA's theme variables with fallbacks, so dark mode and custom themes just wor
 const C = {
   grey:   "var(--grey-color, #9e9e9e)",   // off, idle, decorative
   teal:   "var(--teal-color, #009688)",   // you can tap / pick this
-  blue:   "var(--blue-color, #2196f3)",   // running, and the button that starts it
+  blue:   "var(--blue-color, #2196f3)",   // cold and water (literal)
   green:  "var(--green-color, #4caf50)",  // good, someone home
   amber:  "var(--amber-color, #ffc107)",  // early warning
-  orange: "var(--orange-color, #ff9800)", // lights, heat, power; the step before red
-  red:    "var(--red-color, #f44336)",    // a call for attention
+  orange: "var(--orange-color, #ff9800)", // lights, heat, power, a machine at work; the step before red
+  red:    "var(--red-color, #f44336)",    // a call for attention, a paused job
 };
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 // Readable coloured text – mix toward the text colour, never the raw colour on white.
@@ -125,7 +125,8 @@ Everything inherits `var(--ha-font-family-body, Roboto, sans-serif)`.
   `box-shadow: 0 1px 3px rgba(0,0,0,.15)`.
 - **Action buttons** (card-bottom actions) are primary pills: 36, radius 18, 13px / 600, 18px
   icon, or call-to-action pills (44) when they are the card's main job. Their icons take the
-  colour of what they control (orange for power, blue for start); see *Colours* for dialogs.
+  colour of the state they lead to (orange for power and for setting a machine going, red for
+  Pause, grey for Dock); see *Colours* for dialogs.
 - **Progress / power bar:** 4px (8px for a job progress bar), radius half the height,
   track `rgba(primary-text-rgb, .08)`.
 - **Switch (in sheets):** 44×26 track, 20px knob, coloured when on.
@@ -262,4 +263,6 @@ button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
 - Presence: someone here (green) → left within the hour (orange) → empty for longer (red on
   a house; grey "12 min ago" on a room).
 - Printer: off grey, ready grey, printing orange (an appliance that is on, as on the appliance cards;
-  the job bar follows), paused amber, complete green, error red.
+  the job bar follows), paused red, complete green, error red.
+- Robot vacuum: docked and idle grey, cleaning and returning orange (the room it cleans and a
+  running dock job too; Clean and Resume filled orange), paused, error and needs-you red, offline grey.

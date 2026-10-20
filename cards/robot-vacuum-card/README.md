@@ -26,8 +26,8 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
 
 ## The card
 
-- **Header**: the state in its colour (Docked, Cleaning, Returning, Paused, Idle, Error,
-  Needs you, Offline) and a line that says something useful: "Last clean Sat 10:00 ·
+- **Header**: the state in its colour (Docked and Idle grey, Cleaning and Returning orange like any
+  appliance at work, Paused, Error and Needs you red, Offline grey) and a line that says something useful: "Last clean Sat 10:00 ·
   22.6 m² · 28 min" when docked, "Drying the mop · 2 h 10 min left" while the dock dries
   it, "Cleaning Study" / "Washing the mop" / "Going to wash the mop" during a clean, and
   "Emptying the bin" while the dock works. A clean washing its mop at the dock – before it
@@ -63,7 +63,7 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
   "· ×2" for two passes) under a teal tune icon (teal = tap me), with a chevron – a taller tile, so it never
   reads as one more room. A tap opens the Cleaning mode sheet (below).
 - **Buttons** for the state – the card's main controls, so 44px pills, the one that sets the robot
-  going (Clean, Resume) filled blue: Clean entire floor (or Clean N rooms) when idle, Pause and Dock while
+  going (Clean, Resume) filled orange: Clean entire floor (or Clean N rooms) when idle, Pause and Dock while
   cleaning, Resume and Dock when paused, Pause while returning. Dock only shows when the
   robot is away from the dock. The buttons share the row evenly, but a longer label always
   gets the width it needs. Every button asks first except Pause; the clean's
@@ -77,7 +77,7 @@ a Cleaning mode tile that opens the mode laid out like the Roborock app, and the
   card's footer – under a full-width rule, quiet grey text buttons split by short dividers –
   the dock's own switches, handy after stopping a clean early with Dock, without competing
   with Clean.
-  The one that runs is tinted blue ("Drying"); each asks before it starts, and before it stops.
+  The one that runs is tinted orange ("Drying"); each asks before it starts, and before it stops.
 
 ## Cleaning mode (the sheet, or `layout: mode`)
 
