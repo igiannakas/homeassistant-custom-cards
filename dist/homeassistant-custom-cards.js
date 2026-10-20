@@ -2238,7 +2238,7 @@ async function registerBinDayCard() {
 registerBinDayCard();
 })();
 
-/* ===== climate-modes-card 1.4.3 ===== */
+/* ===== climate-modes-card 1.4.4 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2256,7 +2256,7 @@ registerBinDayCard();
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.4.3";
+const CMC_VERSION = "1.4.4";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -2312,6 +2312,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -2352,7 +2357,7 @@ function confirmDialog({ title, icon, color: col, text, confirmLabel }) {
         ${text ? `<div class="text">${esc(text)}</div>` : ""}
         <div class="buttons">
           <button class="confirm" style="background:${col}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
-          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+          <button class="cancel dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
         </div></div>`;
     const done = (ok) => {
       document.removeEventListener("keydown", onKey, true);
@@ -3730,7 +3735,7 @@ async function registerEnergySummaryCard() {
 registerEnergySummaryCard();
 })();
 
-/* ===== heating-schedule-card 1.0.1 ===== */
+/* ===== heating-schedule-card 1.0.2 ===== */
 (() => {
 /*
  * Heating schedule card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3765,7 +3770,7 @@ registerEnergySummaryCard();
  * See cards/heating-schedule-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.0.1";
+const HSC_VERSION = "1.0.2";
 const HSC_TAG = "heating-schedule-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -4298,6 +4303,11 @@ const SHEET_CSS = `
   .act.save { background: ${C.orange}; color: #fff; }
   .act.save .glyph { background: rgba(255,255,255,.2); }
   .act.save .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  .act.dismiss { background: ${NEUTRAL(0.28)}; color: var(--primary-text-color); }
+  .act.dismiss .glyph { background: ${NEUTRAL(0.14)}; }
+  .act.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   .act[aria-disabled="true"] { opacity: .6; cursor: default; }
   .step:active, .del:active, .add:active, .chip:active, .act:active { filter: brightness(.92); }
   .step:focus-visible, .del:focus-visible, .add:focus-visible, .chip:focus-visible, .act:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
@@ -4987,7 +4997,7 @@ class HeatingScheduleCard extends HTMLElement {
         <div class="sec rooms-sec"><div class="k">Rooms</div><div class="chips"></div><div class="hint rooms-hint"></div></div>
         <div class="sec"><div class="k">Days</div><div class="seg dm" role="group" aria-label="Days"></div><div class="hint days-hint"></div></div>
         <div class="note"></div><div class="err" role="alert"></div>
-        <div class="actions"><button class="act cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+        <div class="actions"><button class="act cancel dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
           <button class="act save"><span class="glyph"><ha-icon icon="mdi:check"></ha-icon></span>Save</button></div></div>`;
     const onKey = (e) => {
       if (e.key === "Escape") {
@@ -5301,7 +5311,7 @@ async function registerHeatingScheduleCard() {
 registerHeatingScheduleCard();
 })();
 
-/* ===== home-status-card 1.3.1 ===== */
+/* ===== home-status-card 1.3.2 ===== */
 (() => {
 /*
  * Home status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -5313,7 +5323,7 @@ registerHeatingScheduleCard();
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.3.1";
+const HSC_VERSION = "1.3.2";
 const HSC_TAG = "home-status-card";
 
 // One meaning per colour (design tokens → Colours): green = someone home, orange = the step
@@ -5475,6 +5485,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -5492,7 +5507,7 @@ function confirmDialog({ title, icon, color, text, confirmLabel }) {
         <div class="text">${esc(text)}</div>
         <div class="buttons">
           <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
-          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+          <button class="cancel dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
         </div></div>`;
     const done = (ok) => {
       document.removeEventListener("keydown", onKey, true);
@@ -6324,7 +6339,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.7.4 ===== */
+/* ===== printer-status-card 1.7.5 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -6347,7 +6362,7 @@ registerMmuLanesCard();
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.7.4";
+const PSC_VERSION = "1.7.5";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -6555,6 +6570,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -6572,7 +6592,7 @@ function confirmDialog({ title, icon, color, text, confirmLabel }) {
         <div class="text">${esc(text)}</div>
         <div class="buttons">
           <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
-          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+          <button class="cancel dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
         </div></div>`;
     const done = (ok) => {
       document.removeEventListener("keydown", onKey, true);
@@ -7653,7 +7673,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 2.7.5 ===== */
+/* ===== robot-vacuum-card 2.7.6 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -7679,7 +7699,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.7.5";
+const RVC_VERSION = "2.7.6";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -8094,6 +8114,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -8111,7 +8136,7 @@ function confirmDialog({ title, icon, color, text, confirmLabel }) {
         <div class="text">${esc(text)}</div>
         <div class="buttons">
           <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
-          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+          <button class="cancel dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
         </div></div>`;
     const done = (ok) => {
       document.removeEventListener("keydown", onKey, true);
@@ -8176,6 +8201,11 @@ const MODE_SHEET_CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
   .done .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
   .done .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   .done:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   .done:active { filter: brightness(.92); }
   ${SEG_CSS}
@@ -8967,7 +8997,7 @@ class RobotVacuumCard extends HTMLElement {
         <div class="row"><div class="glyph" style="background:${tint(C.teal, 20)}"><ha-icon icon="mdi:tune-variant" style="color:${C.teal}"></ha-icon></div>
           <div class="title">Cleaning mode</div></div>
         <div class="seg tabs"></div><div class="sets"></div>
-        <div class="actions"><button class="done"><span class="glyph"><ha-icon icon="mdi:check"></ha-icon></span>Done</button></div></div>`;
+        <div class="actions"><button class="done dismiss"><span class="glyph"><ha-icon icon="mdi:check"></ha-icon></span>Done</button></div></div>`;
     const onKey = (e) => {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -9241,7 +9271,7 @@ async function registerRobotVacuumCard() {
 registerRobotVacuumCard();
 })();
 
-/* ===== room-lights-card 1.5.2 ===== */
+/* ===== room-lights-card 1.5.3 ===== */
 (() => {
 /*
  * Room lights card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -9255,7 +9285,7 @@ registerRobotVacuumCard();
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.5.2";
+const RLC_VERSION = "1.5.3";
 const RLC_TAG = "room-lights-card";
 
 // One meaning per colour (design tokens → Colours): orange = lights, green = someone here,
@@ -9432,6 +9462,11 @@ const SHEET_CSS = `
   button.open { background: ${C.orange}; color: #fff; }
   button.open .glyph { background: rgba(255,255,255,.2); }
   button.open .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button.open .nm, .lamp .nm { flex: 1; min-width: 0; overflow-wrap: break-word; }
   .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
@@ -9464,7 +9499,7 @@ class RoomLampsSheet {
         <div class="list"></div>
         <div class="buttons">
           ${room.navigation_path ? `<button class="open"><span class="glyph"><ha-icon></ha-icon></span><span class="nm"></span></button>` : ""}
-          <button class="close"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Close</button>
+          <button class="close dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Close</button>
         </div>
       </div>`;
     // The sheet opens under the finger that is still holding the tile. When that finger lifts,
@@ -10365,7 +10400,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== vacuum-maintenance-card 2.5.1 ===== */
+/* ===== vacuum-maintenance-card 2.5.2 ===== */
 (() => {
 /*
  * Vacuum maintenance card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -10382,7 +10417,7 @@ registerRoomLightsCard();
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.5.1";
+const VMC_VERSION = "2.5.2";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -10527,6 +10562,11 @@ const SHEET_CSS = `
   button.cta { color: #fff; background: ${C.teal}; }
   button.cta .glyph { background: rgba(255,255,255,.2); }
   button.cta .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -10840,9 +10880,9 @@ class VacuumMaintenanceCard extends HTMLElement {
     sh.key = key;
     const glyph = (icon) => `<span class="glyph"><ha-icon icon="${icon}"></ha-icon></span>`;
     const buttons = sh.confirm
-      ? `<button class="cta" data-a="confirm">${glyph("mdi:restore")}Reset</button><button data-a="close">${glyph("mdi:close")}Cancel</button>`
+      ? `<button class="cta" data-a="confirm">${glyph("mdi:restore")}Reset</button><button class="dismiss" data-a="close">${glyph("mdi:close")}Cancel</button>`
       : `${it.reset ? `<button class="cta" data-a="reset">${glyph("mdi:restore")}Reset after ${it.clean ? "cleaning" : "replacing"}</button>` : ""}
-         <button data-a="history">${glyph("mdi:chart-line")}History</button><button data-a="close">${glyph("mdi:close")}Close</button>`;
+         <button data-a="history">${glyph("mdi:chart-line")}History</button><button class="dismiss" data-a="close">${glyph("mdi:close")}Close</button>`;
     sh.root.querySelector(".dialog").setAttribute("aria-label", it.name);
     sh.root.querySelector(".dialog").innerHTML = `<div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(it.icon)}" style="color:${color}"></ha-icon></div>
       <div class="title">${esc(sh.confirm ? `Reset ${it.name.toLowerCase()}?` : it.name)}</div></div>

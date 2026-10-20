@@ -13,7 +13,7 @@
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.5.1";
+const VMC_VERSION = "2.5.2";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -158,6 +158,11 @@ const SHEET_CSS = `
   button.cta { color: #fff; background: ${C.teal}; }
   button.cta .glyph { background: rgba(255,255,255,.2); }
   button.cta .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -471,9 +476,9 @@ class VacuumMaintenanceCard extends HTMLElement {
     sh.key = key;
     const glyph = (icon) => `<span class="glyph"><ha-icon icon="${icon}"></ha-icon></span>`;
     const buttons = sh.confirm
-      ? `<button class="cta" data-a="confirm">${glyph("mdi:restore")}Reset</button><button data-a="close">${glyph("mdi:close")}Cancel</button>`
+      ? `<button class="cta" data-a="confirm">${glyph("mdi:restore")}Reset</button><button class="dismiss" data-a="close">${glyph("mdi:close")}Cancel</button>`
       : `${it.reset ? `<button class="cta" data-a="reset">${glyph("mdi:restore")}Reset after ${it.clean ? "cleaning" : "replacing"}</button>` : ""}
-         <button data-a="history">${glyph("mdi:chart-line")}History</button><button data-a="close">${glyph("mdi:close")}Close</button>`;
+         <button data-a="history">${glyph("mdi:chart-line")}History</button><button class="dismiss" data-a="close">${glyph("mdi:close")}Close</button>`;
     sh.root.querySelector(".dialog").setAttribute("aria-label", it.name);
     sh.root.querySelector(".dialog").innerHTML = `<div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(it.icon)}" style="color:${color}"></ha-icon></div>
       <div class="title">${esc(sh.confirm ? `Reset ${it.name.toLowerCase()}?` : it.name)}</div></div>

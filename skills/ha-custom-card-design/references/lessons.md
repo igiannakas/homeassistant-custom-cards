@@ -56,6 +56,9 @@ Most of them generalise to any dashboard.
 - Every row: circle, text block and controls on one centre line, measured. `ha-icon` is always `inline-flex` (as a block its glyph sat 0.4–3px low on a text line). The home-status header was rebuilt as `[circle] [title + detail] [Armed]` instead of a chip on the title line only.
 - Behaviour is consistent across items, even when one room has a single lamp.
 - Sheet actions go below a divider. The main action is filled in the card's colour.
+- The pop-up's way out (Close / Cancel / Done) is the darker grey (`.28` tint of the text colour), never the
+  rows' `.07`: in the same grey it read as "a continuation of the tiles". Applied to every pop-up at once,
+  including the cards that ship inside integrations (washing machine, Roomstat).
 - Reuse the icons the user already chose in their room views. Read them from the view config.
 - The user picks icons. Align secondary bits with the line they belong to.
 - Check the real timing: automations turned lights off within 3–5 min, so a 10 min threshold never fired. The default became 2 min.

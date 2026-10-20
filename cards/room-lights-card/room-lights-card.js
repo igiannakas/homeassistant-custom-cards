@@ -10,7 +10,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.5.2";
+const RLC_VERSION = "1.5.3";
 const RLC_TAG = "room-lights-card";
 
 // One meaning per colour (design tokens → Colours): orange = lights, green = someone here,
@@ -187,6 +187,11 @@ const SHEET_CSS = `
   button.open { background: ${C.orange}; color: #fff; }
   button.open .glyph { background: rgba(255,255,255,.2); }
   button.open .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button.open .nm, .lamp .nm { flex: 1; min-width: 0; overflow-wrap: break-word; }
   .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
@@ -219,7 +224,7 @@ class RoomLampsSheet {
         <div class="list"></div>
         <div class="buttons">
           ${room.navigation_path ? `<button class="open"><span class="glyph"><ha-icon></ha-icon></span><span class="nm"></span></button>` : ""}
-          <button class="close"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Close</button>
+          <button class="close dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Close</button>
         </div>
       </div>`;
     // The sheet opens under the finger that is still holding the tile. When that finger lifts,

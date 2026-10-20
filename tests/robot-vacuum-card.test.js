@@ -142,6 +142,7 @@ const cfg = {
     assert(dlg(), `${title} asks first`);
     if (title) assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, title);
     const msg = dlg().shadowRoot.querySelector(".text").textContent;
+    assert.strictEqual(load.assertDismiss(dlg().shadowRoot, `${title || "confirm"} dialog`), dlg().shadowRoot.querySelector(".cancel"), "Cancel is the way out");
     assert(!/Vacuum cleaner/.test(dlg().shadowRoot.textContent.replace(msg, "")), "no device name in the pop-up");
     dlg().shadowRoot.querySelector(".confirm").click();
     await tick();
@@ -370,6 +371,7 @@ const cfg = {
   assert(sheet(), "the tile opens the sheet");
   const sr = sheet().shadowRoot;
   assert.strictEqual(sr.querySelector(".title").textContent, "Cleaning mode");
+  assert.strictEqual(load.assertDismiss(sr, "cleaning mode sheet"), sr.querySelector(".done"), "Done is the way out");
   eq([...sr.querySelectorAll(".tabs button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : "")), ["Vac & mop*", "Mop", "Vacuum"]);
   eq([...sr.querySelectorAll(".set")].map((s) => s.dataset.k), ["fan", "water", "count", "route"]);
   sr.querySelector('.set[data-k="water"] [data-v="intense"]').click();

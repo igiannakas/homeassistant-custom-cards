@@ -110,10 +110,12 @@ const devices = {
   assert.strictEqual(sheet().shadowRoot.querySelector(".title").textContent, "Main brush");
   assert.strictEqual(stext(), "291 h left (97%), about 488 cleans at your average of 36 min. Replace every 300 h of cleaning.");
   eq(btns().map((b) => b.textContent.trim()), ["Reset after replacing", "History", "Close"]);
+  assert.strictEqual(load.assertDismiss(sheet().shadowRoot, "details sheet"), btns()[2], "Close is the way out, not History's grey");
   btns()[0].click();
   assert.strictEqual(sheet().shadowRoot.querySelector(".title").textContent, "Reset main brush?");
   assert.strictEqual(stext(), "Only after fitting a new one: the countdown starts again from 300 h.");
   eq(btns().map((b) => b.textContent.trim()), ["Reset", "Cancel"]);
+  assert.strictEqual(load.assertDismiss(sheet().shadowRoot, "reset confirmation"), btns()[1], "Cancel is the way out");
   assert.strictEqual(calls.length, 0, "nothing pressed before the confirmation");
   btns()[1].click();
   assert(!sheet(), "Cancel closes");

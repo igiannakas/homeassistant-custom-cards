@@ -31,7 +31,7 @@
  * See cards/heating-schedule-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.0.1";
+const HSC_VERSION = "1.0.2";
 const HSC_TAG = "heating-schedule-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -564,6 +564,11 @@ const SHEET_CSS = `
   .act.save { background: ${C.orange}; color: #fff; }
   .act.save .glyph { background: rgba(255,255,255,.2); }
   .act.save .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  .act.dismiss { background: ${NEUTRAL(0.28)}; color: var(--primary-text-color); }
+  .act.dismiss .glyph { background: ${NEUTRAL(0.14)}; }
+  .act.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   .act[aria-disabled="true"] { opacity: .6; cursor: default; }
   .step:active, .del:active, .add:active, .chip:active, .act:active { filter: brightness(.92); }
   .step:focus-visible, .del:focus-visible, .add:focus-visible, .chip:focus-visible, .act:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
@@ -1253,7 +1258,7 @@ class HeatingScheduleCard extends HTMLElement {
         <div class="sec rooms-sec"><div class="k">Rooms</div><div class="chips"></div><div class="hint rooms-hint"></div></div>
         <div class="sec"><div class="k">Days</div><div class="seg dm" role="group" aria-label="Days"></div><div class="hint days-hint"></div></div>
         <div class="note"></div><div class="err" role="alert"></div>
-        <div class="actions"><button class="act cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+        <div class="actions"><button class="act cancel dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
           <button class="act save"><span class="glyph"><ha-icon icon="mdi:check"></ha-icon></span>Save</button></div></div>`;
     const onKey = (e) => {
       if (e.key === "Escape") {

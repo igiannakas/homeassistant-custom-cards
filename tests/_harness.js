@@ -38,3 +38,18 @@ module.exports = async function load(name) {
     st: (state, attributes = {}) => ({ state: String(state), attributes }),
   };
 };
+
+// A pop-up's way out (Close / Cancel / Done) is its one darker-grey button: the "dismiss" class,
+// styled .28 – darker than any row in the pop-up (.07) – with its glyph in the text colour so it
+// reads on that grey (design tokens → Dialogs). Returns the button for further checks.
+module.exports.assertDismiss = (root, label) => {
+  const css = [...root.querySelectorAll("style")].map((s) => s.textContent).join("\n");
+  assert(/\.dismiss \{ background: rgba\(var\(--rgb-primary-text-color, 33,33,33\), 0?\.28\);/.test(css), `${label}: the way out is the darker grey`);
+  assert(/\.dismiss \.glyph \{ background: rgba\(var\(--rgb-primary-text-color, 33,33,33\), 0?\.14\); \}/.test(css), `${label}: its glyph circle`);
+  assert(/\.dismiss \.glyph ha-icon \{ color: var\(--primary-text-color\); \}/.test(css), `${label}: its glyph reads on the grey`);
+  const buttons = root.querySelectorAll(".dismiss");
+  assert.strictEqual(buttons.length, 1, `${label}: one way out`);
+  assert.strictEqual(buttons[0].tagName, "BUTTON", `${label}: the way out is a button`);
+  assert(/^(Close|Cancel|Done)$/.test(buttons[0].textContent.trim()), `${label}: "${buttons[0].textContent.trim()}" only dismisses`);
+  return buttons[0];
+};

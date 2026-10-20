@@ -2,6 +2,7 @@
 const { JSDOM } = require("jsdom");
 const fs = require("fs");
 const assert = require("assert");
+const { assertDismiss } = require("./_harness");
 const src = fs.readFileSync(require("path").join(__dirname, "..", "cards", "home-status-card", "home-status-card.js"), "utf8");
 const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only", pretendToBeVisual: true, url: "https://ha.local/lovelace/0" });
 const { window } = dom;
@@ -103,6 +104,7 @@ const cfg = {
   // Reference layout: one glyph (the title's), the text under the title, a rule above the
   // buttons; no second glyph, no home-name line, and the text doesn't name the home again.
   const ds = dlg.shadowRoot;
+  assert.strictEqual(assertDismiss(ds, "alarm dialog"), ds.querySelector(".cancel"), "Cancel is the way out");
   assert(ds.querySelector(".text").textContent.includes("CCTV alarm system"));
   assert(!ds.textContent.includes("Greece"), "no home name in the dialog");
   assert(!ds.querySelector(".body, .primary, .secondary"), "no subject row");

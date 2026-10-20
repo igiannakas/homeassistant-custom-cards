@@ -48,6 +48,10 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm ha-icon { color: #fff; }
+  /* The way out (Close / Cancel / Done) is the darker grey, never a row's .07 (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button:active { filter: brightness(.92); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 `;
@@ -64,7 +68,7 @@ function confirmDialog({ title, icon, color, secondary, confirmLabel }) {
         <div class="secondary">${esc(secondary)}</div>
         <div class="buttons">
           <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
-          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+          <button class="cancel dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
         </div></div>`;
     const done = (ok) => {
       document.removeEventListener("keydown", onKey, true);

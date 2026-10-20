@@ -19,7 +19,7 @@
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.7.4";
+const PSC_VERSION = "1.7.5";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -227,6 +227,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -244,7 +249,7 @@ function confirmDialog({ title, icon, color, text, confirmLabel }) {
         <div class="text">${esc(text)}</div>
         <div class="buttons">
           <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
-          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+          <button class="cancel dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
         </div></div>`;
     const done = (ok) => {
       document.removeEventListener("keydown", onKey, true);

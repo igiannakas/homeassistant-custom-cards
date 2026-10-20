@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.7.5";
+const RVC_VERSION = "2.7.6";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -437,6 +437,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -454,7 +459,7 @@ function confirmDialog({ title, icon, color, text, confirmLabel }) {
         <div class="text">${esc(text)}</div>
         <div class="buttons">
           <button class="confirm" style="background:${color}"><span class="glyph"><ha-icon icon="${esc(icon)}"></ha-icon></span>${esc(confirmLabel)}</button>
-          <button class="cancel"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
+          <button class="cancel dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Cancel</button>
         </div></div>`;
     const done = (ok) => {
       document.removeEventListener("keydown", onKey, true);
@@ -519,6 +524,11 @@ const MODE_SHEET_CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
   .done .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
   .done .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
+     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   .done:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   .done:active { filter: brightness(.92); }
   ${SEG_CSS}
@@ -1310,7 +1320,7 @@ class RobotVacuumCard extends HTMLElement {
         <div class="row"><div class="glyph" style="background:${tint(C.teal, 20)}"><ha-icon icon="mdi:tune-variant" style="color:${C.teal}"></ha-icon></div>
           <div class="title">Cleaning mode</div></div>
         <div class="seg tabs"></div><div class="sets"></div>
-        <div class="actions"><button class="done"><span class="glyph"><ha-icon icon="mdi:check"></ha-icon></span>Done</button></div></div>`;
+        <div class="actions"><button class="done dismiss"><span class="glyph"><ha-icon icon="mdi:check"></ha-icon></span>Done</button></div></div>`;
     const onKey = (e) => {
       if (e.key === "Escape") {
         e.stopPropagation();
