@@ -9,13 +9,13 @@
  * See cards/printer-temps-card/README.md for every option.
  */
 
-const PTC_VERSION = "1.2.1";
+const PTC_VERSION = "1.3.0";
 const PTC_TAG = "printer-temps-card";
 
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
   orange: "var(--orange-color, #ff9800)",
-  blue: "var(--blue-color, #2196f3)",
+  teal: "var(--teal-color, #009688)",
 };
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
 const esc = (s) =>
@@ -126,8 +126,8 @@ const CSS = `
     color: var(--secondary-text-color); }
   .fan { all: unset; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; white-space: nowrap; border-radius: 4px; }
   .fan ha-icon { --mdc-icon-size: 16px; color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
-  /* A running fan is blue (something running). */
-  .fan.on ha-icon { color: ${C.blue}; }
+  /* A running fan is teal, on every card (the user's choice, 20 Oct 2026; blue until 1.2). */
+  .fan.on ha-icon { color: ${C.teal}; }
   .tile:active, .fan:active { filter: brightness(.92); }
   .tile:focus-visible, .fan:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 1px; }
 `;

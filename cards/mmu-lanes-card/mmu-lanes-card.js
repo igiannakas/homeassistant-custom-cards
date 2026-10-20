@@ -10,19 +10,20 @@
  * See cards/mmu-lanes-card/README.md for every option.
  */
 
-const MLC_VERSION = "1.2.1";
+const MLC_VERSION = "1.3.0";
 const MLC_TAG = "mmu-lanes-card";
 
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
   green: "var(--green-color, #4caf50)",
   amber: "var(--amber-color, #ffc107)",
-  orange: "var(--orange-color, #ff9800)",
+  red: "var(--red-color, #f44336)",
+  teal: "var(--teal-color, #009688)",
 };
 const TEXT = {
   green: "color-mix(in srgb, var(--green-color, #4caf50) 75%, var(--primary-text-color))",
   amber: "color-mix(in srgb, var(--amber-color, #ffc107) 70%, var(--primary-text-color))",
-  orange: "color-mix(in srgb, var(--orange-color, #ff9800) 80%, var(--primary-text-color))",
+  red: "color-mix(in srgb, var(--red-color, #f44336) 85%, var(--primary-text-color))",
 };
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -56,7 +57,8 @@ function lanes(hass, cfg) {
     const h = num(hass.states[e.humidity]?.state);
     const t = num(hass.states[e.temp]?.state);
     const fan = num(hass.states[e.fan]?.state);
-    const tone = h === null ? null : h < dry ? "green" : h < humid ? "amber" : "orange";
+    // Wet filament needs drying before it prints well: red (the user's choice, 20 Oct 2026; orange until 1.2).
+    const tone = h === null ? null : h < dry ? "green" : h < humid ? "amber" : "red";
     return {
       n,
       name: names[n] || `Lane ${n}`,
@@ -110,8 +112,8 @@ const CSS = `
   .lh ha-icon.sp { color: ${C.green}; }
   .lane.empty .lh ha-icon.sp { color: color-mix(in srgb, var(--secondary-text-color) 55%, transparent); }
   .lane.unknown .lh ha-icon.sp { color: ${C.grey}; }
-  /* Drying: heat, so orange. */
-  .lh ha-icon.dry { --mdc-icon-size: 16px; color: ${C.orange}; }
+  /* Drying: a running fan, teal like every running fan (the user's choice, 20 Oct 2026; orange until 1.2). */
+  .lh ha-icon.dry { --mdc-icon-size: 16px; color: ${C.teal}; }
   .lv { display: grid; gap: 1px; margin-top: 2px; font-size: 12px; line-height: 16px; letter-spacing: .4px; color: var(--secondary-text-color); }
   .v { all: unset; box-sizing: border-box; justify-self: start; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;
     cursor: pointer; border-radius: 4px; -webkit-tap-highlight-color: transparent; }
@@ -288,7 +290,7 @@ class MmuLanesCard extends HTMLElement {
       ${this._config.legend ? `<div class="legend"><span><ha-icon icon="mdi:circle-slice-8"></ha-icon>loaded</span>
         <span><ha-icon icon="mdi:circle-outline" style="color:${C.grey}"></ha-icon>empty</span>
         <span><em style="background:${C.green}"></em>&lt;${dry}% dry</span><span><em style="background:${C.amber}"></em>${dry}–${humid}% medium</span>
-        <span><em style="background:${C.orange}"></em>&gt;${humid}% wet</span></div>` : ""}
+        <span><em style="background:${C.red}"></em>&gt;${humid}% wet</span></div>` : ""}
     </ha-card>`;
     this._lanes = ls;
     // A reading opens its own sensor; the rest of the lane opens its humidity sensor.

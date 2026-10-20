@@ -39,8 +39,9 @@ function states(over = {}) {
   assert(!/margin-left:\s*auto/.test(css), "no summary pushed to the right of the title");
   assert(/\.slot ha-icon \{[^}]*color: var\(--grey-color/.test(css), "label icon grey");
   assert(/\.label\.on \.slot ha-icon \{ color: var\(--orange-color/.test(css), "orange while heating");
-  assert(/\.fan\.on ha-icon \{ color: var\(--blue-color/.test(css), "a running fan is blue");
-  assert(!/teal/.test(css), "no teal: nothing here is a pick");
+  assert(/\.fan\.on ha-icon \{ color: var\(--teal-color, #009688\); \}/.test(css), "a running fan is teal");
+  assert.strictEqual((css.match(/--teal-color/g) || []).length, 1, "teal only for a running fan");
+  assert(!/blue-color/.test(css), "no blue left");
   assert(/\.tile \{[^}]*padding: 11px 10px/.test(css), "tile padding 11px 10px");
   assert(/\.pw \{[^}]*font-size: 12px/.test(css), "heater power 12px");
   assert(/\.tile:active, \.fan:active \{ filter: brightness\(\.92\)/.test(css), "press .92");

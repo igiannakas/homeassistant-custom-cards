@@ -13,7 +13,7 @@ Moonraker printer.
 - **Readings**: other temperatures as plain tiles. Readings are shown as `21.4°`.
 - **Names** are never cut off: a name too long for its tile wraps, and the tiles in a row
   stay the same height.
-- **Fans**: one line, the icon **blue while the fan runs** (blue means running).
+- **Fans**: one line, the icon **teal while the fan runs** (as every running fan on these cards).
 - **Label row**: the title with the summary under it – "All heaters off", "Heating" or
   "At temperature" (every heater that is on is within 2° of its target). The thermometer
   icon is grey, and orange while a heater is on.

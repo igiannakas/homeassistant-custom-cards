@@ -8,7 +8,7 @@
 
 - **Lane**: loaded (filled, **green** – good, ready) or empty (outline, name greyed; a lane
   without an entry sensor shows a grey "?"), humidity coloured dry (green) / medium (amber) /
-  wet (orange), temperature, and an orange fan icon while the lane is drying (heat).
+  wet (red), temperature, and a teal fan icon while the lane is drying (as every running fan).
 - **Label row**: the title with how many lanes are loaded under it ("3 of 4 loaded"). The
   header icon is decoration, so it is grey.
 - **Lane names are never cut off.** The grid is fitted to the measured names: as many columns

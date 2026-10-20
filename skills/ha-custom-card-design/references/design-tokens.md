@@ -11,12 +11,12 @@ decorate it (decided 14 Oct 2026):
 
 | Colour | Means | Examples |
 |---|---|---|
-| Teal | **You can tap or pick this** – the accent for anything interactive that has no state colour of its own | The energy card's circle, a link pill's icon, the Cleaning mode tile, rooms picked for the next clean, current values in a sheet, a toggle that's on, Auto clean when away |
-| Blue | **Cold and water** – literal only (since 20 Oct 2026 no longer "running") | Cooling, a cooling fan running, clean water, rain |
+| Teal | **You can tap or pick this** – the accent for anything interactive that has no state colour of its own – **and a fan running** | The energy card's circle, a link pill's icon, the Cleaning mode tile, rooms picked for the next clean, current values in a sheet, a toggle that's on, Auto clean when away; the printer's part, hotend and exhaust fans, an EMU lane drying |
+| Blue | **Cold and water** – literal only (since 20 Oct 2026 no longer "running") | Cooling, clean water, rain |
 | Green | **Good, and someone home** (Home Assistant colours a person at home green) | Battery above 30%, VOC under 150, dry filament, a room or the house occupied, the Home pill |
 | Amber | **Early warning** – needs attention soon | A part due soon, battery ≤ 30%, VOC 150+, mop not attached |
-| Orange | **Lights, heat, power and a machine at work – and the step before red on a scale** | A lit room, heating, a plug / watts, an appliance that is on; a machine at work and the button that sets it going: washing, printing, the robot cleaning or returning, the room it is cleaning, a dock job running, Clean / Resume (filled); Poor air, VOC 250+, wet filament, presence lost within the hour |
-| Red | **A call for attention** | An error, a paused print or clean (it waits for you) and the Pause button, a tank to empty, a part due now, battery ≤ 15%, door open, alarm armed, house empty for over an hour, heating on while away |
+| Orange | **Lights, heat, power and a machine at work – and the step before red on a scale** | A lit room, heating, a plug / watts, an appliance that is on; a machine at work and the button that sets it going: washing, printing, the robot cleaning or returning, the room it is cleaning, a dock job running, Clean / Resume (filled); Poor air, VOC 250+, presence lost within the hour |
+| Red | **A call for attention** | An error, a paused print or clean (it waits for you) and the Pause button, wet filament, a tank to empty, a part due now, battery ≤ 15%, door open, alarm armed, house empty for over an hour, heating on while away |
 | Grey | **Off, idle or neutral** – and every purely decorative icon | Docked, Idle, a part that's fine, a header icon that isn't tappable and shows no state |
 
 - **Confirmations** take the colour of the control that opened it – its "on" colour, both ways
@@ -40,7 +40,7 @@ Use HA's theme variables with fallbacks, so dark mode and custom themes just wor
 ```js
 const C = {
   grey:   "var(--grey-color, #9e9e9e)",   // off, idle, decorative
-  teal:   "var(--teal-color, #009688)",   // you can tap / pick this
+  teal:   "var(--teal-color, #009688)",   // you can tap / pick this; a fan running
   blue:   "var(--blue-color, #2196f3)",   // cold and water (literal)
   green:  "var(--green-color, #4caf50)",  // good, someone home
   amber:  "var(--amber-color, #ffc107)",  // early warning
@@ -70,7 +70,7 @@ Tiers used for readings, so the same number gets the same colour everywhere:
 - **VOC index (Sensirion):** under 150 is green, 150 or more amber, 250 or more orange,
   400 or more red.
 - **Filament humidity:** under 20% is dry (green), 20–40% medium (amber), over 40% wet
-  (orange).
+  (red: it needs drying before it prints well).
 - **CO₂:** 800 ppm is elevated, 1000 ppm means ventilate (red glow).
 
 ## Type

@@ -29,9 +29,10 @@ function states(over = {}) {
   eq(lanes().map((l) => l.querySelector(".sp").getAttribute("icon")), ["mdi:circle-slice-8", "mdi:circle-slice-8", "mdi:circle-outline", "mdi:circle-slice-8"]);
   assert(lanes()[2].classList.contains("empty"));
   eq(lanes().map((l) => l.querySelector(".lv").textContent), ["12%24.0°", "32%24.1°", "51%24.2°", "18%24.3°"]);
-  // Humidity tone: dry (green) < 20, medium (amber) 20–40, wet (orange) above.
+  // Humidity tone: dry (green) < 20, medium (amber) 20–40, wet (red) above.
   const tone = (i) => lanes()[i].querySelector(".lv .v").getAttribute("style");
-  assert(tone(0).includes("--green-color") && tone(1).includes("--amber-color") && tone(2).includes("--orange-color"));
+  assert(tone(0).includes("--green-color") && tone(1).includes("--amber-color") && tone(2).includes("--red-color"));
+  assert(/<em style="background:var\(--red-color, #f44336\)"><\/em>&gt;40% wet/.test(r.querySelector(".legend").innerHTML), "legend: wet red");
   assert.strictEqual(r.querySelector(".s").textContent, "3 of 4 loaded");
   assert(r.querySelector(".legend").textContent.includes("<20% dry") && r.querySelector(".legend").textContent.includes(">40% wet"));
   assert(r.querySelector(".legend"));
@@ -40,17 +41,18 @@ function states(over = {}) {
   assert(r.querySelector(".label .lt .t + .s"), "summary under the title");
   assert(!r.querySelector(".lt").classList.contains("one"));
 
-  // Colours: loaded = green (good, ready), header icon grey (decorative), unknown grey; wet and
-  // drying stay orange. Nothing is teal (nothing here is a pick).
+  // Colours: loaded = green (good, ready), header icon grey (decorative), unknown grey; wet red;
+  // the drying fan teal, like every running fan – and nothing else teal.
   const css = r.querySelector("style").textContent;
   assert(!/text-overflow:\s*ellipsis/.test(css), "no clipped names");
   assert(!/line-clamp/.test(css));
   assert(!/margin-left:\s*auto/.test(css), "no summary pushed to the right of the title");
-  assert(!/teal/.test(css));
+  assert.strictEqual((css.match(/--teal-color/g) || []).length, 1, "teal only for the drying fan");
+  assert(!/orange-color/.test(css), "no orange left");
   assert(/\.slot ha-icon \{[^}]*color: var\(--grey-color/.test(css), "header icon grey");
   assert(/\.lh ha-icon\.sp \{ color: var\(--green-color/.test(css), "loaded lane icon green");
   assert(/\.lane\.unknown \.lh ha-icon\.sp \{ color: var\(--grey-color/.test(css), "unknown grey");
-  assert(/\.lh ha-icon\.dry \{[^}]*color: var\(--orange-color/.test(css), "drying fan orange");
+  assert(/\.lh ha-icon\.dry \{[^}]*color: var\(--teal-color, #009688\); \}/.test(css), "drying fan teal");
   assert(/\.legend ha-icon \{[^}]*color: var\(--green-color/.test(css), "legend loaded green");
   assert(/\.lane \{[^}]*padding: 11px 10px/.test(css), "lane padding 11px 10px");
   assert(/\.v \{[^}]*border-radius: 4px/.test(css), "value radius 4px");
@@ -99,7 +101,7 @@ function states(over = {}) {
   // Names, thresholds, lane count, no legend.
   const c2 = mount({ prefix: "voron", lanes: 2, names: ["PLA black"], humidity_thresholds: [5, 10], legend: false }, states());
   eq([...c2.shadowRoot.querySelectorAll(".ln")].map((n) => n.textContent), ["PLA black", "Lane 1"]);
-  assert(c2.shadowRoot.querySelectorAll(".lv .v")[2].getAttribute("style").includes("--orange-color"));
+  assert(c2.shadowRoot.querySelectorAll(".lv .v")[2].getAttribute("style").includes("--red-color"));
   assert(!c2.shadowRoot.querySelector(".legend"));
   assert.strictEqual(c2.shadowRoot.querySelector(".s").textContent, "2 of 2 loaded");
 
