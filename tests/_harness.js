@@ -39,14 +39,14 @@ module.exports = async function load(name) {
   };
 };
 
-// A pop-up's way out (Close / Cancel / Done) is its one darker-grey button: the "dismiss" class,
-// styled .28 – darker than any row in the pop-up (.07) – with its glyph in the text colour so it
-// reads on that grey (design tokens → Dialogs). Returns the button for further checks.
+// A pop-up's way out (Close / Cancel / Done) is its one dark-grey button: the "dismiss" class,
+// filled in the theme's --dark-grey-color with white (--text-primary-color) text and glyph – never a
+// row's light grey, never black text on a mid grey (design tokens → Dialogs). Returns the button.
 module.exports.assertDismiss = (root, label) => {
   const css = [...root.querySelectorAll("style")].map((s) => s.textContent).join("\n");
-  assert(/\.dismiss \{ background: rgba\(var\(--rgb-primary-text-color, 33,33,33\), 0?\.28\);/.test(css), `${label}: the way out is the darker grey`);
-  assert(/\.dismiss \.glyph \{ background: rgba\(var\(--rgb-primary-text-color, 33,33,33\), 0?\.14\); \}/.test(css), `${label}: its glyph circle`);
-  assert(/\.dismiss \.glyph ha-icon \{ color: var\(--primary-text-color\); \}/.test(css), `${label}: its glyph reads on the grey`);
+  assert(/\.dismiss \{ background: var\(--dark-grey-color, #606060\); color: var\(--text-primary-color, #fff\); \}/.test(css), `${label}: the way out is the dark grey with white text`);
+  assert(/\.dismiss \.glyph \{ background: rgba\(255,255,255,\.2\); \}/.test(css), `${label}: its glyph circle`);
+  assert(/\.dismiss \.glyph ha-icon \{ color: var\(--text-primary-color, #fff\); \}/.test(css), `${label}: its glyph is white`);
   const buttons = root.querySelectorAll(".dismiss");
   assert.strictEqual(buttons.length, 1, `${label}: one way out`);
   assert.strictEqual(buttons[0].tagName, "BUTTON", `${label}: the way out is a button`);

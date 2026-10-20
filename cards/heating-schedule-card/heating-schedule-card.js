@@ -31,7 +31,7 @@
  * See cards/heating-schedule-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.0.2";
+const HSC_VERSION = "1.0.3";
 const HSC_TAG = "heating-schedule-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -564,11 +564,11 @@ const SHEET_CSS = `
   .act.save { background: ${C.orange}; color: #fff; }
   .act.save .glyph { background: rgba(255,255,255,.2); }
   .act.save .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  .act.dismiss { background: ${NEUTRAL(0.28)}; color: var(--primary-text-color); }
-  .act.dismiss .glyph { background: ${NEUTRAL(0.14)}; }
-  .act.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  .act.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  .act.dismiss .glyph { background: rgba(255,255,255,.2); }
+  .act.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   .act[aria-disabled="true"] { opacity: .6; cursor: default; }
   .step:active, .del:active, .add:active, .chip:active, .act:active { filter: brightness(.92); }
   .step:focus-visible, .del:focus-visible, .add:focus-visible, .chip:focus-visible, .act:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }

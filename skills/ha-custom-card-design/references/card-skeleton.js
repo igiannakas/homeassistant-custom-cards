@@ -48,10 +48,10 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm ha-icon { color: #fff; }
-  /* The way out (Close / Cancel / Done) is the darker grey, never a row's .07 (design tokens → Dialogs). */
-  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* The way out (Close / Cancel / Done) is the theme's dark grey with white text (design tokens → Dialogs). */
+  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  button.dismiss .glyph { background: rgba(255,255,255,.2); }
+  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   button:active { filter: brightness(.92); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 `;

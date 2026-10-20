@@ -2238,7 +2238,7 @@ async function registerBinDayCard() {
 registerBinDayCard();
 })();
 
-/* ===== climate-modes-card 1.4.4 ===== */
+/* ===== climate-modes-card 1.4.5 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2256,7 +2256,7 @@ registerBinDayCard();
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.4.4";
+const CMC_VERSION = "1.4.5";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -2312,11 +2312,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  button.dismiss .glyph { background: rgba(255,255,255,.2); }
+  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -3735,7 +3735,7 @@ async function registerEnergySummaryCard() {
 registerEnergySummaryCard();
 })();
 
-/* ===== heating-schedule-card 1.0.2 ===== */
+/* ===== heating-schedule-card 1.0.3 ===== */
 (() => {
 /*
  * Heating schedule card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -3770,7 +3770,7 @@ registerEnergySummaryCard();
  * See cards/heating-schedule-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.0.2";
+const HSC_VERSION = "1.0.3";
 const HSC_TAG = "heating-schedule-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -4303,11 +4303,11 @@ const SHEET_CSS = `
   .act.save { background: ${C.orange}; color: #fff; }
   .act.save .glyph { background: rgba(255,255,255,.2); }
   .act.save .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  .act.dismiss { background: ${NEUTRAL(0.28)}; color: var(--primary-text-color); }
-  .act.dismiss .glyph { background: ${NEUTRAL(0.14)}; }
-  .act.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  .act.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  .act.dismiss .glyph { background: rgba(255,255,255,.2); }
+  .act.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   .act[aria-disabled="true"] { opacity: .6; cursor: default; }
   .step:active, .del:active, .add:active, .chip:active, .act:active { filter: brightness(.92); }
   .step:focus-visible, .del:focus-visible, .add:focus-visible, .chip:focus-visible, .act:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
@@ -5311,7 +5311,7 @@ async function registerHeatingScheduleCard() {
 registerHeatingScheduleCard();
 })();
 
-/* ===== home-status-card 1.3.2 ===== */
+/* ===== home-status-card 1.3.3 ===== */
 (() => {
 /*
  * Home status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -5323,7 +5323,7 @@ registerHeatingScheduleCard();
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.3.2";
+const HSC_VERSION = "1.3.3";
 const HSC_TAG = "home-status-card";
 
 // One meaning per colour (design tokens → Colours): green = someone home, orange = the step
@@ -5485,11 +5485,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  button.dismiss .glyph { background: rgba(255,255,255,.2); }
+  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -6339,7 +6339,7 @@ async function registerMmuLanesCard() {
 registerMmuLanesCard();
 })();
 
-/* ===== printer-status-card 1.7.5 ===== */
+/* ===== printer-status-card 1.7.6 ===== */
 (() => {
 /*
  * Printer status card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -6362,7 +6362,7 @@ registerMmuLanesCard();
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.7.5";
+const PSC_VERSION = "1.7.6";
 const PSC_TAG = "printer-status-card";
 
 const C = {
@@ -6570,11 +6570,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  button.dismiss .glyph { background: rgba(255,255,255,.2); }
+  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -7673,7 +7673,7 @@ async function registerPrinterTempsCard() {
 registerPrinterTempsCard();
 })();
 
-/* ===== robot-vacuum-card 2.7.6 ===== */
+/* ===== robot-vacuum-card 2.7.7 ===== */
 (() => {
 /*
  * Robot vacuum card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -7699,7 +7699,7 @@ registerPrinterTempsCard();
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.7.6";
+const RVC_VERSION = "2.7.7";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -8114,11 +8114,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  button.dismiss .glyph { background: rgba(255,255,255,.2); }
+  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -8201,11 +8201,11 @@ const MODE_SHEET_CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
   .done .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
   .done .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  button.dismiss .glyph { background: rgba(255,255,255,.2); }
+  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   .done:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   .done:active { filter: brightness(.92); }
   ${SEG_CSS}
@@ -9271,7 +9271,7 @@ async function registerRobotVacuumCard() {
 registerRobotVacuumCard();
 })();
 
-/* ===== room-lights-card 1.5.3 ===== */
+/* ===== room-lights-card 1.5.4 ===== */
 (() => {
 /*
  * Room lights card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -9285,7 +9285,7 @@ registerRobotVacuumCard();
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.5.3";
+const RLC_VERSION = "1.5.4";
 const RLC_TAG = "room-lights-card";
 
 // One meaning per colour (design tokens → Colours): orange = lights, green = someone here,
@@ -9462,11 +9462,11 @@ const SHEET_CSS = `
   button.open { background: ${C.orange}; color: #fff; }
   button.open .glyph { background: rgba(255,255,255,.2); }
   button.open .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  button.dismiss .glyph { background: rgba(255,255,255,.2); }
+  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   button.open .nm, .lamp .nm { flex: 1; min-width: 0; overflow-wrap: break-word; }
   .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
@@ -10400,7 +10400,7 @@ async function registerRoomLightsCard() {
 registerRoomLightsCard();
 })();
 
-/* ===== vacuum-maintenance-card 2.5.2 ===== */
+/* ===== vacuum-maintenance-card 2.5.3 ===== */
 (() => {
 /*
  * Vacuum maintenance card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -10417,7 +10417,7 @@ registerRoomLightsCard();
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.5.2";
+const VMC_VERSION = "2.5.3";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -10562,11 +10562,11 @@ const SHEET_CSS = `
   button.cta { color: #fff; background: ${C.teal}; }
   button.cta .glyph { background: rgba(255,255,255,.2); }
   button.cta .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  button.dismiss .glyph { background: rgba(255,255,255,.2); }
+  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }

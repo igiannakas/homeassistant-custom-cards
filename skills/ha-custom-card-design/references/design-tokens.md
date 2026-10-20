@@ -58,7 +58,7 @@ const text = (c, p = 75) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-c
 | Active tile glow (lit, heating, alarm) | `tint(colour, 10)` |
 | Neutral tile background | `rgba(var(--rgb-primary-text-color, 33,33,33), .04)` |
 | Neutral pill / segment track | `rgba(var(--rgb-primary-text-color, 33,33,33), .05)` |
-| Pop-up's way out (Close / Cancel / Done) | `rgba(var(--rgb-primary-text-color, 33,33,33), .28)`, glyph circle `.14`, glyph + text primary text colour |
+| Pop-up's way out (Close / Cancel / Done) | `var(--dark-grey-color, #606060)` fill, white text and glyph (`--text-primary-color`), glyph circle `rgba(255,255,255,.2)` |
 | Pill that is "on" | `tint(colour, 18)` background, `text(colour, 70)` label – on every card |
 | Press feedback | `:active { filter: brightness(.92); }` – on every card |
 | Small reading icons | `color-mix(in srgb, var(--secondary-text-color) 55%, transparent)` |
@@ -228,19 +228,19 @@ cells) and 8px gaps, never through extra height.
 /* title row: 42px glyph circle + 20px/600 title; rows: 56px, radius 28, 36px glyph, 16px/600 */
 /* actions sit below a divider: margin-top 20px; padding-top 20px; border-top 1px divider */
 /* call to action: filled with the card's colour, white text, glyph rgba(255,255,255,.2) */
-/* the way out (Close / Cancel / Done – it only dismisses): class "dismiss", the darker grey */
-button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+/* the way out (Close / Cancel / Done – it only dismisses): class "dismiss", the theme's dark grey */
+button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+button.dismiss .glyph { background: rgba(255,255,255,.2); }
+button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
 ```
 
-- **The way out is the darker grey** (decided 20 Oct 2026): Close, Cancel and Done – the button that
-  only dismisses the pop-up – are filled `rgba(primary-text-rgb, .28)` with a `.14` glyph circle and the
-  glyph and text in the primary text colour. Rows and secondary buttons in a pop-up stay at `.07` or
-  lighter, so the way out never reads as one more row (it did: "they look like a continuation of the
-  tiles"). Being a tint of the text colour, it is a darker grey on a light theme and a lighter one on a
-  dark theme – more contrast against the pop-up either way. It is never a colour: a colour means the
-  action, and the call to action stays the one solid coloured button.
+- **The way out is the dark grey** (decided 20 Oct 2026): Close, Cancel and Done – the button that
+  only dismisses the pop-up – are filled in Home Assistant's `--dark-grey-color` (#606060) with white
+  (`--text-primary-color`) text and glyph on a `rgba(255,255,255,.2)` circle, built like the call to
+  action. Rows and secondary buttons stay at `.07` or lighter, so the way out never reads as one more row
+  (in the rows' grey: "they look like a continuation of the tiles"). Not a tint of the text colour: a
+  `.28` tint put black text on a mid grey, which read as low contrast. A fixed dark grey with white text
+  stands out on a light and a dark pop-up alike (6.3:1). It is never a colour: a colour means the action.
 - Every pop-up has exactly one dismiss button; tests check it with the harness's `assertDismiss`.
 
 ## States that read well

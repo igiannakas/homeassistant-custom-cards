@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.7.6";
+const RVC_VERSION = "2.7.7";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -437,11 +437,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  button.dismiss .glyph { background: rgba(255,255,255,.2); }
+  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -524,11 +524,11 @@ const MODE_SHEET_CSS = `
     background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
   .done .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
   .done .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  button.dismiss .glyph { background: rgba(255,255,255,.2); }
+  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   .done:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   .done:active { filter: brightness(.92); }
   ${SEG_CSS}

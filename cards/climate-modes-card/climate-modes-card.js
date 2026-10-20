@@ -14,7 +14,7 @@
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.4.4";
+const CMC_VERSION = "1.4.5";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -70,11 +70,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is a darker grey than the
-     rows above it, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .28); color: var(--primary-text-color); }
-  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .14); }
-  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
+     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
+  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
+  button.dismiss .glyph { background: rgba(255,255,255,.2); }
+  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
