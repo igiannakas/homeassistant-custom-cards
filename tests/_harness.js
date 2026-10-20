@@ -39,17 +39,36 @@ module.exports = async function load(name) {
   };
 };
 
-// A pop-up's way out (Close / Cancel / Done) is its one dark-grey button: the "dismiss" class,
-// filled in the theme's --dark-grey-color with white (--text-primary-color) text and glyph – never a
-// row's light grey, never black text on a mid grey (design tokens → Dialogs). Returns the button.
-module.exports.assertDismiss = (root, label) => {
+// A sheet closes with one round ✕ at the right of its title row – not a Close or Done row at the
+// bottom, where it read as one more tile (design tokens → Dialogs). Returns the ✕.
+module.exports.assertSheetClose = (root, label) => {
   const css = [...root.querySelectorAll("style")].map((s) => s.textContent).join("\n");
-  assert(/\.dismiss \{ background: var\(--dark-grey-color, #606060\); color: var\(--text-primary-color, #fff\); \}/.test(css), `${label}: the way out is the dark grey with white text`);
-  assert(/\.dismiss \.glyph \{ background: rgba\(255,255,255,\.2\); \}/.test(css), `${label}: its glyph circle`);
-  assert(/\.dismiss \.glyph ha-icon \{ color: var\(--text-primary-color, #fff\); \}/.test(css), `${label}: its glyph is white`);
+  assert(/\.x \{ all: unset;[^}]*flex: 0 0 42px; width: 42px; height: 42px; margin-left: auto; border-radius: 50%;/.test(css), `${label}: a 42px round ✕ pushed to the right`);
+  assert(/\.x \{[^}]*background: rgba\(var\(--rgb-primary-text-color, 33,33,33\), \.1\);/.test(css), `${label}: the ✕ on a light grey`);
+  const xs = root.querySelectorAll(".x");
+  assert.strictEqual(xs.length, 1, `${label}: one ✕`);
+  const x = xs[0];
+  assert.strictEqual(x.tagName, "BUTTON", `${label}: the ✕ is a button`);
+  assert.strictEqual(x.getAttribute("aria-label"), "Close", `${label}: the ✕ is named Close`);
+  assert.strictEqual(x.querySelector("ha-icon").getAttribute("icon"), "mdi:close");
+  assert.strictEqual(x.parentElement, root.querySelector(".dialog").firstElementChild, `${label}: the ✕ is in the title row`);
+  assert.strictEqual(x, x.parentElement.lastElementChild, `${label}: at the end of the title row`);
+  const bottom = [...root.querySelectorAll(".dialog button")].filter((b) => /^(Close|Done)$/.test(b.textContent.trim()));
+  assert.deepStrictEqual(bottom, [], `${label}: no Close or Done row as well`);
+  return x;
+};
+
+// A confirmation keeps its Cancel full size beside the confirm button, in a plain light grey with
+// text-coloured text – never black text on a mid grey, never a dark slab (design tokens → Dialogs).
+module.exports.assertCancel = (root, label) => {
+  const css = [...root.querySelectorAll("style")].map((s) => s.textContent).join("\n");
+  assert(/\.dismiss \{ background: (?:rgba\(var\(--rgb-primary-text-color, 33,33,33\), 0?\.1\)); color: var\(--primary-text-color\); \}/.test(css), `${label}: Cancel is the light grey`);
+  assert(/\.dismiss \.glyph \{ background: rgba\(var\(--rgb-primary-text-color, 33,33,33\), 0?\.08\); \}/.test(css), `${label}: its glyph circle`);
+  assert(/\.dismiss \.glyph ha-icon \{ color: var\(--primary-text-color\); \}/.test(css), `${label}: its glyph in the text colour`);
   const buttons = root.querySelectorAll(".dismiss");
-  assert.strictEqual(buttons.length, 1, `${label}: one way out`);
-  assert.strictEqual(buttons[0].tagName, "BUTTON", `${label}: the way out is a button`);
-  assert(/^(Close|Cancel|Done)$/.test(buttons[0].textContent.trim()), `${label}: "${buttons[0].textContent.trim()}" only dismisses`);
+  assert.strictEqual(buttons.length, 1, `${label}: one Cancel`);
+  assert.strictEqual(buttons[0].tagName, "BUTTON");
+  assert.strictEqual(buttons[0].textContent.trim(), "Cancel", `${label}: the way out says Cancel`);
+  assert(!root.querySelector(".x"), `${label}: a confirmation has no ✕`);
   return buttons[0];
 };

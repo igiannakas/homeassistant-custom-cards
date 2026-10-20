@@ -114,7 +114,7 @@ const cfg = {
   {
     const d = dlg.shadowRoot;
     assert.strictEqual(d.querySelector(".title").textContent, "Power off");
-    assert.strictEqual(load.assertDismiss(d, "power-off dialog"), d.querySelector(".cancel"), "Cancel is the way out");
+    assert.strictEqual(load.assertCancel(d, "power-off dialog"), d.querySelector(".cancel"), "Cancel is the way out");
     assert.strictEqual(d.querySelector(".text").textContent, "The printer shuts down safely, then its plug turns off.");
     assert.strictEqual(d.querySelectorAll(".dialog > .row").length, 1, "title row only");
     assert.strictEqual([...d.querySelectorAll(".glyph")].filter((g) => !g.closest("button")).length, 1, "no second glyph");

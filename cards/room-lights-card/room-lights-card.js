@@ -10,7 +10,7 @@
  * See cards/room-lights-card/README.md for every option.
  */
 
-const RLC_VERSION = "1.5.4";
+const RLC_VERSION = "1.6.0";
 const RLC_TAG = "room-lights-card";
 
 // One meaning per colour (design tokens → Colours): orange = lights, green = someone here,
@@ -187,11 +187,14 @@ const SHEET_CSS = `
   button.open { background: ${C.orange}; color: #fff; }
   button.open .glyph { background: rgba(255,255,255,.2); }
   button.open .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
-     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
-  button.dismiss .glyph { background: rgba(255,255,255,.2); }
-  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
+  /* A sheet closes with a round ✕ at the right of its title row, out of the rows below it (the
+     user's choice, 20 Oct 2026; design tokens → Dialogs). */
+  .x { all: unset; box-sizing: border-box; flex: 0 0 42px; width: 42px; height: 42px; margin-left: auto; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--primary-text-color);
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .1); -webkit-tap-highlight-color: transparent; }
+  .x ha-icon { --mdc-icon-size: 24px; }
+  .x:active { filter: brightness(.92); }
+  .x:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button.open .nm, .lamp .nm { flex: 1; min-width: 0; overflow-wrap: break-word; }
   .sw { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 13px; position: relative; background: var(--disabled-color, #bdbdbd);
     transition: background-color 160ms; }
@@ -220,12 +223,9 @@ class RoomLampsSheet {
     const root = this.host.attachShadow({ mode: "open" });
     root.innerHTML = `<style>${SHEET_CSS}</style><div class="backdrop"></div>
       <div class="dialog" role="dialog" aria-modal="true">
-        <div class="head"><div class="glyph"><ha-icon></ha-icon></div><div class="title"></div></div>
+        <div class="head"><div class="glyph"><ha-icon></ha-icon></div><div class="title"></div><button class="x" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button></div>
         <div class="list"></div>
-        <div class="buttons">
-          ${room.navigation_path ? `<button class="open"><span class="glyph"><ha-icon></ha-icon></span><span class="nm"></span></button>` : ""}
-          <button class="close dismiss"><span class="glyph"><ha-icon icon="mdi:close"></ha-icon></span>Close</button>
-        </div>
+        ${room.navigation_path ? `<div class="buttons"><button class="open"><span class="glyph"><ha-icon></ha-icon></span><span class="nm"></span></button></div>` : ""}
       </div>`;
     // The sheet opens under the finger that is still holding the tile. When that finger lifts,
     // the browser sends a click to whatever is now under it – the backdrop – which would close
@@ -252,7 +252,7 @@ class RoomLampsSheet {
       }
     };
     root.querySelector(".backdrop").addEventListener("click", () => this.close());
-    root.querySelector(".close").addEventListener("click", () => this.close());
+    root.querySelector(".x").addEventListener("click", () => this.close());
     root.querySelector(".open")?.addEventListener("click", () => {
       this.close();
       card._navigate(room.navigation_path);
@@ -260,7 +260,7 @@ class RoomLampsSheet {
     document.addEventListener("keydown", this._onKey, true);
     document.body.appendChild(this.host);
     this.update(card._hass);
-    root.querySelector(".close").focus();
+    root.querySelector(".x").focus();
   }
 
   update(hass) {

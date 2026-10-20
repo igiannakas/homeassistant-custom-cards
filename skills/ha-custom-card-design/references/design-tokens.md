@@ -58,7 +58,8 @@ const text = (c, p = 75) => `color-mix(in srgb, ${c} ${p}%, var(--primary-text-c
 | Active tile glow (lit, heating, alarm) | `tint(colour, 10)` |
 | Neutral tile background | `rgba(var(--rgb-primary-text-color, 33,33,33), .04)` |
 | Neutral pill / segment track | `rgba(var(--rgb-primary-text-color, 33,33,33), .05)` |
-| Pop-up's way out (Close / Cancel / Done) | `var(--dark-grey-color, #606060)` fill, white text and glyph (`--text-primary-color`), glyph circle `rgba(255,255,255,.2)` |
+| Sheet's way out | round ✕ in the title row: 42px, `rgba(var(--rgb-primary-text-color, 33,33,33), .1)`, 24px icon in the text colour |
+| Confirmation's Cancel | full size, `rgba(var(--rgb-primary-text-color, 33,33,33), .1)`, glyph circle `.08`, text-coloured text and glyph |
 | Pill that is "on" | `tint(colour, 18)` background, `text(colour, 70)` label – on every card |
 | Press feedback | `:active { filter: brightness(.92); }` – on every card |
 | Small reading icons | `color-mix(in srgb, var(--secondary-text-color) 55%, transparent)` |
@@ -228,20 +229,27 @@ cells) and 8px gaps, never through extra height.
 /* title row: 42px glyph circle + 20px/600 title; rows: 56px, radius 28, 36px glyph, 16px/600 */
 /* actions sit below a divider: margin-top 20px; padding-top 20px; border-top 1px divider */
 /* call to action: filled with the card's colour, white text, glyph rgba(255,255,255,.2) */
-/* the way out (Close / Cancel / Done – it only dismisses): class "dismiss", the theme's dark grey */
-button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
-button.dismiss .glyph { background: rgba(255,255,255,.2); }
-button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
+/* a sheet's way out: a round ✕ at the end of the title row (no Close / Done row at the bottom) */
+.x { all: unset; flex: 0 0 42px; width: 42px; height: 42px; margin-left: auto; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: var(--primary-text-color);
+  background: rgba(var(--rgb-primary-text-color, 33,33,33), .1); }   /* 24px mdi:close, aria-label="Close" */
+/* a confirmation's way out: Cancel, full size like the confirm button, plain light grey */
+button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .1); color: var(--primary-text-color); }
+button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); }
+button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
 ```
 
-- **The way out is the dark grey** (decided 20 Oct 2026): Close, Cancel and Done – the button that
-  only dismisses the pop-up – are filled in Home Assistant's `--dark-grey-color` (#606060) with white
-  (`--text-primary-color`) text and glyph on a `rgba(255,255,255,.2)` circle, built like the call to
-  action. Rows and secondary buttons stay at `.07` or lighter, so the way out never reads as one more row
-  (in the rows' grey: "they look like a continuation of the tiles"). Not a tint of the text colour: a
-  `.28` tint put black text on a mid grey, which read as low contrast. A fixed dark grey with white text
-  stands out on a light and a dark pop-up alike (6.3:1). It is never a colour: a colour means the action.
-- Every pop-up has exactly one dismiss button; tests check it with the harness's `assertDismiss`.
+- **The way out** (decided 20 Oct 2026, after three tries):
+  - **Sheets** (details, settings that apply at once, a list of lamps or washes) close with a round ✕ at
+    the end of the title row – 42px like the title glyph, a `.1` grey circle, a 24px `mdi:close` in the
+    text colour, `aria-label="Close"`, keyboard focus on open. No Close or Done row at the bottom: it read
+    as "a continuation of the tiles". A sheet's own actions (Open room, Reset, History) stay below the
+    divider; a sheet with none has no divider.
+  - **Confirmations** (confirm / Save against Cancel) keep Cancel at the bottom, full size like the
+    confirm button, in a plain light grey (`.1`, glyph circle `.08`, text in the text colour) – no ✕.
+  - Tried and rejected: a `.28` tint (black text on a mid grey – "low contrast on text") and the theme's
+    dark grey with white text (a dark slab that outweighed the pop-up).
+- Tests check every pop-up with the harness's `assertSheetClose` or `assertCancel`.
 
 ## States that read well
 

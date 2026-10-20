@@ -22,7 +22,7 @@
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.7.7";
+const RVC_VERSION = "2.8.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -437,11 +437,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
-     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
-  button.dismiss .glyph { background: rgba(255,255,255,.2); }
-  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
+  /* Cancel – it only dismisses the confirmation – is full size like the confirm button, in a plain
+     light grey: quiet beside the coloured choice, never black text on a mid grey (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .1); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -518,19 +518,14 @@ const MODE_SHEET_CSS = `
   .tabs { margin-top: 18px; }
   .sets { margin-top: 14px; display: grid; gap: 12px; }
   .seg button { font-size: 13px; }
-  .actions { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
-  .done { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 10px; height: 56px; width: 100%; padding-left: 10px;
-    border-radius: 28px; cursor: pointer; font-size: 16px; font-weight: 600;
-    background: rgba(var(--rgb-primary-text-color, 33,33,33), .07); color: var(--primary-text-color); }
-  .done .glyph { flex-basis: 36px; height: 36px; background: color-mix(in srgb, var(--grey-color, #9e9e9e) 20%, transparent); }
-  .done .glyph ha-icon { --mdc-icon-size: 22px; color: var(--grey-color, #9e9e9e); }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
-     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
-  button.dismiss .glyph { background: rgba(255,255,255,.2); }
-  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
-  .done:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
-  .done:active { filter: brightness(.92); }
+  /* A sheet closes with a round ✕ at the right of its title row, out of the rows below it (the
+     user's choice, 20 Oct 2026; design tokens → Dialogs). */
+  .x { all: unset; box-sizing: border-box; flex: 0 0 42px; width: 42px; height: 42px; margin-left: auto; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--primary-text-color);
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .1); -webkit-tap-highlight-color: transparent; }
+  .x ha-icon { --mdc-icon-size: 24px; }
+  .x:active { filter: brightness(.92); }
+  .x:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   ${SEG_CSS}
   @keyframes fade { from { opacity: 0; } }
   @keyframes pop { from { opacity: 0; transform: scale(.94); } }
@@ -1318,9 +1313,9 @@ class RobotVacuumCard extends HTMLElement {
     root.innerHTML = `<style>${MODE_SHEET_CSS}</style><div class="backdrop"></div>
       <div class="dialog" role="dialog" aria-modal="true" aria-label="Cleaning mode">
         <div class="row"><div class="glyph" style="background:${tint(C.teal, 20)}"><ha-icon icon="mdi:tune-variant" style="color:${C.teal}"></ha-icon></div>
-          <div class="title">Cleaning mode</div></div>
-        <div class="seg tabs"></div><div class="sets"></div>
-        <div class="actions"><button class="done dismiss"><span class="glyph"><ha-icon icon="mdi:check"></ha-icon></span>Done</button></div></div>`;
+          <div class="title">Cleaning mode</div>
+          <button class="x" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button></div>
+        <div class="seg tabs"></div><div class="sets"></div></div>`;
     const onKey = (e) => {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -1328,13 +1323,13 @@ class RobotVacuumCard extends HTMLElement {
       }
     };
     root.querySelector(".backdrop").addEventListener("click", () => this._closeMode());
-    root.querySelector(".done").addEventListener("click", () => this._closeMode());
+    root.querySelector(".x").addEventListener("click", () => this._closeMode());
     root.querySelector(".dialog").addEventListener("click", (e) => this._clickMode(e));
     document.addEventListener("keydown", onKey, true);
     document.body.appendChild(host);
     this._sheet = { host, root, onKey, keys: {} };
     this._paintMode(root, this._sheet.keys);
-    root.querySelector(".done").focus();
+    root.querySelector(".x").focus();
   }
 
   _closeMode() {

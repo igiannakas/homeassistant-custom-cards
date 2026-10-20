@@ -3,7 +3,7 @@ const { JSDOM } = require("jsdom");
 const fs = require("fs");
 const path = require("path");
 const assert = require("assert");
-const { assertDismiss } = require("./_harness");
+const { assertCancel } = require("./_harness");
 const src = fs.readFileSync(path.join(__dirname, "..", "cards", "climate-modes-card", "climate-modes-card.js"), "utf8");
 const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only", pretendToBeVisual: true, url: "https://ha.local/lovelace/0" });
 const { window } = dom;
@@ -153,7 +153,7 @@ const cfg = {
   // Reference layout: one glyph, the text under the title, a rule above the buttons; the old
   // subject line (and its second glyph) is gone – with a text, the subject isn't shown at all.
   const ds = dlg.shadowRoot;
-  assert.strictEqual(assertDismiss(ds, "mode dialog"), ds.querySelector(".cancel"), "Cancel is the way out");
+  assert.strictEqual(assertCancel(ds, "mode dialog"), ds.querySelector(".cancel"), "Cancel is the way out");
   assert(!dt.includes("All rooms"), "no subject line");
   assert(!ds.querySelector(".body, .primary, .secondary"));
   assert.strictEqual(ds.querySelectorAll(".dialog > .row").length, 1);

@@ -142,7 +142,7 @@ const cfg = {
     assert(dlg(), `${title} asks first`);
     if (title) assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, title);
     const msg = dlg().shadowRoot.querySelector(".text").textContent;
-    assert.strictEqual(load.assertDismiss(dlg().shadowRoot, `${title || "confirm"} dialog`), dlg().shadowRoot.querySelector(".cancel"), "Cancel is the way out");
+    assert.strictEqual(load.assertCancel(dlg().shadowRoot, `${title || "confirm"} dialog`), dlg().shadowRoot.querySelector(".cancel"), "Cancel is the way out");
     assert(!/Vacuum cleaner/.test(dlg().shadowRoot.textContent.replace(msg, "")), "no device name in the pop-up");
     dlg().shadowRoot.querySelector(".confirm").click();
     await tick();
@@ -371,7 +371,7 @@ const cfg = {
   assert(sheet(), "the tile opens the sheet");
   const sr = sheet().shadowRoot;
   assert.strictEqual(sr.querySelector(".title").textContent, "Cleaning mode");
-  assert.strictEqual(load.assertDismiss(sr, "cleaning mode sheet"), sr.querySelector(".done"), "Done is the way out");
+  assert.strictEqual(load.assertSheetClose(sr, "cleaning mode sheet"), sr.activeElement, "focus on the ✕");
   eq([...sr.querySelectorAll(".tabs button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? "*" : "")), ["Vac & mop*", "Mop", "Vacuum"]);
   eq([...sr.querySelectorAll(".set")].map((s) => s.dataset.k), ["fan", "water", "count", "route"]);
   sr.querySelector('.set[data-k="water"] [data-v="intense"]').click();
@@ -388,8 +388,8 @@ const cfg = {
     "select.vacuum_cleaner_mop_intensity": st("intense", { options: ["off", "mild", "standard", "intense", "custom"] }),
   }));
   assert.strictEqual(text(".modetile .mode-line"), "Mop · Intense mop");
-  sr.querySelector(".done").click();
-  assert(!sheet(), "Done closes");
+  sr.querySelector(".x").click();
+  assert(!sheet(), "the ✕ closes");
   card.hass = full(states());
   assert.strictEqual(text(".modetile .mode-line"), "Vac & mop · Turbo · Standard mop");
   q(".modetile").click();

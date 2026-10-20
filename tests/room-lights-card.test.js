@@ -3,7 +3,7 @@ const { JSDOM } = require("jsdom");
 const fs = require("fs");
 const path = require("path");
 const assert = require("assert");
-const { assertDismiss } = require("./_harness");
+const { assertSheetClose } = require("./_harness");
 const src = fs.readFileSync(path.join(__dirname, "..", "cards", "room-lights-card", "room-lights-card.js"), "utf8");
 const dom = new JSDOM("<!doctype html><body></body>", { runScripts: "outside-only", pretendToBeVisual: true, url: "https://ha.local/lovelace/0" });
 const { window } = dom;
@@ -270,7 +270,8 @@ const cfg = {
   assert.strictEqual(sr.querySelectorAll(".lamp")[1].getAttribute("aria-checked"), "true");
   // The sheet: title only (no clipping), text and buttons below a 1px rule.
   const sheetCss = sr.querySelector("style").textContent;
-  assert.strictEqual(assertDismiss(sr, "lamps sheet"), sr.querySelector(".close"), "Close is the way out, not another lamp row");
+  assert.strictEqual(assertSheetClose(sr, "lamps sheet"), sr.activeElement, "focus on the ✕");
+  eq([...sr.querySelectorAll(".buttons button")].map((b) => b.className), ["open"], "only Open room below the divider");
   assert(!/text-overflow:\s*ellipsis/.test(sheetCss), "sheet names wrap, never cut");
   assert(/\.buttons \{[^}]*border-top: 1px solid/.test(sheetCss), "rule above the buttons");
   assert(/button \{[^}]*min-height: 56px/.test(sheetCss) && !/button \{[^}]*[^-]height: 56px/.test(sheetCss), "rows grow for a long lamp name");

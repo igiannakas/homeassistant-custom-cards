@@ -56,10 +56,11 @@ Most of them generalise to any dashboard.
 - Every row: circle, text block and controls on one centre line, measured. `ha-icon` is always `inline-flex` (as a block its glyph sat 0.4–3px low on a text line). The home-status header was rebuilt as `[circle] [title + detail] [Armed]` instead of a chip on the title line only.
 - Behaviour is consistent across items, even when one room has a single lamp.
 - Sheet actions go below a divider. The main action is filled in the card's colour.
-- The pop-up's way out (Close / Cancel / Done) is the theme's dark grey with white text, never the rows'
-  `.07`: in the same grey it read as "a continuation of the tiles". A `.28` tint of the text colour was
-  tried first and put black text on a mid grey – "low contrast on text". Applied to every pop-up at once,
-  including the cards that ship inside integrations (washing machine, Roomstat).
+- A sheet closes with a round ✕ in its title row; a confirmation keeps a full-size, light-grey Cancel
+  beside the confirm button (the user's pick of three mock-ups). A Close row in the rows' grey read as "a
+  continuation of the tiles"; a `.28` grey gave "low contrast on text"; a dark-grey slab was "I don't like
+  it". After the first rejection, show two or three options on the real pop-up instead of another guess.
+  Apply it to every pop-up at once, including the cards inside integrations (washing machine, Roomstat).
 - Reuse the icons the user already chose in their room views. Read them from the view config.
 - The user picks icons. Align secondary bits with the line they belong to.
 - Check the real timing: automations turned lights off within 3–5 min, so a 10 min threshold never fired. The default became 2 min.

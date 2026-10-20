@@ -8,7 +8,7 @@
  * See cards/home-status-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.3.3";
+const HSC_VERSION = "1.3.4";
 const HSC_TAG = "home-status-card";
 
 // One meaning per colour (design tokens → Colours): green = someone home, orange = the step
@@ -170,11 +170,11 @@ const DIALOG_CSS = `
   button.confirm { color: #fff; }
   button.confirm .glyph { background: rgba(255,255,255,.2); }
   button.confirm .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
-     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
-  button.dismiss .glyph { background: rgba(255,255,255,.2); }
-  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
+  /* Cancel – it only dismisses the confirmation – is full size like the confirm button, in a plain
+     light grey: quiet beside the coloured choice, never black text on a mid grey (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .1); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }

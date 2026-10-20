@@ -13,7 +13,7 @@
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.5.3";
+const VMC_VERSION = "2.6.0";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -158,11 +158,19 @@ const SHEET_CSS = `
   button.cta { color: #fff; background: ${C.teal}; }
   button.cta .glyph { background: rgba(255,255,255,.2); }
   button.cta .glyph ha-icon { color: #fff; }
-  /* Close / Cancel / Done – the button that only dismisses the pop-up – is filled in the theme's dark grey
-     with white text, so it reads as the way out rather than one more row (design tokens → Dialogs). */
-  button.dismiss { background: var(--dark-grey-color, #606060); color: var(--text-primary-color, #fff); }
-  button.dismiss .glyph { background: rgba(255,255,255,.2); }
-  button.dismiss .glyph ha-icon { color: var(--text-primary-color, #fff); }
+  /* Cancel – it only dismisses the confirmation – is full size like the confirm button, in a plain
+     light grey: quiet beside the coloured choice, never black text on a mid grey (design tokens → Dialogs). */
+  button.dismiss { background: rgba(var(--rgb-primary-text-color, 33,33,33), .1); color: var(--primary-text-color); }
+  button.dismiss .glyph { background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); }
+  button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
+  /* A sheet closes with a round ✕ at the right of its title row, out of the rows below it (the
+     user's choice, 20 Oct 2026; design tokens → Dialogs). */
+  .x { all: unset; box-sizing: border-box; flex: 0 0 42px; width: 42px; height: 42px; margin-left: auto; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--primary-text-color);
+    background: rgba(var(--rgb-primary-text-color, 33,33,33), .1); -webkit-tap-highlight-color: transparent; }
+  .x ha-icon { --mdc-icon-size: 24px; }
+  .x:active { filter: brightness(.92); }
+  .x:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
   button:active { filter: brightness(.92); }
   @keyframes fade { from { opacity: 0; } }
@@ -478,10 +486,10 @@ class VacuumMaintenanceCard extends HTMLElement {
     const buttons = sh.confirm
       ? `<button class="cta" data-a="confirm">${glyph("mdi:restore")}Reset</button><button class="dismiss" data-a="close">${glyph("mdi:close")}Cancel</button>`
       : `${it.reset ? `<button class="cta" data-a="reset">${glyph("mdi:restore")}Reset after ${it.clean ? "cleaning" : "replacing"}</button>` : ""}
-         <button data-a="history">${glyph("mdi:chart-line")}History</button><button class="dismiss" data-a="close">${glyph("mdi:close")}Close</button>`;
+         <button data-a="history">${glyph("mdi:chart-line")}History</button>`;
     sh.root.querySelector(".dialog").setAttribute("aria-label", it.name);
     sh.root.querySelector(".dialog").innerHTML = `<div class="row"><div class="glyph" style="background:${tint(color, 20)}"><ha-icon icon="${esc(it.icon)}" style="color:${color}"></ha-icon></div>
-      <div class="title">${esc(sh.confirm ? `Reset ${it.name.toLowerCase()}?` : it.name)}</div></div>
+      <div class="title">${esc(sh.confirm ? `Reset ${it.name.toLowerCase()}?` : it.name)}</div>${sh.confirm ? "" : '<button data-a="close" class="x" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button>'}</div>
       <div class="text">${esc(text)}</div><div class="buttons">${buttons}</div>`;
   }
 
