@@ -120,7 +120,8 @@ Most of them generalise to any dashboard.
 
 - Costs read in pence under a pound ("9p") and in pounds from a pound up ("£1.23") – on every card, chart label and tooltip, not just one card.
 - One card per appliance: circle + "Name · Running" + the rule line, the printer's split power pill ("On | 252 W" while on, "Off" while off), and a strip of today's numbers (reading, On for / Off since, Today, Today's cost) with straight dividers.
-- An appliance's circle shows its state: orange while on (power, like a lit room and the pill), grey while off. Teal is for a tap target with no state colour of its own; blue for a job in progress (print, clean).
+- An appliance's circle shows its state: orange while on (power, like a lit room and the pill), grey while off. Teal is for a tap target with no state colour of its own; blue for the robot vacuum's jobs (a clean).
+- A printer printing is an appliance that is on: its icon is orange like the washing machine washing and the purifier running on the same dashboard ("Voron icon should be consistent … as the rest of the devices when printing"), and its job bar follows the icon. Compare a state colour with the neighbouring cards on the dashboard, not only with the palette table.
 - Say what the automation does in its own words: "On at 17:30", "Off at 09:00", "On above 62%" – never a vague "Auto".
 - Times and thresholds live in helpers (input_datetime time-only, input_number) used by the automation's triggers and conditions; the card reads the same helpers. No copied numbers in the card config. A window that crosses midnight needs from/until time helpers, not a schedule helper (its blocks stop at midnight and it can't be read by non-admins).
 

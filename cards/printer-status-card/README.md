@@ -16,7 +16,7 @@
 └──────────────────────────────────────────────────────┘
 ```
 
-- **Header**: state in its colour (Off grey, Ready grey, Printing blue, Paused amber,
+- **Header**: state in its colour (Off grey, Ready grey, Printing orange like other appliances that are on, Paused amber,
   Complete green, Cancelled grey, Error red) and the printer's message – or the file name
   during a job. While the plug is on but the printer isn't answering it says **Please wait**,
   with why: "Shutting down" (the `power_off_script` is running), "Klipper is starting", or

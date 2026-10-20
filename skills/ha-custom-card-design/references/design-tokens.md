@@ -12,10 +12,10 @@ decorate it (decided 14 Oct 2026):
 | Colour | Means | Examples |
 |---|---|---|
 | Teal | **You can tap or pick this** – the accent for anything interactive that has no state colour of its own | The energy card's circle, a link pill's icon, the Cleaning mode tile, rooms picked for the next clean, current values in a sheet, a toggle that's on, Auto clean when away |
-| Blue | **Something running**, and the button that starts it | Cleaning / Returning, printing, Clean + Resume (filled), a dock job while it runs, the room the robot is cleaning; cooling (literally cold) |
+| Blue | **Something running**, and the button that starts it | Cleaning / Returning, Clean + Resume (filled), a dock job while it runs, the room the robot is cleaning; cooling (literally cold) |
 | Green | **Good, and someone home** (Home Assistant colours a person at home green) | Battery above 30%, VOC under 150, dry filament, a room or the house occupied, the Home pill |
 | Amber | **Early warning** – needs attention soon | Paused, a part due soon, battery ≤ 30%, VOC 150+, mop not attached |
-| Orange | **Lights, heat and power – and the step before red on a scale** | A lit room, heating, a plug / watts, the printer's power, an appliance that is on; Poor air, VOC 250+, wet filament, presence lost within the hour |
+| Orange | **Lights, heat and power – and the step before red on a scale** | A lit room, heating, a plug / watts, the printer's power, an appliance that is on – a printer printing included, like the washing machine washing; Poor air, VOC 250+, wet filament, presence lost within the hour |
 | Red | **A call for attention** | An error, a tank to empty, a part due now, battery ≤ 15%, door open, alarm armed, house empty for over an hour, heating on while away |
 | Grey | **Off, idle or neutral** – and every purely decorative icon | Docked, Idle, a part that's fine, a header icon that isn't tappable and shows no state |
 
@@ -261,4 +261,5 @@ button.dismiss .glyph ha-icon { color: var(--primary-text-color); }
   → Ventilate (open window, red glow). The words differ by level, not just by colour.
 - Presence: someone here (green) → left within the hour (orange) → empty for longer (red on
   a house; grey "12 min ago" on a room).
-- Printer: off grey, ready grey, printing blue, paused amber, complete green, error red.
+- Printer: off grey, ready grey, printing orange (an appliance that is on, as on the appliance cards;
+  the job bar follows), paused amber, complete green, error red.

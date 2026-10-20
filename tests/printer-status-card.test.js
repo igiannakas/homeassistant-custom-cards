@@ -137,6 +137,9 @@ const cfg = {
   // Printing: job block with progress, time left, layers, filament, speed; no buttons.
   card.hass = hass(states(printing()));
   assert.strictEqual(nm(r), "Voron · Printing");
+  // Printing is orange, like the other appliances that are on (washing, purifying) – not blue.
+  assert.strictEqual(q(".shape ha-icon").style.color, "var(--orange-color, #ff9800)", "printing icon orange");
+  assert(q(".shape").style.background.includes("var(--orange-color, #ff9800) 20%"), "printing circle orange at 20%");
   assert.strictEqual(q(".msg").textContent, "bracket_v3.gcode");
   assert.strictEqual(q(".job").style.display, "");
   assert(/^62%1 h 23 min left · ends \d\d:\d\d$/.test(txt(q(".pct"))), txt(q(".pct")));
@@ -150,6 +153,7 @@ const cfg = {
   }
   card.hass = hass(states(printing()));
   assert.strictEqual(q(".pbar i").style.width, "62%");
+  assert.strictEqual(q(".pbar i").style.background, "var(--orange-color, #ff9800)", "the job bar follows the icon");
   assert.strictEqual(txt(q(".l1")), "Layer 141 / 230 · 12.3 m filament");
   eq([...r.querySelectorAll(".l1 .p")].map((x) => x.textContent), ["Layer 141 / 230", "12.3 m filament"]);
   assert.strictEqual(q(".l2").textContent, "250 mm/s");
@@ -432,6 +436,8 @@ const cfg = {
     assert.strictEqual(cr.querySelectorAll(".sc2 .p").length, 2, "each time stays whole");
     assert(!cr.querySelector(".cbar").hidden);
     assert.strictEqual(cr.querySelector(".cbar i").style.width, "62%");
+    assert.strictEqual(cr.querySelector(".shape ha-icon").style.color, "var(--orange-color, #ff9800)", "compact: printing icon orange");
+    assert.strictEqual(cr.querySelector(".cbar").style.getPropertyValue("--c"), "var(--orange-color, #ff9800)", "compact: the bar follows the icon");
     assert.strictEqual(cr.querySelector(".watts span").textContent, "142 W");
     const before = calls.length;
     cr.querySelector(".watts").click();

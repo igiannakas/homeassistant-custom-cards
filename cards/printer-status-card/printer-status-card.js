@@ -19,12 +19,11 @@
  * See cards/printer-status-card/README.md for every option.
  */
 
-const PSC_VERSION = "1.7.7";
+const PSC_VERSION = "1.8.0";
 const PSC_TAG = "printer-status-card";
 
 const C = {
   grey: "var(--grey-color, #9e9e9e)",
-  blue: "var(--blue-color, #2196f3)",
   amber: "var(--amber-color, #ffc107)",
   green: "var(--green-color, #4caf50)",
   red: "var(--red-color, #f44336)",
@@ -67,7 +66,9 @@ function hoursFrom(text) {
 const STATES = {
   off: { word: "Off", color: C.grey, icon: "mdi:printer-3d-off" },
   ready: { word: "Ready", color: C.grey, icon: "mdi:printer-3d" },
-  printing: { word: "Printing", color: C.blue, icon: "mdi:printer-3d-nozzle" },
+  // A printer at work is an appliance that is on: orange, like the washing machine washing or the
+  // purifier running on the same dashboard (the user's choice, 20 Oct 2026; blue until 1.7).
+  printing: { word: "Printing", color: C.orange, icon: "mdi:printer-3d-nozzle" },
   paused: { word: "Paused", color: C.amber, icon: "mdi:pause-circle-outline" },
   complete: { word: "Complete", color: C.green, icon: "mdi:check-circle-outline" },
   cancelled: { word: "Cancelled", color: C.grey, icon: "mdi:close-circle-outline" },
@@ -287,7 +288,7 @@ const CSS = `
   /* A job progress bar is 8px, here as on the full card. */
   .cbar { height: 8px; border-radius: 4px; margin-top: 6px; background: rgba(var(--rgb-primary-text-color, 33,33,33), .08); overflow: hidden; }
   .cbar[hidden], .sc:empty { display: none; }
-  .cbar i { display: block; height: 100%; border-radius: 4px; background: var(--c, ${C.blue}); transition: width 300ms; }
+  .cbar i { display: block; height: 100%; border-radius: 4px; background: var(--c, ${C.orange}); transition: width 300ms; }
   .watts { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 10px; border-radius: 18px;
     font-size: 13px; font-weight: 600; letter-spacing: .2px; white-space: nowrap;
     background: ${tint(C.orange, 18)}; color: color-mix(in srgb, ${C.orange} 70%, var(--primary-text-color)); }
