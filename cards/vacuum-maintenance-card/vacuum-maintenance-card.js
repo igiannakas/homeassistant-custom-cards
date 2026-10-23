@@ -2,9 +2,9 @@
  * Vacuum maintenance card – https://github.com/igiannakas/homeassistant-custom-cards
  *
  * A robot vacuum's dock and consumables. First, what matters most: the dock's clean and dirty
- * water tanks as two tiles with a tank glyph (red when one needs you – refill it, empty it).
- * Then the consumables in one row of numbers: main brush, side brush, filter and
- * sensors as the share of life left (hours when the life isn't known, e.g. the dock's brush
+ * water tanks as two tiles with a tank glyph (red when one needs you – refill it, empty it –
+ * whether the tank's own sensor or the dock's error says so). Then the consumables in one row
+ * of numbers: main brush, side brush, filter and sensors as the share of life left (hours when the life isn't known, e.g. the dock's brush
  * and strainer), what is due next, a quiet line for the dock (water tanks, auto-empty mode)
  * (the dock's own jobs – Empty, Wash mop, Dry mop – are on the robot vacuum card). Tap a number for the details
  * (hours left, about how many cleans that is at your average) and Reset after replacing (or
@@ -13,7 +13,7 @@
  * See cards/vacuum-maintenance-card/README.md for every option.
  */
 
-const VMC_VERSION = "2.6.0";
+const VMC_VERSION = "2.7.0";
 const VMC_TAG = "vacuum-maintenance-card";
 
 const C = {
@@ -61,6 +61,7 @@ const OTHER = {
   total_count: { domain: "sensor", tk: ["total_cleaning_count"], sfx: ["_total_cleaning_count"] },
   clean_box: { domain: "binary_sensor", tk: ["clean_box_empty", "dock_clean_water_box"], sfx: ["_clean_water_box"] },
   dirty_box: { domain: "binary_sensor", tk: ["dirty_box_full", "dock_dirty_water_box"], sfx: ["_dirty_water_box"] },
+  dock_error: { domain: "sensor", tk: ["dock_error"], sfx: ["_dock_error"] },
   empty_mode: { domain: "select", tk: ["dust_collection_mode", "dock_empty_mode"], sfx: ["_empty_mode", "_dust_collection_mode"] },
 };
 
@@ -117,12 +118,23 @@ function model(hass, cfg, found) {
   const avgH = totalH && count ? totalH / count : null;
   const next = items.filter((i) => i.left !== null).sort((a, b) => a.left - b.left)[0];
   const box = (id) => hass.states[id]?.state;
+  // A tank needs you when its own sensor says so or when the dock's error names it. Roborock
+  // reports the two separately: back at the dock to wash the mop, the robot can raise "water
+  // empty" while the tank's flag stays clear. When only the error says so, the tile opens the
+  // dock error – the entity that holds the reason.
+  const dockError = found.dock_error ? box(found.dock_error) : undefined;
+  const tank = (id, error) => {
+    if (!id) return null;
+    if (box(id) === "on") return { e: id, bad: true };
+    if (dockError === error) return { e: found.dock_error, bad: true };
+    return { e: id, bad: false };
+  };
   return {
     items,
     avgH,
     next,
-    clean: found.clean_box ? { e: found.clean_box, bad: box(found.clean_box) === "on" } : null,
-    dirty: found.dirty_box ? { e: found.dirty_box, bad: box(found.dirty_box) === "on" } : null,
+    clean: tank(found.clean_box, "water_empty"),
+    dirty: tank(found.dirty_box, "waste_water_tank_full"),
     empty: found.empty_mode && !DEAD.includes(box(found.empty_mode)) ? { e: found.empty_mode, mode: box(found.empty_mode) } : null,
   };
 }
@@ -395,6 +407,8 @@ class VacuumMaintenanceCard extends HTMLElement {
     }
     for (const [k, x] of list) {
       const b = tanks.querySelector(`[data-tank="${k}"]`);
+      // The entity a tank opens follows what says it needs you (its sensor or the dock error).
+      if (b.dataset.e !== x.e) b.dataset.e = x.e;
       const shape = b.querySelector(".shape");
       const st = b.querySelector(".st");
       if (k === "empty") {

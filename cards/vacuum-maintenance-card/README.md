@@ -25,6 +25,9 @@
   circle – a drop for clean water (blue), a speckled drop for dirty water (brown). A tank that
   needs you glows red and says what to do: "Empty – refill it", "Full – empty it". The glyph
   never shows a level: the dock only reports OK / empty / full. Tap a tank for its more-info.
+  A tank also reads empty / full when the dock's error says so (`water_empty`,
+  `waste_water_tank_full`): Roborock reports the tank flag and the dock error separately, and
+  the robot can raise the error while the flag stays clear. The tile then opens the dock error.
 - **Numbers**: main brush, side brush, filter and sensors as the share of life left (from
   the hours left and each part's life); the dock's brush and strainer in hours, as their life
   isn't known (set `lives` to see them as %). Amber under `due_soon` hours, **Now** in red at
@@ -62,4 +65,4 @@ entity: vacuum.vacuum_cleaner
 | `lives` | main_brush 300, side_brush 200, filter 150, sensor 30 | Hours of cleaning per part. Add `dock_brush` / `strainer` to show them as %. |
 | `hide` | – | Parts to leave out: `main_brush`, `side_brush`, `filter`, `sensor`, `dock_brush`, `strainer`. |
 | `hide_dock` | false | Leave the water tanks and the Auto-empty tile out. |
-| `entities` | found | Override a part's sensor (`main_brush`, …) or its reset button (`reset_main_brush`, …), or `total_time`, `total_count`, `clean_box`, `dirty_box`, `empty_mode`. |
+| `entities` | found | Override a part's sensor (`main_brush`, …) or its reset button (`reset_main_brush`, …), or `total_time`, `total_count`, `clean_box`, `dirty_box`, `dock_error`, `empty_mode`. |

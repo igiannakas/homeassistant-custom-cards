@@ -115,6 +115,7 @@ Most of them generalise to any dashboard.
 - Offer a control only while the device will accept it: the robot refuses a map switch while the dock empties the bin or washes the mop, so the floors hide then too. A change shown before the device confirms it goes back at once when the call fails – never left showing for the timeout.
 - A toggle says its state in words, not only in colour: "Auto clean when away" glowing while on, "Auto clean off" while off. Not a negated command ("Don't auto clean…") in a row of action buttons – it reads as what a tap does.
 - Trust the device's own job flag over its headline state: a Roborock washing its mop before or between rooms reports Docked, but its in-cleaning flag is on and its counters have restarted, so the card shows the clean, not "Last clean · 0 m² · 0 min".
+- When a device reports one condition through two entities, every card that shows it reads both, so two cards on a view never disagree. A Roborock raised the dock error `water_empty` while its clean-tank flag stayed off: the vacuum card said "refill the clean water tank", the maintenance card said "OK" (23 Oct 2026). The tile now reads either, and opens whichever one said so.
 
 ## Appliances (Oct 2026)
 

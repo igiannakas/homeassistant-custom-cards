@@ -21,6 +21,7 @@ const REG = {
   "button.vacuum_cleaner_dock_reset_cleaning_brush_consumable": [DOCK, null],
   "binary_sensor.vacuum_cleaner_dock_dirty_water_box": [DOCK, null],
   "binary_sensor.vacuum_cleaner_dock_clean_water_box": [DOCK, null],
+  "sensor.vacuum_cleaner_dock_error": [DOCK, "dock_error"],
   "select.vacuum_cleaner_dock_empty_mode": [DOCK, null],
   "switch.vacuum_cleaner_dock_dust_emptying": [DOCK, null],
   "switch.vacuum_cleaner_dock_mop_washing": [DOCK, null],
@@ -30,6 +31,8 @@ const REG = {
 const st = (state, attributes = {}) => ({ state: String(state), attributes });
 const s = (v) => st(v, { unit_of_measurement: "s", device_class: "duration" });
 const h = (v) => st(v, { unit_of_measurement: "h", device_class: "duration" });
+const DOCK_ERRORS = ["ok", "no_dustbin_or_filter", "duct_blockage", "water_empty", "waste_water_tank_full", "dirty_tank_latch_open", "cleaning_tank_full_or_blocked"];
+const derr = (v) => st(v, { device_class: "enum", options: DOCK_ERRORS });
 function states(over = {}) {
   return {
     "vacuum.vacuum_cleaner": st("docked", { friendly_name: "Vacuum cleaner" }),
@@ -48,6 +51,7 @@ function states(over = {}) {
     "button.vacuum_cleaner_dock_reset_cleaning_brush_consumable": st("unknown"),
     "binary_sensor.vacuum_cleaner_dock_dirty_water_box": st("off", { device_class: "problem" }),
     "binary_sensor.vacuum_cleaner_dock_clean_water_box": st("off", { device_class: "problem" }),
+    "sensor.vacuum_cleaner_dock_error": derr("ok"),
     "select.vacuum_cleaner_dock_empty_mode": st("max", { options: ["smart", "light", "balanced", "max"] }),
     "switch.vacuum_cleaner_dock_dust_emptying": st("off"),
     "switch.vacuum_cleaner_dock_mop_washing": st("off"),
@@ -165,6 +169,69 @@ const devices = {
   card.hass = full(states({ "binary_sensor.vacuum_cleaner_dock_dirty_water_box": st("on"), "binary_sensor.vacuum_cleaner_dock_clean_water_box": st("on") }));
   eq(tanks(), [["Clean water", "Empty – refill it", true], ["Dirty water", "Full – empty it", true], ["Auto-empty", "Max", false]], "a tank that needs you glows red and says what to do");
   assert(q('.tank[data-tank="dirty"] .shape').style.color.includes("red"));
+  q('.tank[data-tank="clean"]').click();
+  eq(events.pop(), ["more-info", "binary_sensor.vacuum_cleaner_dock_clean_water_box"], "its own sensor said so, so it opens that");
+
+  // The dock's error counts too. Seen live (23 Oct 2026): back at the dock to wash the mop, the robot
+  // raised "water_empty" while the tank's flag stayed clear, so the vacuum card said "refill the clean
+  // water tank" and this card said OK. Now the tile agrees, and opens the dock error that said so.
+  const OK3 = [["Clean water", "OK", false], ["Dirty water", "OK", false], ["Auto-empty", "Max", false]];
+  card.hass = full(states({ "sensor.vacuum_cleaner_dock_error": derr("water_empty") }));
+  eq(tanks(), [["Clean water", "Empty – refill it", true], ["Dirty water", "OK", false], ["Auto-empty", "Max", false]], "dock error alone empties the clean tank");
+  assert(q('.tank[data-tank="clean"] .shape').style.color.includes("red"));
+  assert(q('.tank[data-tank="dirty"] .shape').style.color.includes("brown"));
+  q('.tank[data-tank="clean"]').click();
+  eq(events.pop(), ["more-info", "sensor.vacuum_cleaner_dock_error"], "the tile opens the dock error that said so");
+  q('.tank[data-tank="dirty"]').click();
+  eq(events.pop(), ["more-info", "binary_sensor.vacuum_cleaner_dock_dirty_water_box"], "the other tank still opens its own sensor");
+  // Its twin, for the dirty tank.
+  card.hass = full(states({ "sensor.vacuum_cleaner_dock_error": derr("waste_water_tank_full") }));
+  eq(tanks(), [["Clean water", "OK", false], ["Dirty water", "Full – empty it", true], ["Auto-empty", "Max", false]], "dock error alone fills the dirty tank");
+  q('.tank[data-tank="dirty"]').click();
+  eq(events.pop(), ["more-info", "sensor.vacuum_cleaner_dock_error"]);
+  q('.tank[data-tank="clean"]').click();
+  eq(events.pop(), ["more-info", "binary_sensor.vacuum_cleaner_dock_clean_water_box"]);
+  // Both saying so: the tank's own sensor is what it opens.
+  card.hass = full(states({ "sensor.vacuum_cleaner_dock_error": derr("water_empty"), "binary_sensor.vacuum_cleaner_dock_clean_water_box": st("on") }));
+  assert.strictEqual(tanks()[0][1], "Empty – refill it");
+  q('.tank[data-tank="clean"]').click();
+  eq(events.pop(), ["more-info", "binary_sensor.vacuum_cleaner_dock_clean_water_box"]);
+  // Any other dock error is the vacuum card's banner, not a tank; nor is an unreachable dock error.
+  for (const e of ["duct_blockage", "cleaning_tank_full_or_blocked", "dirty_tank_latch_open", "unavailable", "unknown"]) {
+    card.hass = full(states({ "sensor.vacuum_cleaner_dock_error": derr(e) }));
+    eq(tanks(), OK3, `dock error ${e} leaves the tanks alone`);
+  }
+  // Once it clears, the tile is OK again and opens its own sensor.
+  card.hass = full(states({ "sensor.vacuum_cleaner_dock_error": derr("water_empty") }));
+  card.hass = full(states());
+  eq(tanks(), OK3, "cleared");
+  q('.tank[data-tank="clean"]').click();
+  eq(events.pop(), ["more-info", "binary_sensor.vacuum_cleaner_dock_clean_water_box"], "back to its own sensor");
+  // A dock without an error sensor reads its tank sensors alone.
+  const noErr = (over) => {
+    const x = states(over);
+    delete x["sensor.vacuum_cleaner_dock_error"];
+    return x;
+  };
+  const card4 = document.createElement("vacuum-maintenance-card");
+  document.body.appendChild(card4);
+  card4.setConfig({ entity: "vacuum.vacuum_cleaner" });
+  card4.hass = full(noErr());
+  const tanks4 = () => [...card4.shadowRoot.querySelectorAll(".tank")].map((b) => [b.querySelector(".nm").textContent, b.querySelector(".st").textContent, b.classList.contains("bad")]);
+  eq(tanks4(), OK3, "no dock error sensor");
+  card4.hass = full(noErr({ "binary_sensor.vacuum_cleaner_dock_clean_water_box": st("on") }));
+  eq(tanks4()[0], ["Clean water", "Empty – refill it", true]);
+  card4.remove();
+  // entities.dock_error overrides the one found.
+  const card5 = document.createElement("vacuum-maintenance-card");
+  document.body.appendChild(card5);
+  card5.setConfig({ entity: "vacuum.vacuum_cleaner", entities: { dock_error: "sensor.other_dock_error" } });
+  card5.hass = full(states({ "sensor.vacuum_cleaner_dock_error": derr("water_empty"), "sensor.other_dock_error": derr("ok") }));
+  eq([...card5.shadowRoot.querySelectorAll(".tank .st")].map((x) => x.textContent), ["OK", "OK", "Max"], "the configured dock error is the one read");
+  card5.hass = full(states({ "sensor.other_dock_error": derr("water_empty") }));
+  eq([...card5.shadowRoot.querySelectorAll(".tank .st")].map((x) => x.textContent), ["Empty – refill it", "OK", "Max"]);
+  card5.remove();
+
   card.hass = full(states());
   assert.strictEqual(all(".jobs, .pill").length, 0, "the dock's jobs live on the vacuum card");
 
