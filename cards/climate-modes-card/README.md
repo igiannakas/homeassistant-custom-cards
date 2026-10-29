@@ -28,9 +28,12 @@
 - A tile per mode. The active one glows in its own colour; a mode without one (or a
   grey one, like Off) glows teal – "what you picked" – so you can always see which is on.
 - **Tile names are never cut off or shrunk.** The tiles share one row at equal widths
-  while every name fits; otherwise the card measures the names and lays the tiles out
-  in even, balanced rows (six tiles on a phone become 3 + 3, not 5 + 1). It fits again
-  when the card is resized.
+  while every name fits. When they don't, the card measures the names and keeps one row
+  with the tighter phone spacing (6px tile sides) if every tile still fits that way – the
+  tiles stay as even as the names allow, a longer name's tile only as wide as it needs
+  (six heating modes stay in one row on a phone from about 385 px wide, e.g. 402 or
+  440 px). Only then does it lay the tiles out in even, balanced rows (3 + 3 on a 375 px
+  phone, not 5 + 1). It fits again when the card is resized.
 - A mode is active when **all** `thermostats` share its `preset`, or when its
   own `active.entity` is in `active.state` (handy for an aircon speed helper).
 - A **flag tile** uses `active: { attribute, state }` and glows on its own, next to the

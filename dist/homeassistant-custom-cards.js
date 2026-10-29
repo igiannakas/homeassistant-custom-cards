@@ -2238,7 +2238,7 @@ async function registerBinDayCard() {
 registerBinDayCard();
 })();
 
-/* ===== climate-modes-card 1.4.6 ===== */
+/* ===== climate-modes-card 1.5.0 ===== */
 (() => {
 /*
  * Climate modes card – https://github.com/igiannakas/homeassistant-custom-cards
@@ -2251,12 +2251,13 @@ registerBinDayCard();
  * `confirmation` and the card shows its own confirm dialog (Bubble Card look, texts may be
  * templates), so no pop-up card is needed. With `status: activity` the label row shows what
  * the heating is doing instead of the mode: which rooms are calling for heat, Idle, or a
- * lock (e.g. summer mode) – and the icon follows. Tile names are never cut: when they don't
- * fit side by side, the tiles wrap into balanced rows.
+ * lock (e.g. summer mode) – and the icon follows. Tile names are never cut: the tiles stay in
+ * one row while every name fits – with the tighter phone spacing if that is what it takes –
+ * and only then wrap into balanced rows.
  * See cards/climate-modes-card/README.md for every option.
  */
 
-const CMC_VERSION = "1.4.6";
+const CMC_VERSION = "1.5.0";
 const CMC_TAG = "climate-modes-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -2278,6 +2279,20 @@ const askColor = (m) => {
   return c === GREY ? TEAL : c;
 };
 const tint = (c, p) => `color-mix(in srgb, ${c} ${p}%, transparent)`;
+// Mode tile geometry, shared by the CSS and the fit check in _fitModes so the two can't drift:
+// the icon circle, the space between tiles, and a tile's sides – roomy, or the tight phone
+// spacing (6px, as the room lights and air quality cards use) when that keeps the tiles in one row.
+const SHAPE = 36;
+const TILE_GAP = 8;
+const TILE_SIDE = 10;
+const TILE_SIDE_TIGHT = 6;
+/* An element's laid-out width in CSS px: sub-pixel (a fit check never uses the rounded
+   clientWidth – a 0.1px overflow still wraps) and untouched by transforms (the card editor's
+   preview is scaled). jsdom has no layout, so the tests give `fallback` instead. */
+const laidOut = (el, fallback) => {
+  const w = parseFloat(getComputedStyle(el).width);
+  return w > 0 ? w : fallback;
+};
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const list = (v) => (v === undefined || v === null || v === "" ? [] : Array.isArray(v) ? v : [v]);
@@ -2477,15 +2492,18 @@ const CSS = `
   .switch.on .sw { background: var(--sw-color); }
   .switch.on .sw::after { transform: translateX(16px); }
   /* Mode tiles: one row, equal widths while every name fits; a longer name takes the width it
-     needs. When they don't all fit, the card measures the names and lays the tiles out in even,
-     balanced rows (.fit: e.g. 3 + 3 rather than 5 + 1). Names are never cut and never shrink. */
-  .modes { display: flex; flex-wrap: wrap; gap: 8px; }
+     needs. If equal widths don't fit, the tiles keep one row with the tight phone spacing (.tight,
+     6px sides) when every name still fits that way – the flex row keeps them as even as the names
+     allow. Only then does the card lay them out in even, balanced rows (.fit: e.g. 3 + 3 rather
+     than 5 + 1). Names are never cut and never shrink. */
+  .modes { display: flex; flex-wrap: wrap; gap: ${TILE_GAP}px; }
   .modes.fit { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
   .mode { all: unset; box-sizing: border-box; flex: 1 1 0; min-width: max-content; display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 11px 10px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
+    padding: 11px ${TILE_SIDE}px; border-radius: 10px; cursor: pointer; background: rgba(var(--rgb-primary-text-color, 33,33,33), .04);
     -webkit-tap-highlight-color: transparent; transition: background-color 180ms; }
   .modes.fit .mode { min-width: 0; }
-  .shape { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  .modes.tight .mode { padding: 11px ${TILE_SIDE_TIGHT}px; }
+  .shape { width: ${SHAPE}px; height: ${SHAPE}px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     background: ${tint(GREY, 20)}; transition: background-color 180ms; }
   .shape ha-icon { --mdc-icon-size: 24px; color: ${GREY}; transition: color 180ms; }
   /* 12px like every other card's second line; the icon carries the tile. A name wraps only if it
@@ -2760,23 +2778,56 @@ class ClimateModesCard extends HTMLElement {
     status.parentElement.classList.toggle("one", !html);
   }
 
-  /* Mode tiles: every name whole, never under 12px. One row while every tile fits (name + 20px
-     padding, at least the 36px icon); else even rows as balanced as they can be; and only if a
-     single name is wider than the card does it wrap. Without layout (tests), the CSS default
-     stays: one flex row that wraps a tile rather than squeezing its name. */
+  /* Mode tiles: every name whole, never under 12px. A tile needs its name (at least the icon
+     circle) plus its sides. In order:
+       1. one row at equal widths, roomy sides;
+       2. one row with the tight phone spacing, if every tile then fits at its own width (the
+          flex row shares out the rest, so the tiles stay as even as the names allow) – checked
+          in the real layout too, since a fraction of a pixel decides whether a flex row wraps;
+       3. even rows, as balanced as they can be (3 + 3, not 5 + 1);
+       4. one column, tight if that keeps the widest name whole; only a name wider than the
+          card on its own wraps.
+     Without layout (tests), the CSS default stays: one flex row that wraps a tile rather than
+     squeezing its name. */
   _fitModes() {
     const box = this.shadowRoot?.querySelector(".modes");
-    const W = box?.clientWidth;
-    const names = box ? [...box.querySelectorAll(".mode .name")] : [];
+    if (!box) return;
+    const W = laidOut(box, box.clientWidth);
+    const names = [...box.querySelectorAll(".mode .name")];
     if (!W || !names.length) return;
     box.classList.remove("wrap");
-    const need = Math.max(56, ...names.map((n) => Math.ceil(n.scrollWidth) + 20));
+    const text = names.map((nm) => laidOut(nm, nm.scrollWidth));
+    const tiles = (side) => text.map((w) => Math.max(SHAPE, w) + 2 * side);
+    const roomy = tiles(TILE_SIDE);
+    const tight = tiles(TILE_SIDE_TIGHT);
     const n = names.length;
-    const fit = Math.max(1, Math.floor((W + 8) / (need + 8)));
-    const cols = n <= fit ? 0 : Math.ceil(n / Math.ceil(n / fit));
+    const gaps = TILE_GAP * (n - 1);
+    const widest = Math.max(...roomy);
+    const rows = () => {
+      const fit = Math.max(1, Math.floor((W + TILE_GAP) / (widest + TILE_GAP)));
+      if (fit > 1) return { cols: Math.ceil(n / Math.ceil(n / fit)), tight: false, wrap: false };
+      const tightFits = Math.max(...tight) <= W;
+      return { cols: 1, tight: widest > W && tightFits, wrap: !tightFits };
+    };
+    let layout;
+    if (n * widest + gaps <= W) layout = { cols: 0, tight: false, wrap: false };
+    else if (tight.reduce((s, w) => s + w, 0) + gaps <= W) layout = { cols: 0, tight: true, wrap: false };
+    else layout = rows();
+    this._layoutModes(box, layout);
+    if (layout.cols === 0 && layout.tight && !this._oneRow(box)) this._layoutModes(box, rows());
+  }
+
+  _layoutModes(box, { cols, tight, wrap }) {
     box.classList.toggle("fit", cols > 0);
     if (cols && box.style.getPropertyValue("--cols") !== String(cols)) box.style.setProperty("--cols", String(cols));
-    box.classList.toggle("wrap", need > W);
+    box.classList.toggle("tight", tight);
+    box.classList.toggle("wrap", wrap);
+  }
+
+  /* Did the flex row really keep every tile on one line? (Reading offsetTop lays the card out.) */
+  _oneRow(box) {
+    const t = box.querySelectorAll(".mode");
+    return t.length < 2 || t[t.length - 1].offsetTop === t[0].offsetTop;
   }
 
   /* what: what a failure message says you tried ("Couldn't switch to Night."). */

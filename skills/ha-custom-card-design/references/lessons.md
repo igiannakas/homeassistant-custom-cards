@@ -72,6 +72,7 @@ Most of them generalise to any dashboard.
 - Global switches go in the section header, not in the tile grid.
 - Design for what's coming next, but build only what was asked.
 - One line that wraps in one tile makes every tile taller (equal rows). Before letting it wrap, win the space back by measuring: the tight phone spacing (6px tile sides, 6px icon gap) when that keeps every name and reading line whole. Judge it from where the text actually lands (line tops, heights), never by adding up rounded widths – a VOC 0.4px too wide slipped through that way. Never shrink the font, never cut the text.
+- A row of mode tiles stays one row on the phone whenever every name fits: equal widths first, then the tight phone spacing with each tile at least as wide as its own name, and only then balanced rows ("get the heating controls to fit in one line" – six heating modes went 3 + 3 on a 440 px phone, 29 Oct 2026). The fit is decided by the tiles' own widths, not the widest name times the count.
 - Lines that wrap keep their groups: a status and its readings share a line only if all fit; otherwise the status gets its own line and the readings stay together on the next (never a lone "VOC 80").
 
 ## Robot vacuum (Oct 2026)

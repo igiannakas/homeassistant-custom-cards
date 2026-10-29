@@ -367,26 +367,45 @@ const cfg = {
   await tick();
   eq(toasts, ["Couldn't switch to Night.", "Couldn't turn Summer mode off."]);
 
-  // Mode tiles: names never cut and never below 12px. One row while every tile fits; else even,
-  // balanced rows; a name wraps only when it is wider than the whole card. jsdom has no layout,
-  // so the measurements are given here.
+  // Mode tiles: names never cut and never below 12px. One row at equal widths while every tile
+  // fits; else one row with the tight phone spacing (6px sides) if every tile fits at its own
+  // width; else even, balanced rows; a name wraps only when it is wider than the whole card.
+  // jsdom has no layout, so the measurements are given here (name widths: one for all, or one each).
+  // Result: [columns (0 = one flex row), names wrap, tight spacing].
   const def = (el, k, v) => Object.defineProperty(el, k, { value: v, configurable: true });
   const fr = fc.shadowRoot;
   const fitAt = (W, nameW = 50) => {
     const box = fr.querySelector(".modes");
     def(box, "clientWidth", W);
-    box.querySelectorAll(".name").forEach((n) => def(n, "scrollWidth", nameW));
+    box.querySelectorAll(".name").forEach((n, i) => def(n, "scrollWidth", Array.isArray(nameW) ? nameW[i] : nameW));
     fc._fitModes();
-    return [box.classList.contains("fit") ? Number(box.style.getPropertyValue("--cols")) : 0, box.classList.contains("wrap")];
+    return [box.classList.contains("fit") ? Number(box.style.getPropertyValue("--cols")) : 0, box.classList.contains("wrap"),
+      box.classList.contains("tight")];
   };
-  // Six tiles, 50px names → 70px each.
-  eq(fitAt(500), [0, false], "all six fit: one flex row");
-  eq(fitAt(400), [3, false], "five would fit: 3 + 3, not 5 + 1");
-  eq(fitAt(300), [3, false], "three per row");
-  eq(fitAt(200), [2, false]);
-  eq(fitAt(60), [1, true], "one column; only then does a name wrap");
-  eq(fitAt(500, 60), [3, false], "longer names → fewer per row");
+  // Six tiles, 50px names → 70px each (roomy), 62px (tight).
+  eq(fitAt(500), [0, false, false], "all six fit: one flex row, roomy");
+  eq(fitAt(400), [3, false, false], "five would fit: 3 + 3, not 5 + 1");
+  eq(fitAt(300), [3, false, false], "three per row");
+  eq(fitAt(200), [2, false, false]);
+  eq(fitAt(60), [1, true, false], "one column; only then does a name wrap");
+  eq(fitAt(64), [1, false, true], "one column: tight sides when that keeps the name whole");
+  eq(fitAt(460, 60), [3, false, false], "longer names → fewer per row");
+  eq(fitAt(500, 60), [0, false, true], "equal widths don't fit, but every tile does at its own width: one tight row");
+  // The heating card's own names (Off, Away, Night, Day, Boost, Schedule; 12px / 500): roomy, equal
+  // widths need 6 × 70.75 + 40 = 464.5px; tight, each its own: 5 × 48 + 62.75 + 40 = 342.75px.
+  const heat = [19.25, 31.5, 32.25, 24, 33.25, 50.75];
+  eq(fitAt(401.3, heat), [0, false, true], "iPhone 17 Pro Max (440pt screen): one row");
+  eq(fitAt(342.75, heat), [0, false, true], "fits exactly");
+  eq(fitAt(342.7, heat), [3, false, false], "a fraction over: 3 + 3 (no slack, no rounding)");
+  eq(fitAt(500, heat), [0, false, false], "wider again: roomy, equal widths, tight dropped");
+  // The real layout has the last word: if the flex row wrapped after all, balanced rows.
+  const tiles = fr.querySelectorAll(".mode");
+  def(tiles[tiles.length - 1], "offsetTop", 80);
+  eq(fitAt(401.3, heat), [3, false, false], "layout disagreed: 3 + 3, tight dropped");
+  delete tiles[tiles.length - 1].offsetTop;
+  eq(fitAt(401.3, heat), [0, false, true]);
   const css = fr.querySelector("style").textContent;
+  assert(/\.modes\.tight \.mode \{ padding: 11px 6px; \}/.test(css), "tight phone spacing: 6px sides");
   assert(!/text-overflow:\s*ellipsis|line-clamp/.test(css), "no clipped text");
   assert(!/font-size: (1[01]|11\.5)px|@container/.test(css), "names never shrink below 12px");
   assert(/\.modes \{ display: flex; flex-wrap: wrap; gap: 8px; \}/.test(css) && /\.mode \{[^}]*flex: 1 1 0; min-width: max-content;/.test(css), "CSS default: a flex row that wraps");
