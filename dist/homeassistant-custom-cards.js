@@ -910,7 +910,7 @@ async function registerApplianceAlertCard() {
 registerApplianceAlertCard();
 })();
 
-/* ===== appliance-card 1.0.3 ===== */
+/* ===== appliance-card 1.1.0 ===== */
 (() => {
 /*
  * Appliance card – a plug-powered appliance (dehumidifier, air purifier, dryer…) in one card.
@@ -930,15 +930,15 @@ registerApplianceAlertCard();
  *
  * Head row: the icon circle (orange while on – power, like a lit room – grey while off),
  * "Name · Running" and, under it, what the automation does next, read from the same helpers the
- * automation uses ("On at 17:30", "Off at 09:00", "On above 62% · from 21:15"), so the card can't
- * disagree with it. At the end, the
+ * automation uses ("On at 17:30", "Off at 09:00", "On above 62% · from 21:15"; an off time with a
+ * date counts down: "Off in 11 h 54 min · at 19:45"), so the card can't disagree with it. At the end, the
  * power pill, as on the printer card: "On | 252 W" (orange) while on, "Off" while off. The left
  * half switches the plug at once, the watts open the power sensor.
  * Below: the reading, how long it has been on (or since when it is off), today's energy and cost,
  * split by straight dividers. Anywhere but the pill opens the appliance's own dashboard.
  */
 
-const AC_VERSION = "1.0.3";
+const AC_VERSION = "1.1.0";
 const AC_TAG = "appliance-card";
 
 const C = {
@@ -972,11 +972,12 @@ function zoned(ms, tz) {
   return { day: `${parts.year}-${parts.month}-${parts.day}`, min: Number(parts.hour) * 60 + Number(parts.minute), hm: `${parts.hour}:${parts.minute}` };
 }
 
-/* "07:00" today, "Tue 18:10" within the week, "4 Oct" before that. */
-function since(ms, now, tz) {
+/* A moment near now, past or future: "07:00" on the same day, "Tue 18:10" within a week either
+   side, "4 Oct" further away. */
+function clock(ms, now, tz) {
   const a = zoned(ms, tz);
   if (a.day === zoned(now, tz).day) return a.hm;
-  const days = (now - ms) / 864e5;
+  const days = Math.abs(now - ms) / 864e5;
   const opts = days < 6.5 ? { weekday: "short" } : { day: "numeric", month: "short" };
   const d = new Intl.DateTimeFormat("en-GB", { ...opts, timeZone: tz }).format(new Date(ms));
   return days < 6.5 ? `${d} ${a.hm}` : d;
@@ -988,6 +989,21 @@ function timeOf(hass, v) {
   const m = /^(\d{1,2}):(\d{2})/.exec(String(raw ?? ""));
   if (!m) return null;
   return { min: Number(m[1]) * 60 + Number(m[2]), hm: `${m[1].padStart(2, "0")}:${m[2]}` };
+}
+
+/* A dated moment → epoch ms: an input_datetime with a date and a time (read through its timestamp
+   attribute; the state is local time with no zone), or a timestamp sensor (ISO state). Anything
+   else – a time-only helper, a literal, unavailable – is null and left to timeOf. */
+function momentOf(hass, v) {
+  const s = isEntity(v) ? hass.states[v] : null;
+  if (!s || !LIVE(s.state)) return null;
+  const a = s.attributes || {};
+  if (v.startsWith("input_datetime.")) return a.has_date && a.has_time && num(a.timestamp) !== null ? num(a.timestamp) * 1000 : null;
+  if (a.device_class === "timestamp") {
+    const t = Date.parse(s.state);
+    return Number.isFinite(t) ? t : null;
+  }
+  return null;
 }
 
 /* A value with its unit: "62%", "21.4°", "612 ppm"; µg/m³ is left out (the label says PM2.5).
@@ -1108,10 +1124,14 @@ function runStart(rows, current) {
 /*
  * The line under the name: what the automation does next, built from the helpers it uses.
  * While on: the turn_off rule ("Off at 09:00"); while off: the turn_on rule ("On at 17:30",
- * "On above 62% · from 21:15", "… · until 06:50" inside the window). "Schedule off" when the
- * rule's automation is switched off; "Paused while away" when it only runs with someone home.
+ * "On above 62% · from 21:15", "… · until 06:50" inside the window). An `at` with a date is a
+ * moment, so the line counts down to it: "Off in 11 h 54 min · at 19:45" ("Off now" once it has
+ * passed and the automation is about to act). "Schedule off" when the rule's automation (or the
+ * toggle that enables it) is off; "Paused while away" when it only runs with someone home.
+ * Time-of-day helpers are read in the server's zone (`tz`), where the automation runs; a dated
+ * moment is shown in the user's (`shownTz`), like every other time on the card.
  */
-function ruleLine(hass, cfg, isOn, now, tz) {
+function ruleLine(hass, cfg, isOn, now, tz, shownTz) {
   const sch = cfg.schedule;
   const rule = sch && (isOn ? sch.turn_off : sch.turn_on);
   if (!rule) return [];
@@ -1123,11 +1143,19 @@ function ruleLine(hass, cfg, isOn, now, tz) {
   let any = false;
   const above = rule.above !== undefined ? threshold(hass, rule.above, unit) : null;
   const below = rule.below !== undefined ? threshold(hass, rule.below, unit) : null;
-  const at = rule.at ? timeOf(hass, rule.at) : null;
+  const when = rule.at ? momentOf(hass, rule.at) : null;
+  const at = rule.at && when === null ? timeOf(hass, rule.at) : null;
   if (above) (head += ` above ${above}`), (any = true);
   if (below) (head += ` below ${below}`), (any = true);
   if (at) (head += ` at ${at.hm}`), (any = true);
   const parts = [];
+  if (when !== null) {
+    if (when > now) {
+      head += ` in ${dur(when - now)}`;
+      parts.push(`at ${clock(when, now, shownTz)}`);
+    } else head += " now";
+    any = true;
+  }
   const from = rule.from ? timeOf(hass, rule.from) : null;
   const until = rule.until ? timeOf(hass, rule.until) : null;
   if (from && until) {
@@ -1168,7 +1196,7 @@ function model(hass, cfg, now, run, price) {
     if (!run) stats.push({ v: "–", l: isOn ? "On for" : "Off since" });
     else if (run.open) stats.push({ v: `${Math.max(1, Math.floor((now - run.t) / 864e5))} d+`, l: isOn ? "On for" : "Off for" });
     else if (isOn) stats.push({ v: dur(now - run.t), l: "On for" });
-    else stats.push({ v: since(run.t, now, tz), l: "Off since" });
+    else stats.push({ v: clock(run.t, now, tz), l: "Off since" });
   }
   if (cfg.energy) {
     const k = kwh(S[cfg.energy]);
@@ -1183,7 +1211,7 @@ function model(hass, cfg, now, run, price) {
     icon: cfg.icon || sw?.attributes?.icon || "mdi:power-plug",
     // The circle shows the state: on is power (orange, as a lit room and the pill), off is grey.
     color: isOn ? C.orange : C.grey,
-    rule: live ? ruleLine(hass, cfg, isOn, now, serverTz) : [],
+    rule: live ? ruleLine(hass, cfg, isOn, now, serverTz, tz) : [],
     stats,
   };
 }
@@ -1330,7 +1358,7 @@ class ApplianceCard extends HTMLElement {
           price: "Leave empty to use the grid price from Settings → Energy.",
           idle_below: "On but drawing less than this shows as Idle (default 2 W).",
           schedule:
-            "turn_on / turn_off: { automation, at, above, below, from, until } – the helpers the automation uses; presence: who must be home. See the README.",
+            "turn_on / turn_off: { automation, at, above, below, from, until, text } – the helpers the automation uses (an `at` with a date counts down); presence: who must be home. See the README.",
         })[s.name],
     };
   }

@@ -321,6 +321,96 @@ const view = (card) => {
   assert.strictEqual(v.pill, "on:On");
   assert.deepStrictEqual(v.stats, ["–/On for"]);
 
+  // 7. The clothes dryer: on after a wash, off a set time after its last start (live values, 3 Nov 2026).
+  //    The off time is an input_datetime with a date, read through its timestamp; the rule is enabled by
+  //    an input_boolean, not the automation itself. While on, the line counts down to the off time.
+  const offAt = (ts) => st(new Date(ts * 1000).toISOString().replace("T", " ").slice(0, 19), { has_date: true, has_time: true, timestamp: ts });
+  const dryerStates = (over = {}) =>
+    hass({
+      "switch.clothes_dryer": st("on", { friendly_name: "Clothes dryer" }, "2026-11-02T20:44:44Z"),
+      "sensor.clothes_dryer_power": st("159.2", { unit_of_measurement: "W" }),
+      "sensor.clothes_dryer_energy_today": st("0.273", { unit_of_measurement: "kWh" }),
+      "input_boolean.clothes_dryer_automation": st("on"),
+      "input_datetime.clothes_dryer_off_at": offAt(1793735143), // 19:45:43 GMT
+      ...over,
+    });
+  const CD = {
+    entity: "switch.clothes_dryer",
+    name: "Clothes Dryer",
+    icon: "mdi:tumble-dryer",
+    power: "sensor.clothes_dryer_power",
+    energy: "sensor.clothes_dryer_energy_today",
+    navigation_path: "/lovelace/clothes-dryer",
+    schedule: {
+      turn_on: { automation: "input_boolean.clothes_dryer_automation", text: "On after a wash" },
+      turn_off: { automation: "input_boolean.clothes_dryer_automation", at: "input_datetime.clothes_dryer_off_at" },
+    },
+  };
+  history["switch.clothes_dryer"] = [{ s: "off", lu: sec("2026-11-02T07:37:14Z") }, { s: "on", lu: sec("2026-11-02T09:58:24Z") }];
+  const dry = mount(CD, dryerStates(), T("2026-11-03T07:51:00Z"));
+  await tick(10);
+  v = view(dry);
+  assert.strictEqual(v.nm, "Clothes Dryer\u00a0· Running");
+  assert.strictEqual(v.sc, "Off in 11 h 54 min\u00a0· at 19:45", "counts down to the dated off time");
+  assert.strictEqual(v.stats[0], "21 h 52 min/On for");
+  const cdSc = dry.shadowRoot.querySelector(".sc");
+  assert.strictEqual(cdSc.querySelectorAll(".p").length, 2, "two unbreakable parts: the line breaks only at the dot");
+  for (const [at, want] of [
+    ["2026-11-03T19:00:30Z", "Off in 45 min\u00a0· at 19:45"],
+    ["2026-11-03T18:45:43Z", "Off in 1 h\u00a0· at 19:45"],
+    ["2026-11-03T19:45:20Z", "Off in <1 min\u00a0· at 19:45"],
+    ["2026-11-03T19:45:43Z", "Off now"],
+    ["2026-11-03T19:50:00Z", "Off now"],
+  ]) {
+    dry._now = () => T(at);
+    dry.hass = dryerStates();
+    await tick(10);
+    assert.strictEqual(view(dry).sc, want, at);
+  }
+  // Only the countdown moves with the clock: the next render (the 30 s timer) rewrites the line,
+  // and an unchanged one is left alone.
+  dry._now = () => T("2026-11-03T19:00:30Z");
+  dry.hass = dryerStates();
+  await tick(10);
+  const scNode = dry.shadowRoot.querySelector(".sc").firstChild;
+  dry._now = () => T("2026-11-03T19:00:40Z"); // 45 min 3 s left: still "45 min"
+  dry._render();
+  assert.strictEqual(dry.shadowRoot.querySelector(".sc").firstChild, scNode, "same minute: not rewritten");
+  dry._now = () => T("2026-11-03T19:01:30Z");
+  dry._render();
+  assert.strictEqual(view(dry).sc, "Off in 44 min\u00a0· at 19:45");
+  // A wash late in the day moves the off time past midnight: the day is named.
+  dry._now = () => T("2026-11-03T16:10:00Z");
+  dry.hass = dryerStates({ "input_datetime.clothes_dryer_off_at": offAt(sec("2026-11-04T04:09:00Z")) });
+  await tick(10);
+  assert.strictEqual(view(dry).sc, "Off in 11 h 59 min\u00a0· at Wed 04:09");
+  // Toggle off: nothing will switch it off.
+  dry.hass = dryerStates({ "input_boolean.clothes_dryer_automation": st("off") });
+  await tick(10);
+  assert.strictEqual(view(dry).sc, "Schedule off");
+  // Off: what starts it next, in the rule's own words – or nothing, with the toggle off.
+  dry.hass = dryerStates({ "switch.clothes_dryer": st("off", {}, "2026-11-03T19:45:44Z") });
+  await tick(10);
+  assert.strictEqual(view(dry).sc, "On after a wash");
+  dry.hass = dryerStates({ "switch.clothes_dryer": st("off", {}, "2026-11-03T19:45:44Z"), "input_boolean.clothes_dryer_automation": st("off") });
+  await tick(10);
+  assert.strictEqual(view(dry).sc, "Schedule off");
+  // An off time that can't be read: no line rather than a wrong one.
+  dry.hass = dryerStates({ "input_datetime.clothes_dryer_off_at": st("unavailable") });
+  await tick(10);
+  assert.strictEqual(view(dry).sc, "");
+  // A timestamp sensor works the same way, shown in the user's zone (summer: BST).
+  dry._now = () => T("2026-10-14T16:20:00Z");
+  dry.setConfig({ ...CD, schedule: { turn_off: { at: "sensor.dryer_ends" } } });
+  dry.hass = dryerStates({ "sensor.dryer_ends": st("2026-10-14T21:00:00+00:00", { device_class: "timestamp" }) });
+  await tick(10);
+  assert.strictEqual(view(dry).sc, "Off in 4 h 40 min\u00a0· at 22:00");
+  // Time-only helpers keep their meaning: "Off at 07:00" (no countdown), as in case 3.
+  dry.setConfig({ ...CD, schedule: { turn_off: { at: "input_datetime.dehumidifier_off_at" } } });
+  dry.hass = dryerStates();
+  await tick(10);
+  assert.strictEqual(view(dry).sc, "Off at 07:00");
+
   console.log("ALL APPLIANCE TESTS PASSED");
   process.exit(0);
 })().catch((e) => {
