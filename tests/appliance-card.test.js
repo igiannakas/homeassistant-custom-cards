@@ -411,6 +411,49 @@ const view = (card) => {
   await tick(10);
   assert.strictEqual(view(dry).sc, "Off at 07:00");
 
+  // 8. The countdown on hold (9 Nov 2026): the tank filled at 05:09:43 with the dryer due off at
+  //    12:02:10. While `paused` is on, the line shows the time it had left when it stopped, fixed,
+  //    and never "Off now" – nothing switches it off while paused.
+  const PD = {
+    ...CD,
+    schedule: {
+      ...CD.schedule,
+      turn_off: { ...CD.schedule.turn_off, paused: "input_boolean.clothes_dryer_paused", paused_since: "input_datetime.clothes_dryer_paused_since" },
+    },
+  };
+  const held = (over = {}) =>
+    dryerStates({
+      "sensor.clothes_dryer_power": st("0", { unit_of_measurement: "W" }),
+      "input_datetime.clothes_dryer_off_at": offAt(sec("2026-11-09T12:02:10Z")),
+      "input_boolean.clothes_dryer_paused": st("on"),
+      "input_datetime.clothes_dryer_paused_since": offAt(sec("2026-11-09T05:09:43Z")),
+      ...over,
+    });
+  dry.setConfig(PD);
+  for (const at of ["2026-11-09T06:00:00Z", "2026-11-09T12:30:00Z"]) {
+    dry._now = () => T(at);
+    dry.hass = held();
+    await tick(10);
+    assert.strictEqual(view(dry).sc, "Paused · 6 h 52 min left", `fixed while paused (${at})`);
+  }
+  // Resumed: the automation moved the off time later by the pause (4 h 10 min 11 s) and cleared the flag.
+  dry._now = () => T("2026-11-09T09:20:00Z");
+  dry.hass = held({ "sensor.clothes_dryer_power": st("158", { unit_of_measurement: "W" }), "input_boolean.clothes_dryer_paused": st("off"), "input_datetime.clothes_dryer_off_at": offAt(sec("2026-11-09T16:12:21Z")) });
+  await tick(10);
+  assert.strictEqual(view(dry).sc, "Off in 6 h 52 min · at 16:12", "the same time left, counting again");
+  // The pause start can't be read: "Paused" alone rather than a wrong figure.
+  dry.hass = held({ "input_datetime.clothes_dryer_paused_since": st("unavailable") });
+  await tick(10);
+  assert.strictEqual(view(dry).sc, "Paused");
+  // Toggle off still wins: nothing would switch it off either way.
+  dry.hass = held({ "input_boolean.clothes_dryer_automation": st("off") });
+  await tick(10);
+  assert.strictEqual(view(dry).sc, "Schedule off");
+  // `paused` belongs to the turn_off rule: a dryer that is off shows its turn_on rule.
+  dry.hass = held({ "switch.clothes_dryer": st("off", {}, "2026-11-09T09:30:00Z") });
+  await tick(10);
+  assert.strictEqual(view(dry).sc, "On after a wash");
+
   console.log("ALL APPLIANCE TESTS PASSED");
   process.exit(0);
 })().catch((e) => {

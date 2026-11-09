@@ -910,7 +910,7 @@ async function registerApplianceAlertCard() {
 registerApplianceAlertCard();
 })();
 
-/* ===== appliance-card 1.1.0 ===== */
+/* ===== appliance-card 1.2.0 ===== */
 (() => {
 /*
  * Appliance card – a plug-powered appliance (dehumidifier, air purifier, dryer…) in one card.
@@ -931,14 +931,15 @@ registerApplianceAlertCard();
  * Head row: the icon circle (orange while on – power, like a lit room – grey while off),
  * "Name · Running" and, under it, what the automation does next, read from the same helpers the
  * automation uses ("On at 17:30", "Off at 09:00", "On above 62% · from 21:15"; an off time with a
- * date counts down: "Off in 11 h 54 min · at 19:45"), so the card can't disagree with it. At the end, the
+ * date counts down: "Off in 11 h 54 min · at 19:45", or "Paused · 2 h 27 min left" while the
+ * automation holds the countdown), so the card can't disagree with it. At the end, the
  * power pill, as on the printer card: "On | 252 W" (orange) while on, "Off" while off. The left
  * half switches the plug at once, the watts open the power sensor.
  * Below: the reading, how long it has been on (or since when it is off), today's energy and cost,
  * split by straight dividers. Anywhere but the pill opens the appliance's own dashboard.
  */
 
-const AC_VERSION = "1.1.0";
+const AC_VERSION = "1.2.0";
 const AC_TAG = "appliance-card";
 
 const C = {
@@ -1127,7 +1128,9 @@ function runStart(rows, current) {
  * "On above 62% · from 21:15", "… · until 06:50" inside the window). An `at` with a date is a
  * moment, so the line counts down to it: "Off in 11 h 54 min · at 19:45" ("Off now" once it has
  * passed and the automation is about to act). "Schedule off" when the rule's automation (or the
- * toggle that enables it) is off; "Paused while away" when it only runs with someone home.
+ * toggle that enables it) is off; "Paused while away" when it only runs with someone home;
+ * "Paused · 2 h 27 min left" while the rule's `paused` entity is on (the time left is `at` minus
+ * `paused_since`, both moments; plain "Paused" when either can't be read).
  * Time-of-day helpers are read in the server's zone (`tz`), where the automation runs; a dated
  * moment is shown in the user's (`shownTz`), like every other time on the card.
  */
@@ -1137,6 +1140,13 @@ function ruleLine(hass, cfg, isOn, now, tz, shownTz) {
   if (!rule) return [];
   if (rule.automation && hass.states[rule.automation]?.state !== "on") return ["Schedule off"];
   if (!isOn && sch.presence && !present(hass, sch.presence)) return ["Paused while away"];
+  if (rule.paused && hass.states[rule.paused]?.state === "on") {
+    // The countdown is on hold (a dryer with a full tank): the time it had left when it stopped
+    // stays fixed until the automation resumes it and moves the moment later.
+    const when = rule.at ? momentOf(hass, rule.at) : null;
+    const since = rule.paused_since ? momentOf(hass, rule.paused_since) : null;
+    return when !== null && since !== null && when > since ? ["Paused", `${dur(when - since)} left`] : ["Paused"];
+  }
   if (rule.text) return String(rule.text).split(" · ");
   const unit = cfg.reading?.entity ? hass.states[cfg.reading.entity]?.attributes?.unit_of_measurement : undefined;
   let head = isOn ? "Off" : "On";
@@ -1358,7 +1368,7 @@ class ApplianceCard extends HTMLElement {
           price: "Leave empty to use the grid price from Settings → Energy.",
           idle_below: "On but drawing less than this shows as Idle (default 2 W).",
           schedule:
-            "turn_on / turn_off: { automation, at, above, below, from, until, text } – the helpers the automation uses (an `at` with a date counts down); presence: who must be home. See the README.",
+            "turn_on / turn_off: { automation, at, above, below, from, until, text, paused, paused_since } – the helpers the automation uses (an `at` with a date counts down; `paused` on holds it); presence: who must be home. See the README.",
         })[s.name],
     };
   }
