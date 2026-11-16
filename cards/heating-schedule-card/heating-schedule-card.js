@@ -31,7 +31,7 @@
  * See cards/heating-schedule-card/README.md for every option.
  */
 
-const HSC_VERSION = "1.0.4";
+const HSC_VERSION = "1.1.0";
 const HSC_TAG = "heating-schedule-card";
 
 const NAMED = ["red", "pink", "purple", "deep-purple", "indigo", "blue", "light-blue", "cyan", "teal", "green", "light-green",
@@ -59,6 +59,9 @@ const num = (v) => (v === null || v === undefined || v === "" || !isFinite(Numbe
 /* 19.8 → "19.8", 20 → "20": temperatures as people say them. */
 const deg = (v) => (v === null ? "–" : String(Math.round(v * 10) / 10));
 const join = (parts) => parts.filter(Boolean).map((p) => `<span class="p">${p}</span>`).join("&nbsp;· ");
+/* "“Living Room heating” lost its switch", "2 schedules lost their switches". */
+const lostText = (ghosts) =>
+  ghosts.length === 1 ? `“${ghosts[0].name || ghosts[0].entity}” lost its switch` : `${ghosts.length} schedules lost their switches`;
 const listNames = (names) => (names.length < 2 ? names[0] || "" : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 
 /* ---------- Modes ---------- */
@@ -318,8 +321,17 @@ function genName(rooms, mask) {
  *   - some of its rooms → those rooms leave it (taking their old times for the days that don't
  *     change into a schedule of their own).
  * Whatever is still needed becomes new schedules, one per set of days. Schedules left with the
- * same rooms and the same times are merged, and a schedule whose rooms or days changed gets a
- * name that says so. Returns the service calls, in order: switch-ons, edits, adds, removes.
+ * same rooms and the same times are merged.
+ *
+ * A schedule whose rooms or days change needs a new name, and it is replaced (a new schedule,
+ * then the old one removed) rather than renamed: Scheduler renames by deleting the switch and
+ * creating a new one, and since Scheduler 3.3.9 the new one is never created – the schedule
+ * stays loaded with its old settings and no switch until Home Assistant restarts (16 Nov 2026).
+ * So `name` is never sent with scheduler.edit.
+ *
+ * Returns the service calls in an order that never leaves a room-day without a schedule if a
+ * call fails part way: adds, then edits (each after the switch-on of a schedule that is off),
+ * then removes.
  */
 function planSave(models, rooms, targets, days, prog) {
   const byEnt = new Map(rooms.map((r) => [r.schedule, r]));
@@ -377,36 +389,47 @@ function planSave(models, rooms, targets, days, prog) {
       }
   }
 
-  const ops = [];
   const adds = [];
+  const edits = [];
   const removes = [];
+  const add = (name, it, raw = {}) => {
+    const data = { name, weekdays: weekdaysOf(it.mask), timeslots: it.slots.map(sanitizeSlot), repeat_type: raw.repeat_type || "repeat" };
+    if (raw.start_date) data.start_date = raw.start_date;
+    if (raw.end_date) data.end_date = raw.end_date;
+    if (Array.isArray(raw.tags) && raw.tags.length) data.tags = [...raw.tags];
+    adds.push({ domain: "scheduler", service: "add", data });
+  };
+  const remove = (s) => removes.push({ domain: "scheduler", service: "remove", data: { entity_id: s.entity }, name: s.name });
   for (const it of items) {
     if (!it.s) {
-      if (!it.removed)
-        adds.push({ domain: "scheduler", service: "add", data: { name: genName(inOrder(it.roomSet), it.mask), weekdays: weekdaysOf(it.mask),
-          timeslots: it.slots.map(sanitizeSlot), repeat_type: "repeat" } });
+      if (!it.removed) add(genName(inOrder(it.roomSet), it.mask), it);
       continue;
     }
     if (it.removed) {
-      if (it.touched) removes.push({ domain: "scheduler", service: "remove", data: { entity_id: it.s.entity } });
+      if (it.touched) remove(it.s);
       continue;
     }
     if (!it.touched) continue;
-    const data = {};
-    if (it.mask !== it.s.mask) data.weekdays = weekdaysOf(it.mask);
-    if (slotsSig(it.slots) !== slotsSig(it.s.raw.timeslots || [])) data.timeslots = it.slots.map(sanitizeSlot);
+    const daysChanged = it.mask !== it.s.mask;
+    const slotsChanged = slotsSig(it.slots) !== slotsSig(it.s.raw.timeslots || []);
     const roomsChanged = it.roomSet.size !== it.s.rooms.size;
-    if (!it.other && (roomsChanged || data.weekdays)) {
-      const name = genName(inOrder(it.roomSet), it.mask);
-      if (name !== it.s.name) data.name = name;
+    const name = !it.other && (roomsChanged || daysChanged) ? genName(inOrder(it.roomSet), it.mask) : it.s.name;
+    if (name !== it.s.name) {
+      // Replaced, not renamed (see above). The new schedule runs, like any schedule saved here.
+      add(name, it, it.s.raw);
+      remove(it.s);
+      continue;
     }
-    if (!Object.keys(data).length) continue;
+    if (!daysChanged && !slotsChanged) continue;
+    const data = {};
+    if (daysChanged) data.weekdays = weekdaysOf(it.mask);
+    if (slotsChanged) data.timeslots = it.slots.map(sanitizeSlot);
     // Editing a schedule that is off turns it on: a schedule changed here is meant to run.
-    if (!it.s.enabled) ops.push({ domain: "switch", service: "turn_on", data: { entity_id: it.s.entity } });
-    ops.push({ domain: "scheduler", service: "edit",
+    if (!it.s.enabled) edits.push({ domain: "switch", service: "turn_on", data: { entity_id: it.s.entity }, name: it.s.name });
+    edits.push({ domain: "scheduler", service: "edit", name: it.s.name,
       data: { entity_id: it.s.entity, ...data, start_date: it.s.raw.start_date ?? null, end_date: it.s.raw.end_date ?? null } });
   }
-  return [...ops, ...adds, ...removes];
+  return [...adds, ...edits, ...removes];
 }
 
 /* ---------- Styles ---------- */
@@ -731,6 +754,8 @@ class HeatingScheduleCard extends HTMLElement {
   disconnectedCallback() {
     clearInterval(this._timer);
     this._timer = null;
+    clearTimeout(this._ghostTimer);
+    this._ghostTimer = null;
     this._ro?.disconnect();
     this._closeSheet();
     this._disconnect();
@@ -848,14 +873,46 @@ class HeatingScheduleCard extends HTMLElement {
     const key = [this._schedules, this._hass.states["sun.sun"], rooms.map((r) => r.schedule).join()];
     if (this._models && this._modelKey && key.every((k, i) => k === this._modelKey[i])) {
       this._models.rooms = rooms;
-      return this._models;
+      return this._ghosts(this._models);
     }
     const byEnt = new Map(rooms.map((r) => [r.schedule, r]));
     const sun = this._sun();
-    const schedules = (this._schedules || []).map((raw) => parseSchedule(raw, byEnt, sun)).filter((s) => s.rooms.size);
-    this._models = { rooms, schedules };
+    const all = (this._schedules || []).map((raw) => parseSchedule(raw, byEnt, sun)).filter((s) => s.rooms.size);
+    this._models = { rooms, all };
     this._modelKey = key;
-    return this._models;
+    return this._ghosts(this._models);
+  }
+
+  /* Split the schedules into the ones that run and the ones that lost their switch: listed by
+     Scheduler, but with no switch in Home Assistant. That happens when a rename doesn't finish
+     (Scheduler deletes the switch and, since 3.3.9, never makes the new one); the schedule stays
+     loaded with its old settings, doesn't run, and comes back as saved after a restart. A new
+     schedule's switch takes a moment to appear, so a switch counts as lost after GHOST_MS. */
+  _ghosts(m) {
+    const S = this._hass.states;
+    const now = Date.now();
+    this._missing = this._missing || new Map();
+    let wait = Infinity;
+    for (const s of m.all) {
+      if (S[s.entity]) {
+        this._missing.delete(s.id);
+        s.ghost = false;
+        continue;
+      }
+      const since = this._missing.get(s.id) ?? now;
+      this._missing.set(s.id, since);
+      s.ghost = now - since >= HeatingScheduleCard.GHOST_MS;
+      if (!s.ghost) wait = Math.min(wait, since + HeatingScheduleCard.GHOST_MS - now);
+    }
+    if (wait < Infinity && !this._ghostTimer)
+      this._ghostTimer = setTimeout(() => {
+        this._ghostTimer = null;
+        this._render();
+        if (this._sheet) this._paintSheet();
+      }, wait + 50);
+    m.schedules = m.all.filter((s) => !s.ghost);
+    m.ghosts = m.all.filter((s) => s.ghost);
+    return m;
   }
 
   /* The schedules that set this room on this day; the first one switched on is the one that counts. */
@@ -1014,7 +1071,7 @@ class HeatingScheduleCard extends HTMLElement {
       } else if (n.getAttribute(k) !== v) n.setAttribute(k, v);
     };
     const now = zoned(this._now(), this._tz());
-    const { rooms, schedules } = this._model();
+    const { rooms, schedules, ghosts } = this._model();
     const ready = !!this._schedules;
 
     // The day strip shows when any room's day differs between days of the week.
@@ -1038,6 +1095,7 @@ class HeatingScheduleCard extends HTMLElement {
     let sum = "";
     if (this._error) sum = esc(this._error);
     else if (!ready) sum = "Loading schedules…";
+    else if (ghosts.length) sum = join([esc(lostText(ghosts)), "restart Home Assistant"]);
     else if (!schedules.length) sum = "No schedules yet – tap a room to make one";
     else {
       const nexts = rooms.map((r) => ({ r, n: this._next(schedules, r, now) })).filter((x) => x.n);
@@ -1122,7 +1180,10 @@ class HeatingScheduleCard extends HTMLElement {
         const m = modeAt(tp.rooms.get(room.schedule), now.min);
         state = m ? `${esc(this._mode(m).name)} all day` : "Nothing scheduled now";
       }
-      const warn = ready && today.overlap ? `<span class="warn">${today.list.filter((s) => s.enabled).length} schedules overlap</span>` : "";
+      // A schedule that lost its switch is named as the cause; it doesn't run, so it isn't an overlap.
+      const lost = ghosts.filter((g) => g.rooms.has(room.schedule));
+      const warn = !ready ? "" : lost.length ? `<span class="warn">${esc(lostText(lost))}</span>`
+        : today.overlap ? `<span class="warn">${today.list.filter((s) => s.enabled).length} schedules overlap</span>` : "";
       set(el.querySelector(".sc"), join([temp, state, warn]));
 
       const p = el.querySelector(".pill");
@@ -1389,6 +1450,8 @@ class HeatingScheduleCard extends HTMLElement {
     // What saving will do that the editor doesn't show.
     const affected = schedules.filter((s) => (s.mask & sh.mask) && [...sh.sel].some((k) => s.rooms.has(rooms[k].schedule)));
     const notes = [];
+    const lost = this._lostFor(sh);
+    if (lost.length) notes.push(`${lostText(lost)}, so these rooms can't be changed safely. Restart Home Assistant first.`);
     if (affected.some((s) => !s.plain)) notes.push("A schedule here has conditions, sunrise or sunset times, or dates; saving replaces them with the times above.");
     if (affected.some((s) => !s.enabled)) notes.push("A schedule here is switched off; saving switches it on.");
     set(root.querySelector(".note"), esc(notes.join(" ")));
@@ -1519,12 +1582,25 @@ class HeatingScheduleCard extends HTMLElement {
     this._moveBoundary(k, sh.prog[k].s + d);
   }
 
+  /* Schedules that lost their switch and set one of the rooms picked in the sheet. */
+  _lostFor(sh) {
+    const { rooms, ghosts } = this._model();
+    return ghosts.filter((g) => [...sh.sel].some((k) => g.rooms.has(rooms[k].schedule)));
+  }
+
   async _save() {
     const sh = this._sheet;
     if (!sh || sh.saving) return;
     const { rooms, schedules } = this._model();
     const prog = normProg(sh.prog);
     const targets = [...sh.sel].map((k) => rooms[k]);
+    // A schedule that lost its switch is loaded with settings that are no longer the saved ones,
+    // so nothing it touches can be planned safely until a restart reloads it.
+    const lost = this._lostFor(sh);
+    if (lost.length) {
+      sh.error = `${lostText(lost)}. Restart Home Assistant, then save again.`;
+      return this._paintSheet();
+    }
     for (const r of targets) {
       const missing = prog.find((b) => Object.keys(r.options).length && !(b.m in r.options));
       if (missing) {
@@ -1532,26 +1608,109 @@ class HeatingScheduleCard extends HTMLElement {
         return this._paintSheet();
       }
     }
-    const ops = planSave(schedules, rooms, new Set(targets.map((r) => r.schedule)), sh.mask, prog);
+    const targetEnts = new Set(targets.map((r) => r.schedule));
+    const ops = planSave(schedules, rooms, targetEnts, sh.mask, prog);
     if (!ops.length) return this._closeSheet();
     sh.saving = true;
     sh.error = "";
     this._paintSheet();
-    try {
-      for (const op of ops) await this._hass.callService(op.domain, op.service, op.data, undefined, false);
-      if (this._sheet === sh) this._closeSheet();
-    } catch (err) {
+    let done = 0;
+    let failed = null;
+    for (const op of ops) {
+      try {
+        await this._hass.callService(op.domain, op.service, op.data, undefined, false);
+        done++;
+      } catch (err) {
+        failed = { op, err };
+        break;
+      }
+    }
+    if (failed && !done) {
+      // Nothing changed.
       if (this._sheet === sh) {
         sh.saving = false;
-        sh.error = err?.message ? `Couldn't save: ${err.message}` : "Couldn't save the schedule.";
+        sh.error = failed.err?.message ? `Couldn't save: ${failed.err.message}` : "Couldn't save the schedule.";
         this._paintSheet();
       }
-    } finally {
       this._fetch();
+      return;
     }
+    // Something changed: read the schedules back and check what is really there, for every room a
+    // call touched (a replaced schedule takes its other rooms and days with it).
+    const touched = new Set(targetEnts);
+    for (const op of ops) {
+      const s = schedules.find((x) => x.entity === op.data.entity_id);
+      if (s) for (const e of s.rooms.keys()) touched.add(e);
+      for (const ts of op.data.timeslots || []) for (const a of ts.actions || []) if (a.entity_id) touched.add(a.entity_id);
+    }
+    const problems = await this._verify(touched);
+    if (failed) {
+      const what = { add: "create", edit: "change", remove: "remove", turn_on: "switch on" }[failed.op.service] || "save";
+      const name = failed.op.name || failed.op.data?.name;
+      const msg = failed.err?.message ? `: ${failed.err.message}` : "";
+      problems.unshift(`Saved only in part – couldn't ${what} ${name ? `“${name}”` : "a schedule"}${msg}.`);
+    }
+    if (this._sheet !== sh) return;
+    if (!problems.length) return this._closeSheet();
+    sh.saving = false;
+    sh.error = problems.join(" ");
+    this._paintSheet();
+  }
+
+  /* After a save: read Scheduler's list again until every schedule for the rooms has its switch
+     (a new switch takes a moment), then report what is wrong – a schedule without its switch, or two
+     running schedules for the same room on the same day, for the rooms the save touched. Returns
+     the problems as sentences. */
+  async _verify(roomEnts) {
+    const { tries, every } = HeatingScheduleCard.VERIFY;
+    const byEnt = new Map(this._model().rooms.map((r) => [r.schedule, r]));
+    let list = null;
+    let missing = [];
+    for (let k = 0; k < tries; k++) {
+      await new Promise((r) => setTimeout(r, every));
+      try {
+        const got = await this._hass.callWS({ type: "scheduler" });
+        if (Array.isArray(got)) list = got;
+      } catch (err) {
+        continue; // reconnecting: try again
+      }
+      if (!list) continue;
+      const S = this._hass.states;
+      // A schedule still being created is listed without its settings; it counts until it has a switch.
+      missing = list.filter((raw) => !S[raw.entity_id] &&
+        (!Array.isArray(raw.timeslots) || [...parseSchedule(raw, byEnt, null).rooms.keys()].some((e) => roomEnts.has(e))));
+      if (!missing.length) break;
+    }
+    if (!list) return ["Couldn't read the schedules back to check them. Reload the page to see what was saved."];
+    this._schedules = list;
+    this._fetchedAt = Date.now();
+    this._render();
+    const problems = [];
+    if (missing.length) {
+      const names = listNames(missing.map((raw) => `“${raw.name || raw.entity_id || "New schedule"}”`));
+      problems.push(`${names} ${missing.length > 1 ? "have" : "has"} no switch. Restarting Home Assistant reloads ${missing.length > 1 ? "them" : "it"}.`);
+    }
+    const { rooms, schedules } = this._model();
+    const clashes = [];
+    for (const r of rooms) {
+      if (!roomEnts.has(r.schedule)) continue;
+      for (let d = 0; d < 7; d++) {
+        const on = schedules.filter((s) => s.enabled && this._hass.states[s.entity] && s.rooms.has(r.schedule) && (s.mask >> d) & 1);
+        if (on.length > 1) {
+          clashes.push(`${r.name}: ${listNames(on.map((s) => `“${s.name}”`))}`);
+          break;
+        }
+      }
+    }
+    if (clashes.length) problems.push(`More than one schedule now sets ${clashes.length > 1 ? "these rooms" : "this room"} – ${clashes.join("; ")}.`);
+    return problems;
   }
 }
 
+/* How long a schedule may be listed without its switch before it counts as lost (a new switch takes
+   a moment to appear), and how long a save waits for every switch to be there. */
+HeatingScheduleCard.GHOST_MS = 5000;
+HeatingScheduleCard.VERIFY = { tries: 12, every: 500 };
 HeatingScheduleCard.plan = planSave;
 HeatingScheduleCard.parse = parseSchedule;
 HeatingScheduleCard.daysLabel = daysLabel;

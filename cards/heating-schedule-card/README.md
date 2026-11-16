@@ -49,16 +49,38 @@ Tap a room. The sheet shows its day for the day on show:
     schedule of its own;
   - two schedules left with the same rooms and the same times (a weekend split undone) are merged
     into one;
-  - new schedules are named after their rooms and days ("Master Bedroom heating (Weekend)"), and a
-    schedule whose rooms or days change is renamed to match. Its switch's entity id changes with the
-    name, as Scheduler does.
+  - new schedules are named after their rooms and days ("Master Bedroom heating (Weekend)");
+  - a schedule whose rooms or days change is **replaced, never renamed**. The card creates the new,
+    correctly named schedule, then removes the old one, so its switch gets a new entity id.
+    Renaming is unsafe: Scheduler renames by deleting the switch and creating a new one, and since
+    Scheduler 3.3.9 the new one is never created. The schedule then stays loaded with its old
+    settings and no switch until Home Assistant restarts.
+  - New schedules are created first and old ones removed last. A save that stops part way can
+    therefore leave a room with two schedules, but never with none.
+- **After saving, the card checks.** It reads the schedules back and waits a few seconds for every
+  new switch to appear. The sheet closes only when every schedule for the rooms it touched has
+  its switch, and no room has more than one schedule on any day. Otherwise it stays open and says
+  what is wrong, for example "“Living Room heating” has no switch. Restarting Home Assistant
+  reloads it." or "Saved only in part – couldn't remove “…”".
 - **Cancel** or Escape closes without saving. A tap beside the sheet closes it only while nothing
-  has changed, so edits aren't lost to a stray tap. If a call fails, the sheet stays open with Home
-  Assistant's message, and the card reads the schedules again.
+  has changed, so edits aren't lost to a stray tap. If the first call fails, nothing was changed:
+  the sheet stays open with Home Assistant's message.
 
 The sheet warns before saving over something it doesn't show: a schedule with conditions,
 sunrise/sunset times or a date range (saving replaces them with the times shown), or a schedule
 that is switched off (saving switches it on).
+
+**A schedule that lost its switch.** Scheduler can list a schedule that has no switch in Home
+Assistant, which is what an unfinished rename leaves behind. That schedule doesn't run, and what
+Scheduler shows for it is no longer what it saved. The card treats it as follows:
+
+- it doesn't count it as an overlap;
+- it names it on each of its rooms ("“Living Room and Study heating” lost its switch");
+- the summary under the title adds "restart Home Assistant";
+- it won't save changes to those rooms until a restart has reloaded the schedule.
+
+A new schedule's switch normally appears within a second; the card waits 5 s before calling one
+lost.
 
 ## Configuration
 
@@ -99,9 +121,10 @@ Any other option shows under its own name, in grey.
   (HACS). The card reads every schedule over Scheduler's websocket API (`scheduler`) and picks the
   ones with actions that set a room's helper (`input_select.select_option` / `select.select_option`).
   It re-reads them whenever Scheduler reports a change (`scheduler_updated`), so changes made
-  elsewhere – the Scheduler card, another phone – show at once. Saving uses `scheduler.edit`,
-  `scheduler.add`, `scheduler.remove` and `switch.turn_on`. A schedule's other actions (a lamp in
-  the same schedule, say) stay where they are.
+  elsewhere – the Scheduler card, another phone – show at once. Saving uses `scheduler.add`,
+  `scheduler.edit` (only for times and days, never a name), `scheduler.remove` and
+  `switch.turn_on`. A schedule's other actions (a lamp in the same schedule, say) stay where they
+  are, and so does its name.
 - **Days:** `daily`, `workday`, `weekend` and single days are all read. Workday and weekend are drawn
   as Monday–Friday and Saturday–Sunday (Scheduler itself asks the workday sensor, which also knows
   the bank holidays). New schedules are written with plain days.

@@ -61,12 +61,43 @@ function states() {
   return s;
 }
 
-/* A fake Scheduler: the websocket list, and add / edit / remove applied the way the component does
-   (edit merges the given keys; a new name means a new entity id). Rejects what Scheduler's schema
-   rejects that the card could plausibly send. */
-function fakeScheduler(list) {
+/* A fake Scheduler (3.3.9): the saved schedules (store), the schedule objects it has loaded – what its
+   websocket list returns (mem) – and their switches (states). add / edit / remove / switch on-off
+   as the component does them, including its rename: Scheduler saves the new name, deletes the switch
+   and, since 3.3.9, never creates the new one (its add skips a schedule id it already has loaded),
+   so the loaded object keeps its old name, rooms and switch id, the switch is gone and the saved
+   version only comes back after a restart. A new schedule's switch appears a moment after the add.
+   Rejects what Scheduler's schema rejects that the card could plausibly send. */
+function fakeScheduler(initial, S, opts = {}) {
+  const clone = (x) => JSON.parse(JSON.stringify(x));
   const slug = (n) => n.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const store = new Map(); // schedule_id → saved settings
+  const mem = new Map(); //   schedule_id → { entity_id, snap }, in Scheduler's list order
+  const registry = new Map(); // schedule_id → entity id last given (HA reuses it for the same unique id)
+  const stats = { renames: 0 };
+  let onChange = () => {};
   let n = 0;
+  const switchOn = (e, on) => (S[e] = { state: on ? "on" : "off", attributes: {} });
+  const freeId = (id, name) => {
+    if (registry.has(id)) return registry.get(id);
+    const base = `switch.schedule_${slug(name || "") || id}`;
+    let e = base;
+    for (let k = 2; S[e] || [...registry.values()].includes(e); k++) e = `${base}_${k}`;
+    return e;
+  };
+  const load = (id) => {
+    const e = freeId(id, store.get(id).name);
+    registry.set(id, e);
+    mem.set(id, { entity_id: e, snap: clone(store.get(id)) });
+    switchOn(e, store.get(id).enabled !== false);
+  };
+  for (const raw of initial) {
+    const { entity_id, schedule_id, ...rest } = clone(raw);
+    store.set(schedule_id, rest);
+    registry.set(schedule_id, entity_id);
+    load(schedule_id);
+  }
+  const find = (e) => [...mem.entries()].find(([, o]) => o.entity_id === e);
   const checkSlots = (slots) => {
     assert(Array.isArray(slots) && slots.length >= 1, "timeslots: at least one");
     for (const t of slots) {
@@ -82,32 +113,73 @@ function fakeScheduler(list) {
   };
   const apply = (domain, service, data) => {
     if (domain === "switch") {
-      const s = list.find((x) => x.entity_id === data.entity_id);
-      assert(s, `switch ${data.entity_id}`);
-      s.enabled = service === "turn_on";
-      return;
+      const hit = find(data.entity_id);
+      assert(hit && S[data.entity_id], `switch ${data.entity_id}`);
+      const [id, o] = hit;
+      store.get(id).enabled = o.snap.enabled = service === "turn_on";
+      switchOn(o.entity_id, service === "turn_on");
+      return onChange();
     }
     assert.strictEqual(domain, "scheduler");
     if (service === "add") {
       checkSlots(data.timeslots);
-      assert.strictEqual(data.repeat_type, "repeat");
+      assert(["repeat", "single", "pause"].includes(data.repeat_type), "repeat_type");
+      const extra = Object.keys(data).filter((k) => !["name", "weekdays", "timeslots", "repeat_type", "start_date", "end_date", "tags"].includes(k));
+      assert(!extra.length, `unknown add keys ${extra}`);
       const id = `new${++n}`;
-      list.push({ schedule_id: id, entity_id: `switch.schedule_${slug(data.name) || id}`, name: data.name, weekdays: data.weekdays, timeslots: data.timeslots,
-        repeat_type: "repeat", enabled: true, start_date: null, end_date: null });
+      store.set(id, { ...clone(data), start_date: data.start_date ?? null, end_date: data.end_date ?? null, enabled: true });
+      const e = freeId(id, data.name);
+      registry.set(id, e);
+      mem.set(id, { entity_id: e, snap: clone(store.get(id)) });
+      // The switch appears a moment later – or never, when opts.noSwitch says so.
+      if (!(opts.noSwitch && opts.noSwitch(data)))
+        setTimeout(() => {
+          if (mem.has(id)) switchOn(e, true);
+          onChange();
+        }, 0);
     } else if (service === "edit") {
-      const s = list.find((x) => x.entity_id === data.entity_id);
-      assert(s, `edit ${data.entity_id}`);
+      const hit = find(data.entity_id);
+      assert(hit, `edit ${data.entity_id}`);
+      const [id, o] = hit;
       assert("start_date" in data && "end_date" in data, "edit passes the date range through (the schema would clear it)");
       if (data.timeslots) checkSlots(data.timeslots);
-      for (const [k, v] of Object.entries(data)) if (k !== "entity_id") s[k] = v;
-      if (data.name) s.entity_id = `switch.schedule_${slug(data.name)}`;
+      const saved = store.get(id);
+      const renamed = "name" in data && data.name !== o.snap.name;
+      for (const [k, v] of Object.entries(data)) if (k !== "entity_id") saved[k] = clone(v);
+      if (renamed) {
+        // Scheduler 3.3.9: the switch is deleted and never re-created; the loaded object stays as it was.
+        stats.renames++;
+        delete S[o.entity_id];
+        registry.delete(id);
+      } else o.snap = clone(saved);
+      onChange();
     } else if (service === "remove") {
-      const i = list.findIndex((x) => x.entity_id === data.entity_id);
-      assert(i >= 0, `remove ${data.entity_id}`);
-      list.splice(i, 1);
+      const hit = find(data.entity_id);
+      assert(hit, `remove ${data.entity_id}`);
+      const [id, o] = hit;
+      delete S[o.entity_id];
+      store.delete(id);
+      mem.delete(id);
+      registry.delete(id);
+      onChange();
     } else throw new Error(`unexpected scheduler.${service}`);
   };
-  return { list, apply };
+  return {
+    get list() {
+      return [...mem.entries()].map(([id, o]) => ({ ...clone(o.snap), schedule_id: id, entity_id: o.entity_id }));
+    },
+    store,
+    stats,
+    apply,
+    onChange: (f) => (onChange = f),
+    /* A Home Assistant restart: everything loads again from the saved settings. */
+    restart() {
+      for (const o of mem.values()) delete S[o.entity_id];
+      mem.clear();
+      for (const id of store.keys()) load(id);
+      onChange();
+    },
+  };
 }
 
 function makeHass(S, sched, calls, opts = {}) {
@@ -122,7 +194,7 @@ function makeHass(S, sched, calls, opts = {}) {
       callWS: async (msg) => {
         if (opts.wsError) throw opts.wsError;
         assert.strictEqual(msg.type, "scheduler");
-        return JSON.parse(JSON.stringify(sched.list));
+        return sched.list;
       },
       callService: async (d, s, data, target, notify) => {
         calls.push([d, s, JSON.parse(JSON.stringify(data)), notify]);
@@ -165,10 +237,13 @@ function makeHass(S, sched, calls, opts = {}) {
   eq([127, 31, 96, 32, 7, 23, 65].map(Card.daysLabel), ["Every day", "Weekdays", "Weekend", "Saturday", "Mon–Wed", "Mon–Wed, Fri", "Mon, Sun"]);
 
   // ---- Mount with the live data ----
+  // Short waits in tests: a save checks every 2 ms, a missing switch counts as lost after 20 ms.
+  Card.VERIFY = { tries: 5, every: 2 };
+  Card.GHOST_MS = 20;
   const mount = (opts = {}) => {
-    const sched = fakeScheduler(liveSchedules());
     const calls = [];
     const S = states();
+    const sched = fakeScheduler(liveSchedules(), S, opts);
     const { hass, subs } = makeHass(S, sched, calls, opts);
     const card = make();
     card._now = () => NOW;
@@ -178,7 +253,15 @@ function makeHass(S, sched, calls, opts = {}) {
     card.addEventListener("hass-notification", (e) => events.push(["notification", e.detail.message]));
     card.setConfig({ rooms: ROOMS });
     card.hass = hass;
-    return { card, sched, calls, S, hass, subs, events, root: () => card.shadowRoot, push: () => (card.hass = { ...hass, states: { ...S } }) };
+    // Home Assistant hands the card a new hass on every state change.
+    const push = () => (card.hass = { ...hass, states: S });
+    sched.onChange(push);
+    // Every save goes through without a rename (Scheduler 3.3.9 loses the switch on a rename).
+    const noRename = () => {
+      assert.strictEqual(sched.stats.renames, 0, "no schedule renamed");
+      assert(!calls.some((c) => c[1] === "edit" && "name" in c[2]), "scheduler.edit is never sent a name");
+    };
+    return { card, sched, calls, S, hass, subs, events, root: () => card.shadowRoot, push, noRename };
   };
 
   let m = mount();
@@ -348,17 +431,23 @@ function makeHass(S, sched, calls, opts = {}) {
   assert.strictEqual(sr.querySelector(".days-hint").textContent, "Weekdays keep the current times.");
   assert.strictEqual(sr.querySelector(".sub").textContent, "Weekend");
   sr.querySelector(".save").click();
-  await tick(5);
-  assert(!document.querySelector("hsc-edit-sheet"), "closes after saving");
-  const saved = m.calls.slice(-2);
-  eq(saved.map((c) => `${c[0]}.${c[1]}`), ["scheduler.edit", "scheduler.add"]);
-  eq(saved[0][2], { entity_id: "switch.schedule_master_bedroom", weekdays: ["mon", "tue", "wed", "thu", "fri"], name: "Master Bedroom heating (Weekdays)",
-    start_date: null, end_date: null }, "the daily schedule keeps the weekdays");
+  assert.strictEqual(sr.querySelector(".save").textContent.trim(), "Saving…");
+  await tick(40);
+  assert(!document.querySelector("hsc-edit-sheet"), "closes after saving, once every switch is there");
+  const saved = m.calls.slice(-3);
+  // The daily schedule's days change, so it is replaced – new schedules first, then the old one removed.
+  eq(saved.map((c) => `${c[0]}.${c[1]}`), ["scheduler.add", "scheduler.add", "scheduler.remove"]);
+  eq(saved[0][2].name, "Master Bedroom heating (Weekdays)");
+  eq(saved[0][2].weekdays, ["mon", "tue", "wed", "thu", "fri"]);
+  eq(saved[0][2].timeslots.map((s) => s.start), ["00:00:00", "09:30:00", "21:30:00"], "the weekdays keep their times");
   eq(saved[1][2].weekdays, ["sat", "sun"]);
   eq(saved[1][2].name, "Master Bedroom heating (Weekend)");
   eq(saved[1][2].timeslots.map((s) => `${s.start}-${s.stop}:${s.actions[0].service_data.option}`),
     ["00:00:00-07:30:00:night", "07:30:00-21:30:00:comfort", "21:30:00-00:00:00:night"]);
+  eq(saved[2][2], { entity_id: "switch.schedule_master_bedroom" });
   assert(saved.every((c) => c[3] === false), "calls without Home Assistant's own error toast");
+  eq(m.sched.list.map((x) => [x.name, !!m.S[x.entity_id]]),
+    [["Living, Study, Second Bedroom", true], ["Master Bedroom heating (Weekdays)", true], ["Master Bedroom heating (Weekend)", true]], "every schedule has its switch");
   // After the update event the card re-reads: the day strip appears.
   m.subs[0]({ event: "scheduler_item_updated" });
   await tick(300);
@@ -377,9 +466,12 @@ function makeHass(S, sched, calls, opts = {}) {
   sr.querySelector('[data-mask="127"]').click();
   assert.strictEqual(sr.querySelector(".days-hint").textContent, "Replaces the current times at the weekend.");
   sr.querySelector(".save").click();
-  await tick(5);
+  await tick(40);
   eq(m.sched.list.filter((s) => s.timeslots.some((x) => x.actions.some((a) => a.entity_id === MB))).map((s) => [s.weekdays, s.name]),
     [[["daily"], "Master Bedroom heating"]], "one daily schedule again");
+  eq(m.calls.slice(-3).map((c) => `${c[1]}:${c[2].name || c[2].entity_id}`),
+    ["add:Master Bedroom heating", "remove:switch.schedule_master_bedroom_heating_weekdays", "remove:switch.schedule_master_bedroom_heating_weekend"]);
+  m.noRename();
   m.subs[0]({});
   await tick(300);
   assert(root.querySelector(".days").hidden, "same every day again: no day strip");
@@ -396,17 +488,135 @@ function makeHass(S, sched, calls, opts = {}) {
   assert.strictEqual(sr.querySelector(".rooms-hint").textContent, "Second Bedroom and Study keep their current times.");
   sr.querySelectorAll(".blk")[1].querySelector('[data-step="15"]').click(); // Day from 06:15
   sr.querySelector(".save").click();
-  await tick(5);
-  let out = m.calls.slice(-2);
-  eq(out.map((c) => `${c[0]}.${c[1]}`), ["scheduler.edit", "scheduler.add"]);
-  eq(out[0][2].name, "Second Bedroom and Study heating", "the shared schedule is renamed for the rooms left");
+  await tick(40);
+  assert(!document.querySelector("hsc-edit-sheet"), "closes after saving");
+  let out = m.calls.slice(-3);
+  // The shared schedule keeps the rooms left, under a new name: replaced, not renamed.
+  eq(out.map((c) => `${c[0]}.${c[1]}`), ["scheduler.add", "scheduler.add", "scheduler.remove"]);
+  eq(out[0][2].name, "Second Bedroom and Study heating", "the rooms left get a schedule named for them");
   assert(out[0][2].timeslots.every((s) => s.actions.every((a) => a.entity_id !== LR)), "Living Room leaves it");
   assert(out[0][2].timeslots.every((s) => !("conditions" in s) && !("condition_type" in s)), "empty conditions aren't sent");
   eq(out[0][2].timeslots.map((s) => s.start), ["00:00:00", "06:00:00", "21:30:00"], "their times are untouched");
   eq(out[1][2].name, "Living Room heating");
   eq(out[1][2].weekdays, ["daily"]);
   eq(out[1][2].timeslots[1].start, "06:15:00");
+  eq(out[2][2], { entity_id: "switch.schedule_31efb0" }, "then the old shared schedule goes");
+  eq(m.sched.list.map((x) => [x.name, !!m.S[x.entity_id]]),
+    [["Master Bedroom", true], ["Second Bedroom and Study heating", true], ["Living Room heating", true]]);
+  m.noRename();
+  root = m.root();
+  assert(![...root.querySelectorAll(".sc")].some((x) => /overlap|lost/.test(x.textContent)), "no overlap, nothing lost");
   m.card.remove();
+
+  // ---- Today's split (16 Nov 2026): Second Bedroom and Study leave Living Room's schedule ----
+  // Before: one schedule for the three rooms (06:00 / 20:00), and Master Bedroom's own.
+  const shared = (id, entity, name, ents, t1, t2) => ({ schedule_id: id, entity_id: entity, name, weekdays: ["daily"], start_date: null, end_date: null,
+    repeat_type: "repeat", enabled: true, tags: [], timeslots: [slot("00:00:00", t1, ents, "night"), slot(t1, t2, ents, "comfort"), slot(t2, "00:00:00", ents, "night")] });
+  const beforeSplit = () => [
+    shared("956b57", "switch.schedule_master_bedroom", "Master Bedroom", [MB], "06:30:00", "20:00:00"),
+    shared("473c2e", "switch.schedule_living_room_and_study_heating", "Living Room and Study heating", [LR, SB, ST], "06:00:00", "20:00:00"),
+  ];
+  const mountToday = (opts = {}) => {
+    const calls = [];
+    const S = states();
+    delete S["switch.schedule_31efb0"];
+    delete S["switch.schedule_master_bedroom"];
+    const sched = fakeScheduler(beforeSplit(), S, opts);
+    const { hass, subs } = makeHass(S, sched, calls, opts);
+    const card = make();
+    card._now = () => NOW;
+    document.body.appendChild(card);
+    card.setConfig({ rooms: ROOMS });
+    card.hass = hass;
+    const push = () => (card.hass = { ...hass, states: S });
+    sched.onChange(push);
+    return { card, sched, calls, S, subs, push, root: () => card.shadowRoot };
+  };
+  let td = mountToday();
+  await tick(5);
+  td.root().querySelectorAll(".room")[2].click(); // Second Bedroom
+  sr = document.querySelector("hsc-edit-sheet").shadowRoot;
+  eq(chips(), ["Living Room*", "Master Bedroom", "Second Bedroom*", "Study*"]);
+  sr.querySelector('[data-room="0"]').click(); // Living Room out
+  sr.querySelector(".save").click();
+  await tick(40);
+  assert(!document.querySelector("hsc-edit-sheet"), "today's split saves cleanly");
+  eq(td.calls.map((c) => `${c[1]}:${c[2].name || c[2].entity_id}`),
+    ["add:Living Room heating", "add:Second Bedroom and Study heating", "remove:switch.schedule_living_room_and_study_heating"]);
+  eq(td.sched.stats.renames, 0, "no rename, so no switch is lost");
+  eq(td.sched.list.map((x) => [x.name, !!td.S[x.entity_id], [...new Set(x.timeslots.flatMap((t) => t.actions.map((a) => a.entity_id.split(".")[1])))].join()]),
+    [["Master Bedroom", true, "master_bedroom_heating_schedule"], ["Living Room heating", true, "living_room_heating_schedule"],
+      ["Second Bedroom and Study heating", true, "second_bedroom_heating_schedule,study_heating_schedule"]]);
+  td.card.remove();
+
+  // ---- What 1.0.4 did: the rename left the schedule loaded without its switch ----
+  td = mountToday();
+  await tick(5);
+  // 1.0.4's plan for the same split: edit with a new name, then add.
+  const lrOnly = beforeSplit()[1].timeslots.map((t) => ({ start: t.start, stop: t.stop, actions: t.actions.filter((a) => a.entity_id === LR) }));
+  td.sched.apply("scheduler", "edit", { entity_id: "switch.schedule_living_room_and_study_heating", name: "Living Room heating", timeslots: lrOnly,
+    start_date: null, end_date: null });
+  td.sched.apply("scheduler", "add", { name: "Second Bedroom and Study heating", weekdays: ["daily"], repeat_type: "repeat",
+    timeslots: beforeSplit()[1].timeslots.map((t) => ({ start: t.start, stop: t.stop, actions: t.actions.filter((a) => a.entity_id !== LR) })) });
+  assert(!td.S["switch.schedule_living_room_and_study_heating"], "the switch is gone");
+  eq(td.sched.list[1].name, "Living Room and Study heating", "Scheduler still lists the old settings");
+  td.subs[0]({});
+  await tick(350);
+  root = td.root();
+  const tsc = (i) => root.querySelectorAll(".room")[i].querySelector(".sc").textContent.replace(/\u00a0/g, " ");
+  assert.strictEqual(root.querySelector(".status").textContent.replace(/\u00a0/g, " "),
+    "“Living Room and Study heating” lost its switch · restart Home Assistant", "the summary names it and what to do");
+  for (const i of [0, 2, 3]) assert(tsc(i).endsWith("“Living Room and Study heating” lost its switch"), `room ${i} names the cause`);
+  assert(![...root.querySelectorAll(".sc")].some((x) => /overlap/.test(x.textContent)), "not counted as an overlap: it doesn't run");
+  assert.strictEqual(tsc(1), "20° → 20° · Day at 06:30", "Master Bedroom isn't affected");
+  // Its rooms can't be changed until a restart.
+  root.querySelectorAll(".room")[2].click();
+  sr = document.querySelector("hsc-edit-sheet").shadowRoot;
+  assert.strictEqual(sr.querySelector(".note").textContent,
+    "“Living Room and Study heating” lost its switch, so these rooms can't be changed safely. Restart Home Assistant first.");
+  sr.querySelectorAll(".blk")[1].querySelector('[data-step="15"]').click();
+  const nCalls = td.calls.length;
+  sr.querySelector(".save").click();
+  await tick(20);
+  assert.strictEqual(td.calls.length, nCalls, "nothing is sent");
+  assert.strictEqual(sr.querySelector(".err").textContent, "“Living Room and Study heating” lost its switch. Restart Home Assistant, then save again.");
+  sr.querySelector(".cancel").click();
+  // A restart loads what was saved: the warning goes.
+  td.sched.restart();
+  td.subs[0]({});
+  await tick(300);
+  assert(!/lost/.test(root.querySelector(".status").textContent), "after a restart nothing is lost");
+  assert(![...root.querySelectorAll(".sc")].some((x) => /lost/.test(x.textContent)));
+  td.card.remove();
+
+  // ---- A save whose new schedule never gets its switch ----
+  td = mountToday({ noSwitch: (data) => data.name === "Living Room heating" });
+  await tick(5);
+  td.root().querySelectorAll(".room")[2].click();
+  sr = document.querySelector("hsc-edit-sheet").shadowRoot;
+  sr.querySelector('[data-room="0"]').click();
+  sr.querySelector(".save").click();
+  await tick(60);
+  assert(document.querySelector("hsc-edit-sheet"), "the sheet stays open");
+  assert.strictEqual(sr.querySelector(".err").textContent, "“Living Room heating” has no switch. Restarting Home Assistant reloads it.");
+  assert.strictEqual(sr.querySelector(".save").textContent.trim(), "Save");
+  sr.querySelector(".cancel").click();
+  td.card.remove();
+
+  // ---- A save that fails part way says so, and names the overlap it leaves ----
+  td = mountToday({ fail: (d, s) => d === "scheduler" && s === "remove" });
+  await tick(5);
+  td.root().querySelectorAll(".room")[2].click();
+  sr = document.querySelector("hsc-edit-sheet").shadowRoot;
+  sr.querySelector('[data-room="0"]').click();
+  sr.querySelector(".save").click();
+  await tick(60);
+  assert(document.querySelector("hsc-edit-sheet"), "the sheet stays open");
+  const perr = sr.querySelector(".err").textContent;
+  assert(perr.startsWith("Saved only in part – couldn't remove “Living Room and Study heating”: Entity not found: switch.schedule_x."), perr);
+  assert(perr.includes("More than one schedule now sets these rooms – Living Room: “Living Room and Study heating” and “Living Room heating”;"), perr);
+  sr.querySelector(".cancel").click();
+  td.card.remove();
 
   // ---- Copy to another room; and errors ----
   m = mount({ fail: (d, s) => d === "scheduler" && s === "edit" });
@@ -468,12 +678,18 @@ function makeHass(S, sched, calls, opts = {}) {
   const brief = (o) => o.map((x) => `${x.service}:${x.data.entity_id || x.data.name}${x.data.weekdays ? `[${x.data.weekdays}]` : ""}${x.data.timeslots ? "+t" : ""}${x.data.name && x.data.entity_id ? `>${x.data.name}` : ""}`);
 
   eq(brief(ops(liveSchedules(), [LR, SB, ST], 127)), ["edit:switch.schedule_31efb0+t"], "all its rooms, all days: rewrite the times");
+  // A schedule whose days or rooms change needs a new name: it is replaced (adds first, removes last), never renamed.
   eq(brief(ops(liveSchedules(), [LR, SB, ST], 96)),
-    ["edit:switch.schedule_31efb0[mon,tue,wed,thu,fri]>Living Room, Second Bedroom and Study heating (Weekdays)", "add:Living Room, Second Bedroom and Study heating (Weekend)[sat,sun]+t"]);
+    ["add:Living Room, Second Bedroom and Study heating (Weekdays)[mon,tue,wed,thu,fri]+t", "add:Living Room, Second Bedroom and Study heating (Weekend)[sat,sun]+t",
+      "remove:switch.schedule_31efb0"]);
   eq(brief(ops(liveSchedules(), [LR], 32)),
-    ["edit:switch.schedule_31efb0+t>Second Bedroom and Study heating", "add:Living Room heating (Sun–Fri)[mon,tue,wed,thu,fri,sun]+t".replace("Sun–Fri", "Mon–Fri, Sun"), "add:Living Room heating (Saturday)[sat]+t"],
+    ["add:Second Bedroom and Study heating[daily]+t", "add:Living Room heating (Mon–Fri, Sun)[mon,tue,wed,thu,fri,sun]+t", "add:Living Room heating (Saturday)[sat]+t",
+      "remove:switch.schedule_31efb0"],
     "some rooms, some days: the room leaves, keeping its old times on the other days");
-  eq(brief(ops(liveSchedules(), [ST, MB], 127)), ["edit:switch.schedule_31efb0+t>Living Room and Second Bedroom heating", "edit:switch.schedule_master_bedroom+t", "add:Study heating[daily]+t"]);
+  eq(brief(ops(liveSchedules(), [ST, MB], 127)),
+    ["add:Living Room and Second Bedroom heating[daily]+t", "add:Study heating[daily]+t", "edit:switch.schedule_master_bedroom+t", "remove:switch.schedule_31efb0"]);
+  for (const [targets, days] of [[[LR, SB, ST], 96], [[LR], 32], [[ST, MB], 127], [[MB], 96], [[SB, ST], 127]])
+    assert(!ops(liveSchedules(), targets, days).some((x) => x.service === "edit" && "name" in x.data), "never a rename");
   // Nothing changes when the times are the same.
   eq(ops(liveSchedules(), [LR, SB, ST], 127, [{ s: 0, m: "night" }, { s: 360, m: "comfort" }, { s: 1290, m: "night" }]), []);
   // A room with no schedule at all gets one.
@@ -485,19 +701,27 @@ function makeHass(S, sched, calls, opts = {}) {
   const withLamp = liveSchedules();
   withLamp[1].timeslots.forEach((s) => s.actions.push({ service: "light.turn_on", entity_id: "light.lamp", service_data: {} }));
   let o = ops(withLamp, [MB], 127);
-  eq(brief(o), ["edit:switch.schedule_master_bedroom+t", "add:Master Bedroom heating[daily]+t"]);
-  assert(!o[0].data.name, "a schedule with other actions keeps its name");
-  eq(o[0].data.timeslots.map((s) => s.actions.map((a) => a.entity_id)), [["light.lamp"], ["light.lamp"], ["light.lamp"]]);
-  // Conditions and dates are kept when only rooms leave; a disabled schedule is switched on first.
+  eq(brief(o), ["add:Master Bedroom heating[daily]+t", "edit:switch.schedule_master_bedroom+t"]);
+  assert(!o[1].data.name, "a schedule with other actions keeps its name, so it is edited");
+  eq(o[1].data.timeslots.map((s) => s.actions.map((a) => a.entity_id)), [["light.lamp"], ["light.lamp"], ["light.lamp"]]);
+  // A disabled schedule edited in place is switched on first.
+  const off = liveSchedules();
+  off[0].enabled = false;
+  eq(ops(off, [LR, SB, ST], 127).map((x) => `${x.domain}.${x.service}`), ["switch.turn_on", "scheduler.edit"]);
+  // A replacement keeps conditions, dates and tags, and runs.
   const cond = liveSchedules();
   cond[0].timeslots.forEach((s) => (s.conditions = [{ entity_id: "binary_sensor.x", value: "on", match_type: "is" }]) && (s.condition_type = "and"));
   cond[0].start_date = "2026-10-01";
+  cond[0].tags = ["heating"];
   cond[0].enabled = false;
   o = ops(cond, [LR], 127);
-  eq(o.map((x) => `${x.domain}.${x.service}`), ["switch.turn_on", "scheduler.edit", "scheduler.add"]);
-  eq(o[1].data.timeslots[0].conditions, [{ entity_id: "binary_sensor.x", value: "on", match_type: "is" }]);
-  eq(o[1].data.timeslots[0].condition_type, "and");
-  eq(o[1].data.start_date, "2026-10-01", "the date range goes back unchanged");
+  eq(o.map((x) => `${x.domain}.${x.service}:${x.data.name || x.data.entity_id}`),
+    ["scheduler.add:Second Bedroom and Study heating", "scheduler.add:Living Room heating", "scheduler.remove:switch.schedule_31efb0"]);
+  eq(o[0].data.timeslots[0].conditions, [{ entity_id: "binary_sensor.x", value: "on", match_type: "is" }]);
+  eq(o[0].data.timeslots[0].condition_type, "and");
+  eq(o[0].data.start_date, "2026-10-01", "the date range goes over unchanged");
+  eq(o[0].data.tags, ["heating"]);
+  assert(!("end_date" in o[0].data), "no empty end date sent to add");
   // A non-plain schedule whose every room changes is replaced, not rewritten in place.
   o = ops(cond, [LR, SB, ST], 127);
   eq(brief(o), ["add:Living Room, Second Bedroom and Study heating[daily]+t", "remove:switch.schedule_31efb0"], "replaced (and the new one runs), not switched on first");
@@ -507,7 +731,7 @@ function makeHass(S, sched, calls, opts = {}) {
   split.push({ ...JSON.parse(JSON.stringify(split[1])), schedule_id: "w", entity_id: "switch.schedule_w", name: "MB weekend", weekdays: ["sat", "sun"],
     timeslots: [slot("00:00:00", "08:00:00", [MB], "night"), slot("08:00:00", "21:30:00", [MB], "comfort"), slot("21:30:00", "00:00:00", [MB], "night")] });
   const weekdayTimes = [{ s: 0, m: "night" }, { s: 570, m: "comfort" }, { s: 1290, m: "night" }];
-  eq(brief(ops(split, [MB], 96, weekdayTimes)), ["edit:switch.schedule_master_bedroom[daily]>Master Bedroom heating", "remove:switch.schedule_w"],
+  eq(brief(ops(split, [MB], 96, weekdayTimes)), ["add:Master Bedroom heating[daily]+t", "remove:switch.schedule_master_bedroom", "remove:switch.schedule_w"],
     "the weekend given the weekday times: one schedule again");
   // Programme parsing: triggers without a stop hold until the next one, wrapping midnight.
   const trig = Card.parse({ schedule_id: "t", entity_id: "switch.t", weekdays: ["daily"], timeslots: [
