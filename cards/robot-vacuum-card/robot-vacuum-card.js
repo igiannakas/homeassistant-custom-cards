@@ -19,10 +19,19 @@
  * is one entity id. Rooms and their segment ids come from roborock.get_maps; a room clean is
  * vacuum.send_command app_segment_clean on the map that is loaded. Nothing blocks a clean
  * except the vacuum being offline. Tap any value for its own more-info.
+ *
+ * Two backends share the same card (BACKENDS, chosen once per vacuum from the entity registry):
+ * Roborock, as above, and "area" for any other vacuum with the CLEAN_AREA feature – a Matter
+ * robot such as the DJI ROMO. It shows what such a vacuum exposes and hides the rest (no battery,
+ * map, floors, progress or dock jobs). Its rooms are the Home Assistant areas mapped to the
+ * vacuum's segments, read with config/entity_registry/get (not admin-only, unlike
+ * vacuum/get_segments), and a room clean is vacuum.clean_area. Its Cleaning mode is the
+ * clean_mode select ("Auto Vac And Mop"), shown as the same tabs plus one intensity row, and
+ * its robot errors come from the operational_error sensor.
  * See cards/robot-vacuum-card/README.md for every option.
  */
 
-const RVC_VERSION = "2.9.0";
+const RVC_VERSION = "2.10.0";
 const RVC_TAG = "robot-vacuum-card";
 
 const C = {
@@ -126,11 +135,18 @@ function deviceEntityIds(hass, vacuumId) {
   return { devId, ids };
 }
 
-function discover(hass, cfg) {
+/* The generic (area) backend's entities, found the same way. */
+const AREA_KEYS = {
+  clean_mode: { domain: "select", tk: ["clean_mode"], sfx: ["_clean_mode"] },
+  op_state: { domain: "sensor", tk: ["operational_state"], sfx: ["_operational_state"] },
+  op_error: { domain: "sensor", tk: ["operational_error"], sfx: ["_operational_error"] },
+};
+
+function discover(hass, cfg, keys = KEYS) {
   const reg = hass.entities || {};
   const { devId, ids } = deviceEntityIds(hass, cfg.entity);
   const found = {};
-  for (const [k, spec] of Object.entries(KEYS)) {
+  for (const [k, spec] of Object.entries(keys)) {
     const own = cfg.entities?.[k];
     if (own) {
       found[k] = own;
@@ -344,6 +360,122 @@ function model(hass, cfg, found, maps, shownMap) {
 }
 
 /* ------------------------------------------------------------------------ */
+/* The generic (CLEAN_AREA) backend: a Matter robot vacuum                  */
+/* ------------------------------------------------------------------------ */
+
+const FEATURE_CLEAN_AREA = 16384;
+const OP_STATE_LINE = { charging: "Charging", seeking_charger: "Returning to the dock" };
+// How long a room clean started from this card stays named in the header while the vacuum hasn't
+// reported cleaning yet.
+const STARTED_GRACE_MS = 60000;
+
+/* Which backend drives this vacuum: Roborock when its registry platform says so (and for anything
+   that doesn't say, which keeps the card as it was), the area backend for a Matter vacuum (which
+   never takes Roborock commands, so it is known even while it is unavailable and reports no
+   features) and for any other vacuum that can clean areas. Checked on every render, so a vacuum
+   whose features arrive late moves to the right backend. */
+function backendFor(hass, cfg) {
+  const platform = hass.entities?.[cfg.entity]?.platform;
+  if (platform === "roborock") return "roborock";
+  if (platform === "matter") return "area";
+  const feat = Number(hass.states?.[cfg.entity]?.attributes?.supported_features) || 0;
+  return feat & FEATURE_CLEAN_AREA ? "area" : "roborock";
+}
+
+/* The mapped areas as rooms: name from the area, its own icon, sorted by name (stable). Areas
+   Home Assistant no longer knows are left out. */
+function areaRooms(hass, cfg, mapped) {
+  return (mapped || [])
+    .map((id) => ({ id, name: hass.areas?.[id]?.name, icon: hass.areas?.[id]?.icon }))
+    .filter((r) => r.name && !cfg.rooms?.[r.name]?.hide)
+    .sort((a, b) => a.name.localeCompare(b.name, "en-GB"));
+}
+
+/* "Auto Vac And Mop" → { tab: "vac_and_mop", level: "Auto" }. Vac And Mop is tried before Mop,
+   which it ends with. */
+const CLEAN_MODE_TABS = [[" Vac And Mop", "vac_and_mop"], [" Mop", "mop"], [" Vac", "vacuum"]];
+const LEVEL_ORDER = ["Quick", "Auto", "Deep Clean", "Quiet"];
+function parseCleanMode(option) {
+  const o = String(option ?? "");
+  for (const [sfx, tab] of CLEAN_MODE_TABS) if (o.length > sfx.length && o.endsWith(sfx)) return { tab, level: o.slice(0, -sfx.length) };
+  return null;
+}
+const levelRank = (l) => (LEVEL_ORDER.indexOf(l) + 1 || 99);
+
+function modelArea(hass, cfg, found, rooms, started) {
+  const v = hass.states[cfg.entity];
+  const s = (k) => (found[k] ? hass.states[found[k]]?.state : undefined);
+  const raw = v ? v.state : "unavailable";
+  let key = DEAD.includes(raw) ? "offline" : STATES[raw] ? raw : "idle";
+  const msgs = [];
+  const err = s("op_error");
+  if (key !== "offline" && err && !["no_error", ...DEAD].includes(err)) msgs.push({ text: `Robot: ${human(err).toLowerCase()}`, e: found.op_error, c: C.red });
+  if (msgs.length && ["docked", "idle"].includes(key)) key = "needs";
+
+  const op = s("op_state");
+  let line = [];
+  if (key === "offline") line = [{ t: "Can't reach the vacuum" }];
+  else if (key === "cleaning") line = started?.names.length ? [{ t: `Cleaning ${started.names.join(" · ")}` }] : [];
+  else if (key === "returning") line = [{ t: OP_STATE_LINE.seeking_charger, e: found.op_state }];
+  else if (key === "docked" && OP_STATE_LINE[op]) line = [{ t: OP_STATE_LINE[op], e: found.op_state }];
+
+  return {
+    key, state: STATES[key], name: cfg.name || v?.attributes?.friendly_name || "Vacuum", msgs, line,
+    battery: null, charging: false, progress: null, area: null, time: null, room: "", floors: [], dockBusy: false, mapName: "",
+    rooms, image: null, auto: cfg.auto_clean ? hass.states[cfg.auto_clean] : null,
+  };
+}
+
+/* The clean_mode select as the Cleaning mode panel's data: tabs from the option suffixes and one
+   intensity row for the current tab. An option that doesn't parse turns the whole panel into a
+   plain list of the options. */
+function areaModeData(card) {
+  const ent = card._hass.states[card._found.clean_mode];
+  const options = ent?.attributes?.options || [];
+  const raw = ent && !DEAD.includes(ent.state) ? ent.state : null;
+  const cur = card._shown("option", raw);
+  const parsed = options.map(parseCleanMode);
+  const ok = !!options.length && parsed.every(Boolean);
+  return { options, parsed, ok, cur, now: ok && cur ? parseCleanMode(cur) : null };
+}
+
+function areaModeModel(card) {
+  const d = areaModeData(card);
+  if (!d.options.length) return { tabs: [], mode: null, rows: [] };
+  if (!d.ok)
+    return { tabs: [], mode: null, rows: [{ k: "option", label: "Cleaning mode", cur: d.cur, opts: d.options, text: (o) => o, value: (o) => o, list: true }] };
+  const tabs = MODES.filter((t) => d.parsed.some((p) => p.tab === t));
+  const tab = d.now?.tab || null;
+  const levels = tab ? d.parsed.filter((p) => p.tab === tab).map((p) => p.level).sort((a, b) => levelRank(a) - levelRank(b)) : [];
+  return {
+    tabs, mode: tab,
+    rows: tab ? [{ k: "level", label: "Intensity", cur: d.now.level, opts: levels, text: (o) => o, value: (o) => o }] : [],
+  };
+}
+
+function areaModeParts(card) {
+  const d = areaModeData(card);
+  if (!d.cur) return ["Set the mode"];
+  return d.now ? [optLabel(d.now.tab), d.now.level] : [d.cur];
+}
+
+/* A tap in the panel as the option to select: a tab keeps the current intensity when that tab
+   has it, else takes its first one. */
+function areaPick(card, k, v) {
+  const d = areaModeData(card);
+  let option = null;
+  if (k === "option") option = d.options.includes(v) ? v : null;
+  else if (d.ok) {
+    const tab = k === "mode" ? v : d.now?.tab;
+    const inTab = d.options.filter((o, i) => d.parsed[i].tab === tab);
+    const level = k === "level" ? v : d.now?.level;
+    option = inTab.find((o) => parseCleanMode(o).level === level) || (k === "mode" ? inTab.sort((a, b) => levelRank(parseCleanMode(a).level) - levelRank(parseCleanMode(b).level))[0] : null) || null;
+  }
+  if (!option) return null;
+  return { key: "option", value: option, call: ["select", "select_option", { entity_id: card._found.clean_mode, option }, "change the cleaning mode"] };
+}
+
+/* ------------------------------------------------------------------------ */
 /* Cleaning mode: laid out like the Roborock app (without Customize)        */
 /* ------------------------------------------------------------------------ */
 
@@ -496,6 +628,8 @@ const SEG_CSS = `
   .seg button ha-icon { --mdc-icon-size: 20px; }
   .seg button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .seg[hidden] { display: none; }
+  .seg.list { flex-wrap: wrap; }
+  .seg.list button { flex: 1 1 40%; }
   .set { display: grid; gap: 6px; }
   .k { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: .4px; color: var(--secondary-text-color); }
   .k b { font-weight: 500; margin-left: 6px; color: ${tx(C.teal, 75)}; }
@@ -764,6 +898,67 @@ function cropBox(img) {
   }
 }
 
+/* The two backends: where the data comes from and what a tap does. Everything else – the
+   header, messages, rooms grid, tile, sheet and buttons – is shared and only reads what these
+   return, so a part a vacuum doesn't have (battery, map, floors, job, dock jobs) simply isn't
+   there. Each method gets the card. */
+const BACKENDS = {
+  roborock: {
+    keys: KEYS,
+    count: true, // the cleaning count (×2) is sent with the clean
+    needsBattery: true, // discovery runs again until the battery is found
+    load: (c) => c._loadMaps(),
+    model: (c) => {
+      const sel = c._found.map_select ? c._hass.states[c._found.map_select]?.state : null;
+      return model(c._hass, c._config, c._found, c._maps, c._shown("floor", sel));
+    },
+    modeModel: (c) => {
+      const opts = c._hass.states[c._found.mode]?.attributes?.options || [];
+      return { tabs: MODES.filter((x) => opts.includes(x)), ...c._modeRows() };
+    },
+    modeParts: (c) => c._modeParts(),
+    hasMode: (c) => !!c._found.mode || !!c._hass.states[c._config.entity]?.attributes?.fan_speed_list,
+    settings: (c) => c._settingsText(),
+    pick: (c, k, v) => {
+      const f = c._found;
+      const id = c._config.entity;
+      const call = k === "fan" ? ["vacuum", "set_fan_speed", { entity_id: id, fan_speed: v }, "change the suction power"]
+        : { mode: f.mode, water: f.mop_water, route: f.mop_route }[k] ? ["select", "select_option", { entity_id: { mode: f.mode, water: f.mop_water, route: f.mop_route }[k], option: v }, "change the cleaning mode"]
+        : null;
+      return { key: k, value: v, call };
+    },
+    clean: (c, segs, twice, all) => {
+      const id = c._config.entity;
+      const target = segs.length ? segs : all;
+      if (target.length) return c._call("vacuum", "send_command", { entity_id: id, command: "app_segment_clean", params: [{ segments: target, repeat: twice ? 2 : 1 }] }, "start the clean");
+      return c._call("vacuum", "start", { entity_id: id }, "start the clean");
+    },
+  },
+  area: {
+    keys: AREA_KEYS,
+    count: false,
+    needsBattery: false,
+    load: (c) => c._loadAreas(),
+    model: (c) => modelArea(c._hass, c._config, c._found, areaRooms(c._hass, c._config, c._areas), c._startedRooms()),
+    modeModel: areaModeModel,
+    modeParts: areaModeParts,
+    hasMode: (c) => !!c._hass.states[c._found.clean_mode]?.attributes?.options?.length,
+    settings: (c) => areaModeParts(c).filter((p) => p !== "Set the mode").join(" · "),
+    pick: areaPick,
+    // A whole clean is vacuum.start (Matter clears any area selection); rooms are vacuum.clean_area.
+    clean: async (c, segs) => {
+      const id = c._config.entity;
+      if (!segs.length) {
+        c._started = null;
+        return c._call("vacuum", "start", { entity_id: id }, "start the clean");
+      }
+      const ok = await c._call("vacuum", "clean_area", { entity_id: id, cleaning_area_id: segs }, "start the clean");
+      if (ok) c._started = { names: segs.map((s) => c._m.rooms.find((r) => r.id === s)?.name).filter(Boolean), t: Date.now(), seen: false };
+      return ok;
+    },
+  },
+};
+
 const PENDING_MS = 45000; // how long a floor or setting change shows before the robot confirms it
 
 class RobotVacuumCard extends HTMLElement {
@@ -826,6 +1021,11 @@ class RobotVacuumCard extends HTMLElement {
     this._found = null;
     this._sel = new Set();
     this._pending = {};
+    this._be = null;
+    this._areas = null;
+    this._areaRef = undefined;
+    this._areaTried = 0;
+    this._started = null;
     if (this._hass) this._render();
   }
 
@@ -934,7 +1134,9 @@ class RobotVacuumCard extends HTMLElement {
     const room = t.closest("[data-room]");
     if (room) {
       if (room.getAttribute("aria-disabled") === "true" || room.disabled) return;
-      const id = Number(room.dataset.room);
+      // Ids are numbers (Roborock segments) or strings (area ids): take the room's own.
+      const id = (this._m?.rooms || []).find((r) => String(r.id) === room.dataset.room)?.id;
+      if (id === undefined) return;
       this._sel.has(id) ? this._sel.delete(id) : this._sel.add(id);
       return this._render();
     }
@@ -989,16 +1191,16 @@ class RobotVacuumCard extends HTMLElement {
     if (!this._config || !this._hass) return;
     if (!this._built) this._build();
     const hass = this._hass;
-    if (!this._found || this._regRef !== hass.entities || !this._found.battery) {
-      this._found = discover(hass, this._config);
+    const be = BACKENDS[backendFor(hass, this._config)];
+    if (!this._found || this._regRef !== hass.entities || be !== this._be || (be.needsBattery && !this._found.battery)) {
+      this._be = be;
+      this._found = discover(hass, this._config, be.keys);
       this._regRef = hass.entities;
     }
     if (this._config.layout === "mode") return this._paintMode(this.shadowRoot, this._keys);
     inkSchedule(this, ".txt");
-    this._loadMaps();
-    const selected = this._found.map_select ? hass.states[this._found.map_select]?.state : null;
-    const shownMap = this._shown("floor", selected);
-    const m = model(hass, this._config, this._found, this._maps, shownMap);
+    this._be.load(this);
+    const m = this._be.model(this);
     this._m = m;
     const root = this.shadowRoot;
     const set = (sel, v, html = false) => {
@@ -1103,7 +1305,7 @@ class RobotVacuumCard extends HTMLElement {
         b.setAttribute("aria-pressed", String(on));
         b.setAttribute("aria-disabled", String(busy));
         b.disabled = offline;
-        const icon = on ? "mdi:check" : roomIcon(this._hass, this._config, r.name);
+        const icon = on ? "mdi:check" : this._config.rooms?.[r.name]?.icon || r.icon || roomIcon(this._hass, this._config, r.name);
         const ri = b.querySelector("ha-icon");
         if (ri.getAttribute("icon") !== icon) ri.setAttribute("icon", icon);
       });
@@ -1111,9 +1313,9 @@ class RobotVacuumCard extends HTMLElement {
 
     // Cleaning mode tile: what the next clean will use; a tap opens the app-style sheet.
     const tileEl = root.querySelector(".modetile");
-    tileEl.hidden = !!this._config.hide_mode || (!this._found.mode && !hass.states[this._config.entity]?.attributes?.fan_speed_list);
+    tileEl.hidden = !!this._config.hide_mode || !this._be.hasMode(this);
     if (!tileEl.hidden) {
-      set(".mode-line", this._modeParts().map((p) => `<span class="p">${esc(p)}</span>`).join("&nbsp;· "), true);
+      set(".mode-line", this._be.modeParts(this).map((p) => `<span class="p">${esc(p)}</span>`).join("&nbsp;· "), true);
       tileEl.disabled = offline;
     }
     if (this._sheet) this._paintMode(this._sheet.root, this._sheet.keys);
@@ -1244,14 +1446,11 @@ class RobotVacuumCard extends HTMLElement {
 
   _paintMode(root, keys) {
     const hass = this._hass;
-    const f = this._found;
     const v = hass.states[this._config.entity];
     const offline = !v || DEAD.includes(v.state);
-    const modeEnt = f.mode ? hass.states[f.mode] : null;
-    const { mode, rows } = this._modeRows();
+    const { tabs: modes, mode, rows } = this._be.modeModel(this);
 
     const tabs = root.querySelector(".tabs");
-    const modes = MODES.filter((x) => (modeEnt?.attributes?.options || []).includes(x));
     tabs.hidden = !modes.length;
     const tk = modes.join();
     if (tk !== keys.tabs) {
@@ -1264,10 +1463,10 @@ class RobotVacuumCard extends HTMLElement {
     });
 
     const box = root.querySelector(".sets");
-    const rk = rows.map((r) => `${r.k}:${r.opts.join(",")}`).join("|");
+    const rk = rows.map((r) => `${r.k}:${r.list ? "list:" : ""}${r.opts.join(",")}`).join("|");
     if (rk !== keys.rows) {
       box.innerHTML = rows
-        .map((r) => `<div class="set" data-k="${r.k}"><div class="k">${esc(r.label)}<b></b></div><div class="seg">${r.opts
+        .map((r) => `<div class="set" data-k="${r.k}"><div class="k">${esc(r.label)}<b></b></div><div class="seg${r.list ? " list" : ""}">${r.opts
           .map((o) => {
             const label = r.text ? r.text(o) : optLabel(o);
             const inner = r.icons?.[o] ? `<ha-icon icon="${r.icons[o]}"></ha-icon>` : r.svg && routeSvg(o) ? routeSvg(o) : esc(label);
@@ -1346,19 +1545,16 @@ class RobotVacuumCard extends HTMLElement {
     if (!b || b.disabled || b.getAttribute("aria-pressed") === "true") return;
     const k = b.dataset.set;
     const v = b.dataset.v;
-    const f = this._found;
     const id = this._config.entity;
     if (k === "count") return setCount(id, Number(v));
     // Show the choice at once; the robot's answer confirms it (or it falls back after a while,
     // or at once if the robot refuses it).
-    this._pend(k, v);
+    const pick = this._be.pick(this, k, v);
+    if (!pick) return;
+    this._pend(pick.key, pick.value);
     this._render();
-    const ent = { mode: f.mode, water: f.mop_water, route: f.mop_route }[k];
-    const done = k === "fan"
-      ? this._call("vacuum", "set_fan_speed", { entity_id: id, fan_speed: v }, "change the suction power")
-      : ent ? this._call("select", "select_option", { entity_id: ent, option: v }, "change the cleaning mode") : null;
-    if (done && !(await done) && this._pending[k]?.v === v) {
-      delete this._pending[k];
+    if (pick.call && !(await this._call(...pick.call)) && this._pending[pick.key]?.v === pick.value) {
+      delete this._pending[pick.key];
       this._render();
     }
   }
@@ -1392,6 +1588,47 @@ class RobotVacuumCard extends HTMLElement {
         this._mapsLoading = false;
         this._render();
       });
+  }
+
+  /* The rooms of an area vacuum: the Home Assistant areas mapped to its segments. The registry
+     entry's options.vacuum.area_mapping ({area_id: [segment ids]}) is read with
+     config/entity_registry/get – open to every user, unlike vacuum/get_segments, which is admin
+     only. Read on the first render and again whenever the entity's registry entry changes; a
+     failed read is tried again after a minute. No mapping means no rooms grid; whole cleans
+     work as ever. */
+  _loadAreas() {
+    const hass = this._hass;
+    const ref = hass.entities?.[this._config.entity];
+    if (this._areasLoading || typeof hass.callWS !== "function") return;
+    const retry = this._areaFailed && Date.now() - this._areaTried > 60000;
+    if (this._areaTried && this._areaRef === ref && !retry) return;
+    this._areasLoading = true;
+    this._areaRef = ref;
+    this._areaTried = Date.now();
+    this._areaFailed = false;
+    hass
+      .callWS({ type: "config/entity_registry/get", entity_id: this._config.entity })
+      .then((r) => {
+        const map = r?.options?.vacuum?.area_mapping;
+        this._areas = map && typeof map === "object" ? Object.keys(map).filter((a) => Array.isArray(map[a]) && map[a].length) : [];
+      })
+      .catch(() => {
+        this._areaFailed = true;
+      })
+      .finally(() => {
+        this._areasLoading = false;
+        this._render();
+      });
+  }
+
+  /* The room clean this card started, while it runs: named in the header. Dropped once the vacuum
+     has been busy and stopped, or if it never started. */
+  _startedRooms() {
+    const s = this._started;
+    if (!s) return null;
+    if (BUSY.includes(this._hass.states[this._config.entity]?.state)) s.seen = true;
+    else if (s.seen || Date.now() - s.t > STARTED_GRACE_MS) return (this._started = null);
+    return s;
   }
 
   /* Every floor's picture, loaded once per version of the map (the URL's token rotates, the
@@ -1507,10 +1744,10 @@ class RobotVacuumCard extends HTMLElement {
   async _action(k) {
     const id = this._config.entity;
     const m = this._m;
-    const how = this._settingsText();
+    const how = this._be.settings(this);
     if (k === "clean") {
       const segs = [...this._sel];
-      const twice = getCount(id) === 2;
+      const twice = this._be.count && getCount(id) === 2;
       // ×2 with no rooms picked: every room on the floor, twice.
       const all = !segs.length && twice ? m.rooms.map((r) => r.id) : [];
       const names = segs.map((s) => m.rooms.find((r) => r.id === s)?.name).filter(Boolean);
@@ -1525,9 +1762,7 @@ class RobotVacuumCard extends HTMLElement {
       if (!ok) return;
       this._sel.clear();
       this._render();
-      const target = segs.length ? segs : all;
-      if (target.length) return this._call("vacuum", "send_command", { entity_id: id, command: "app_segment_clean", params: [{ segments: target, repeat: twice ? 2 : 1 }] }, "start the clean");
-      return this._call("vacuum", "start", { entity_id: id }, "start the clean");
+      return this._be.clean(this, segs, twice, all);
     }
     if (k === "pause") return this._call("vacuum", "pause", { entity_id: id }, "pause the robot");
     if (k === "resume") {
@@ -1582,7 +1817,7 @@ async function registerRobotVacuumCard() {
   window.customCards.push({
     type: RVC_TAG,
     name: "Robot vacuum",
-    description: "Robot vacuum: state, battery, map with floors, room cleaning and buttons – or (layout: mode) the cleaning mode, like the Roborock app.",
+    description: "Robot vacuum (Roborock or a Matter vacuum): state, battery, map with floors, room cleaning and buttons – or (layout: mode) the cleaning mode, like the Roborock app.",
   });
   console.info(`%c ROBOT-VACUUM-CARD %c ${RVC_VERSION} `, "background:#2196f3;color:#fff", "");
 }

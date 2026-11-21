@@ -669,6 +669,260 @@ const cfg = {
   assert(!/text-overflow:\s*ellipsis/.test(css), "no clipped text");
   assert(/\.acts \{ display: flex; flex-wrap: wrap;/.test(css) && /\.acts \.pill \{ flex: 1 1 0; min-width: max-content;/.test(css), "pill rows never squeeze a label");
 
+  {
+  // ---- The generic (CLEAN_AREA) backend: a Matter robot vacuum, DJI ROMO P2 ----
+  const XDEV = "dev_romo";
+  const XOPTS = ["Quick Vac", "Auto Vac", "Deep Clean Vac", "Quiet Vac", "Quick Mop", "Auto Mop", "Deep Clean Mop", "Quick Vac And Mop", "Auto Vac And Mop", "Deep Clean Vac And Mop", "Quiet Vac And Mop"];
+  const xreg = {
+    "vacuum.romo": ["matter", XDEV, null],
+    "select.romo_clean_mode": ["matter", XDEV, "clean_mode"],
+    "sensor.romo_operational_state": ["matter", XDEV, "operational_state"],
+    "sensor.romo_operational_error": ["matter", XDEV, "operational_error"],
+    "button.romo_identify": ["matter", XDEV, null],
+    "sensor.other_operational_error": ["matter", "dev_other_matter", "operational_error"],
+  };
+  const xentities = Object.fromEntries(Object.entries(xreg).map(([id, [pl, d, tk]]) => [id, { entity_id: id, platform: pl, device_id: d, translation_key: tk }]));
+  const xareas = {
+    kit: { area_id: "kit", name: "Kitchen", icon: "mdi:countertop-outline" },
+    liv: { area_id: "liv", name: "Living Room" },
+    downstairs_corridor: { area_id: "downstairs_corridor", name: "Downstairs Corridor" },
+    downstairs_toilet: { area_id: "downstairs_toilet", name: "Downstairs Toilet", icon: "mdi:toilet" },
+  };
+  const AREA_MAPPING = { liv: ["6"], kit: ["1"], downstairs_corridor: ["7"], downstairs_toilet: ["4"] };
+  const xstates = (over = {}) => ({
+    "vacuum.romo": st("docked", { friendly_name: "ROMO", supported_features: 29212 }),
+    "select.romo_clean_mode": st("Auto Vac And Mop", { options: XOPTS }),
+    "sensor.romo_operational_state": st("docked"),
+    "sensor.romo_operational_error": st("no_error"),
+    "button.romo_identify": st("unknown"),
+    "sensor.other_operational_error": st("stuck"),
+    "automation.romo_away": st("on", { friendly_name: "Clean when away" }),
+    ...over,
+  });
+  const xws = [];
+  const xhass = (s, extra = {}) => ({
+    states: s,
+    entities: xentities,
+    devices: {},
+    areas: xareas,
+    callService: async (d, sv, data) => calls.push([d, sv, data]),
+    callWS: async (msg) => {
+      xws.push(msg);
+      return { entity_id: "vacuum.romo", options: { vacuum: { area_mapping: AREA_MAPPING, last_seen_segments: [{ id: "1", name: "Kitchen", group: "0" }] } } };
+    },
+    ...extra,
+  });
+  const xcfg = { entity: "vacuum.romo", auto_clean: "automation.romo_away", auto_clean_name: "Auto clean when away" };
+  const xmount = async (config, s, extra) => {
+    const c = document.createElement("robot-vacuum-card");
+    document.body.appendChild(c);
+    c.addEventListener("hass-more-info", (e) => events.push(["more-info", e.detail.entityId]));
+    c.setConfig(config);
+    c.hass = xhass(s, extra);
+    await tick();
+    c.hass = xhass(s, extra);
+    return c;
+  };
+  const xconfirm = async (title) => {
+    await tick();
+    const d = document.querySelector("rvc-confirm-dialog");
+    assert(d, `${title} asks first`);
+    assert.strictEqual(d.shadowRoot.querySelector(".title").textContent, title);
+    const msg = d.shadowRoot.querySelector(".text").textContent;
+    d.shadowRoot.querySelector(".confirm").click();
+    await tick();
+    return msg;
+  };
+  const xcard = await xmount(xcfg, xstates());
+  const xr = xcard.shadowRoot;
+  const xq = (x) => xr.querySelector(x);
+  const xall = (x) => [...xr.querySelectorAll(x)];
+  const xtext = (x) => xq(x).textContent.replace(/\s+/g, " ").trim();
+  const xact = () => xall(".acts .pill").map((b) => b.textContent.trim());
+
+  // Backend and discovery: by translation key on the vacuum's own device, not another device's.
+  assert(xcard._be && xcard._be.load && !xcard._be.needsBattery, "the area backend is chosen");
+  eq([xcard._found.clean_mode, xcard._found.op_state, xcard._found.op_error], ["select.romo_clean_mode", "sensor.romo_operational_state", "sensor.romo_operational_error"]);
+  assert(!xcard._found.battery && !xcard._found.map_select && !xcard._found.status, "nothing Roborock-only is discovered");
+  eq(xws.map((m) => [m.type, m.entity_id]), [["config/entity_registry/get", "vacuum.romo"]], "one registry read, not vacuum/get_segments");
+  assert(!calls.some((c) => c[1] === "get_maps"));
+
+  // A Matter vacuum that is unavailable at first (no features yet) is still an area vacuum,
+  // and a non-Roborock vacuum whose CLEAN_AREA feature arrives late moves to the area backend.
+  {
+    const before = xws.length;
+    const off = await xmount(xcfg, xstates({ "vacuum.romo": st("unavailable", { friendly_name: "ROMO" }) }));
+    assert(!off._be.needsBattery, "an unavailable Matter vacuum uses the area backend");
+    assert(!calls.some((c) => c[1] === "get_maps"), "no Roborock call for a Matter vacuum");
+    off.remove();
+    const gent = { ...xentities, "vacuum.romo": { ...xentities["vacuum.romo"], platform: "other_vendor" } };
+    const late = await xmount(xcfg, xstates({ "vacuum.romo": st("docked", { friendly_name: "ROMO" }) }), { entities: gent });
+    assert(late._be.needsBattery, "no features and not Matter: the Roborock path, as before");
+    late.hass = xhass(xstates(), { entities: gent });
+    await tick();
+    assert(!late._be.needsBattery, "features arrive: the area backend");
+    late.remove();
+    xws.splice(before);
+  }
+
+  // Header: name and state; docked adds nothing the state doesn't say; nothing Roborock-only shows.
+  assert.strictEqual(xtext(".nm"), "ROMO · Docked");
+  assert.strictEqual(xtext(".line"), "");
+  assert(xq(".batt").hidden && xq(".jt").hidden && xq(".floors").hidden && xq(".map").hidden, "no battery, job, floors or map");
+  assert.strictEqual(xall(".jobs button").length, 0, "no dock jobs");
+  assert.strictEqual(xall(".msg").length, 0, "other devices' errors never show");
+
+  // Rooms: the mapped areas, by name, with the area's icon then the name guess.
+  eq(xall(".chip").map((c) => c.textContent.trim()), ["Downstairs Corridor", "Downstairs Toilet", "Kitchen", "Living Room"]);
+  eq(xall(".chip ha-icon").map((i) => i.getAttribute("icon")), ["mdi:stairs", "mdi:toilet", "mdi:countertop-outline", "mdi:sofa"]);
+  eq(xact(), ["Clean entire floor", "Auto clean when away"], "docked: no Dock button");
+
+  // Whole clean: asks, then vacuum.start.
+  const n0 = calls.length;
+  xq('.acts [data-k="clean"]').click();
+  assert.strictEqual(await xconfirm("Clean entire floor"), "Every room, Vac & mop · Auto.");
+  eq(calls.slice(n0), [["vacuum", "start", { entity_id: "vacuum.romo" }]]);
+
+  // Picked rooms: Clean 2 rooms → vacuum.clean_area with the area ids; the header names them while it runs.
+  xall(".chip").find((c) => /Kitchen/.test(c.textContent)).click();
+  xall(".chip").find((c) => /Living/.test(c.textContent)).click();
+  eq(xact()[0], "Clean 2 rooms");
+  assert.strictEqual(xall(".chip.sel").length, 2);
+  const n1 = calls.length;
+  xq('.acts [data-k="clean"]').click();
+  assert.strictEqual(await xconfirm("Clean 2 rooms"), "Kitchen and Living Room, Vac & mop · Auto.");
+  eq(calls.slice(n1), [["vacuum", "clean_area", { entity_id: "vacuum.romo", cleaning_area_id: ["kit", "liv"] }]]);
+  eq(xall(".chip.sel").length, 0, "the picks clear");
+  const running = xstates({ "vacuum.romo": st("cleaning", { friendly_name: "ROMO", supported_features: 29212 }) });
+  xcard.hass = xhass(running);
+  assert.strictEqual(xtext(".nm"), "ROMO · Cleaning");
+  assert.strictEqual(xtext(".line"), "Cleaning Kitchen · Living Room");
+  eq(xact(), ["Pause", "Dock", "Auto clean when away"]);
+  const n2 = calls.length;
+  xq('.acts [data-k="pause"]').click();
+  await tick();
+  assert(!document.querySelector("rvc-confirm-dialog"), "Pause is immediate");
+  eq(calls.slice(n2), [["vacuum", "pause", { entity_id: "vacuum.romo" }]]);
+  xcard.hass = xhass(xstates({ "vacuum.romo": st("paused", { friendly_name: "ROMO", supported_features: 29212 }) }));
+  eq(xact(), ["Resume", "Dock", "Auto clean when away"]);
+  xq('.acts [data-k="resume"]').click();
+  await xconfirm("Resume");
+  eq(calls[calls.length - 1], ["vacuum", "start", { entity_id: "vacuum.romo" }], "resume is vacuum.start");
+  xq('.acts [data-k="dock"]').click();
+  await xconfirm("Return to the dock");
+  eq(calls[calls.length - 1], ["vacuum", "return_to_base", { entity_id: "vacuum.romo" }]);
+  // Back at the dock: the room clean's name is forgotten. A clean the card didn't start never names rooms.
+  xcard.hass = xhass(xstates());
+  xcard.hass = xhass(running);
+  assert.strictEqual(xtext(".line"), "", "no stale room names");
+  const other = await xmount(xcfg, running);
+  assert.strictEqual(other.shadowRoot.querySelector(".line").textContent.trim(), "", "started elsewhere: just the state");
+
+  // Charging / returning lines from the operational state.
+  xcard.hass = xhass(xstates({ "sensor.romo_operational_state": st("charging") }));
+  assert.strictEqual(xtext(".line"), "Charging");
+  xcard.hass = xhass(xstates({ "vacuum.romo": st("returning", { friendly_name: "ROMO", supported_features: 29212 }), "sensor.romo_operational_state": st("seeking_charger") }));
+  assert.strictEqual(xtext(".line"), "Returning to the dock");
+  eq(xact(), ["Pause", "Auto clean when away"]);
+
+  // Needs you: a red row for the operational error; it never blocks a clean.
+  xcard.hass = xhass(xstates({ "sensor.romo_operational_error": st("dust_bin_full") }));
+  assert.strictEqual(xtext(".nm"), "ROMO · Needs you");
+  eq(xall(".msg").map((m) => m.textContent.trim()), ["Robot: dust bin full"]);
+  assert(xq('.acts [data-k="clean"]') && !xq('.acts [data-k="clean"]').disabled, "an error never blocks a clean");
+  xq(".msg").click();
+  eq(events[events.length - 1], ["more-info", "sensor.romo_operational_error"]);
+  xcard.hass = xhass(xstates({ "vacuum.romo": st("unavailable") }));
+  assert.strictEqual(xall(".msg").length, 0);
+  assert.strictEqual(xtext(".line"), "Can't reach the vacuum");
+  assert(xall(".acts .pill").every((b) => b.disabled || b.dataset.k === "auto"), "offline greys the controls");
+  xcard.hass = xhass(xstates());
+
+  // Cleaning mode tile and sheet: tabs from the suffix, one intensity row for the tab.
+  assert(!xq(".modetile").hidden);
+  assert.strictEqual(xtext(".mode-line"), "Vac & mop · Auto");
+  xq(".modetile").click();
+  const sh = () => document.querySelector("rvc-mode-sheet").shadowRoot;
+  const sq = (x) => [...sh().querySelectorAll(x)];
+  eq(sq(".tabs button").map((b) => [b.textContent, b.getAttribute("aria-pressed")]), [["Vac & mop", "true"], ["Mop", "false"], ["Vacuum", "false"]]);
+  eq(sq(".sets .set").map((x) => x.dataset.k), ["level"], "one row");
+  eq(sq('.sets [data-set="level"]').map((b) => b.textContent), ["Quick", "Auto", "Deep Clean", "Quiet"]);
+  assert.strictEqual(sq('.sets [aria-pressed="true"]')[0].textContent, "Auto");
+  assert.strictEqual(sq(".sets .k")[0].textContent, "IntensityAuto");
+  load.assertSheetClose(sh(), "Cleaning mode sheet (area)");
+  // Only the combinations that exist: Mop has no Quiet.
+  const n3 = calls.length;
+  sq('.tabs [data-v="mop"]')[0].click();
+  await tick();
+  eq(calls.slice(n3), [["select", "select_option", { entity_id: "select.romo_clean_mode", option: "Auto Mop" }]], "a tab keeps the intensity");
+  eq(sq('.sets [data-set="level"]').map((b) => b.textContent), ["Quick", "Auto", "Deep Clean"]);
+  assert.strictEqual(xtext(".mode-line"), "Mop · Auto", "shown at once");
+  xcard.hass = xhass(xstates({ "select.romo_clean_mode": st("Auto Mop", { options: XOPTS }) }));
+  sq('.sets [data-v="Deep Clean"]')[0].click();
+  await tick();
+  eq(calls[calls.length - 1], ["select", "select_option", { entity_id: "select.romo_clean_mode", option: "Deep Clean Mop" }]);
+  xcard.hass = xhass(xstates({ "select.romo_clean_mode": st("Deep Clean Mop", { options: XOPTS }) })); // the robot confirms
+  xcard.hass = xhass(xstates({ "select.romo_clean_mode": st("Quiet Vac", { options: XOPTS }) }));
+  sq('.tabs [data-v="mop"]')[0].click();
+  await tick();
+  eq(calls[calls.length - 1], ["select", "select_option", { entity_id: "select.romo_clean_mode", option: "Quick Mop" }], "a tab without the intensity takes its first");
+  sh().querySelector(".x").click();
+  assert(!document.querySelector("rvc-mode-sheet"));
+
+  // An option that doesn't parse turns the panel into a plain list.
+  const odd = ["Quick Vac", "Auto Vac", "Turbo"];
+  const ocard = await xmount(xcfg, xstates({ "select.romo_clean_mode": st("Turbo", { options: odd }) }));
+  assert.strictEqual(ocard.shadowRoot.querySelector(".mode-line").textContent.trim(), "Turbo");
+  ocard.shadowRoot.querySelector(".modetile").click();
+  const osh = document.querySelector("rvc-mode-sheet").shadowRoot;
+  assert(osh.querySelector(".tabs").hidden, "no tabs");
+  eq([...osh.querySelectorAll('.sets [data-set="option"]')].map((b) => b.textContent), odd);
+  const n4 = calls.length;
+  osh.querySelector('[data-v="Auto Vac"]').click();
+  await tick();
+  eq(calls.slice(n4), [["select", "select_option", { entity_id: "select.romo_clean_mode", option: "Auto Vac" }]]);
+  document.querySelector("rvc-mode-sheet").shadowRoot.querySelector(".x").click();
+
+  // layout: mode shows the same panel on its own.
+  const lcard = await xmount({ entity: "vacuum.romo", layout: "mode" }, xstates());
+  eq([...lcard.shadowRoot.querySelectorAll(".tabs button")].map((b) => b.textContent), ["Vac & mop", "Mop", "Vacuum"]);
+  eq([...lcard.shadowRoot.querySelectorAll(".sets .set")].map((x) => x.dataset.k), ["level"]);
+
+  // Missing mapping: no rooms, no banner, whole clean works. A failing read is retried later.
+  for (const bad of [{ options: {} }, { options: { vacuum: { area_mapping: {} } } }, null]) {
+    const c = await xmount(xcfg, xstates(), { callWS: async () => bad });
+    assert.strictEqual(c.shadowRoot.querySelectorAll(".chip").length, 0);
+    assert.strictEqual(c.shadowRoot.querySelectorAll(".msg").length, 0, "no error banner");
+    assert.strictEqual(c.shadowRoot.querySelector('.acts [data-k="clean"]').textContent.trim(), "Clean entire floor");
+  }
+  let fail = true;
+  const fc = await xmount(xcfg, xstates(), { callWS: async () => { if (fail) throw new Error("nope"); return { options: { vacuum: { area_mapping: { kit: ["1"] } } } }; } });
+  assert.strictEqual(fc.shadowRoot.querySelectorAll(".chip").length, 0);
+  assert.strictEqual(fc.shadowRoot.querySelectorAll(".msg").length, 0);
+  fail = false;
+  fc._areaTried -= 61000;
+  fc.hass = xhass(xstates(), { callWS: async () => ({ options: { vacuum: { area_mapping: { kit: ["1"] } } } }) });
+  await tick();
+  assert.strictEqual(fc.shadowRoot.querySelectorAll(".chip").length, 1, "retried after a minute");
+  // The registry entry changing reads the mapping again; an unchanged one doesn't.
+  const reads = xws.length;
+  xcard.hass = xhass(xstates());
+  assert.strictEqual(xws.length, reads, "unchanged registry: no read");
+  xcard.hass = xhass(xstates(), { entities: { ...xentities, "vacuum.romo": { ...xentities["vacuum.romo"], area_id: "kit" } } });
+  await tick();
+  assert.strictEqual(xws.length, reads + 1, "changed registry entry: read again");
+
+  // Roborock is untouched: its registry platform decides, even with CLEAN_AREA, and it never reads the registry entry.
+  const rr = await xmount({ entity: "vacuum.vacuum_cleaner" }, states({ "vacuum.vacuum_cleaner": st("docked", { friendly_name: "Vacuum cleaner", supported_features: 29212 }) }), {
+    entities: Object.fromEntries(Object.entries(entities).map(([id, e]) => [id, id === "vacuum.vacuum_cleaner" ? { ...e, platform: "roborock" } : e])),
+    devices,
+    areas,
+    callWS: async (msg) => ({ response: MAPS, msg }),
+  });
+  assert(rr._found.battery && rr.shadowRoot.querySelector(".floors button"), "still the Roborock card");
+
+  }
+
   console.log("ALL ROBOT-VACUUM-CARD TESTS PASSED");
   process.exit(0);
 })().catch((e) => {
