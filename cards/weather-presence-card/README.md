@@ -21,6 +21,18 @@
   icon (you can tap it) and a grey chevron. Turn on **Hide this pill** to drop it
   where it makes no sense, such as on the climate dashboard itself; its name, icon
   and path are kept for when you turn it back on.
+- **Ignoring row** (with `presence.ignored`, Home ETA's "someone home" sensor): while Home
+  ETA ignores someone's phone (a dead phone stuck at home), a row under the weather says who –
+  "Ignoring Vasiliki" ("Ignoring Nancy and Vasiliki" for several) and "Heating follows the next
+  person home" – with an amber glyph (an early warning: presence isn't counting everyone) and a
+  **Stop ignoring** pill. The pill asks first in the cards' own dialog, in teal: "Stop ignoring
+  Vasiliki" / "Home presence will count their phone again." (phones, for several), then calls
+  `home_eta.stop_ignoring` for exactly the people shown. It rests until the row goes; if Home
+  Assistant refuses the call, its own message shows (or "Couldn't stop ignoring Vasiliki.") and
+  the pill works again. While nobody is ignored the row isn't there at all, so no visibility
+  conditions are needed, and the same card on several dashboards shows it on each. The pill
+  stays beside the message while the title and the pill fit (the line under the title wraps,
+  balanced); on a narrower phone it takes a full-width row of its own.
 - The pills are 36px buttons, the height of the weather icon's circle, on every screen. They stay beside the
   weather whenever they fit (the two readings may wrap onto two lines), e.g. both
   pills on a 440px iPhone Pro Max. When they don't fit, e.g. both pills on a 375px
@@ -28,7 +40,7 @@
   both labels fit, a longer label takes the width it needs.
 
 Colours follow the shared convention: green = someone home, teal = you can tap this,
-grey = away / neutral; the reading icons are a quiet grey and weather icons keep their
+amber = early warning (a phone being ignored), grey = away / neutral; the reading icons are a quiet grey and weather icons keep their
 literal colours, except that grey weather (cloudy, fog) shows teal – the weather circle is a tap
 target, and a tap target is never grey.
 
@@ -45,6 +57,7 @@ weather_name: Met Office
 presence:
   entity: input_boolean.home_master
   navigation_path: /lovelace/security
+  ignored: binary_sensor.home_eta_someone_home
 link:
   name: Climate
   icon: mdi:home-thermometer
@@ -58,5 +71,6 @@ link:
 | `weather_name` | Label for the weather service's temperature (default `Forecast`). |
 | `presence.entity` | Someone home: `input_boolean` / `binary_sensor` on, `person` home, or `zone` count above 0. |
 | `presence.navigation_path` | Where tapping the presence pill goes. |
+| `presence.ignored` | Optional. Home ETA's someone-home sensor (`binary_sensor.home_eta_someone_home`): while its `ignored_names` lists anyone, the ignoring row shows, and Stop ignoring calls `home_eta.stop_ignoring` with its `ignored` people. |
 | `link.name`, `link.icon`, `link.navigation_path` | The link pill. Shown only when it has a `navigation_path`; leave `link` out to drop it. |
 | `link.hide` | `true` hides the link pill but keeps its settings (editor: **Hide this pill**). |

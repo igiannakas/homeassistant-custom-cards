@@ -11,6 +11,8 @@ window.customElements.define("home-assistant", class extends window.HTMLElement 
 const { document } = window;
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 const eq = (a, b, m) => assert.strictEqual(JSON.stringify(a), JSON.stringify(b), m);
+const { assertCancel } = require("./_harness");
+const getComputedStyleSafe = (el) => window.getComputedStyle(el).display;
 
 const now = Date.now();
 const restart = new Date(now - 2 * 60e3).toISOString();
@@ -205,6 +207,141 @@ const cfg = {
   c8.hass = week;
   await tick(10);
   assert.strictEqual(c8.shadowRoot.querySelector(".pres span").textContent, "Away · 7 d+");
+
+  // ---- Home ETA ignoring someone's phone: a row with Stop ignoring, which asks first. ----
+  assert(form.includes(`"name":"ignored"`), "ignored sensor in the editor");
+  const eta = (names, persons = names.map((n) => `person.${n.toLowerCase()}`), state = "on") => ({
+    entity_id: "binary_sensor.home_eta_someone_home", state,
+    attributes: { persons: [], names: [], ignored: persons, ignored_names: names, device_class: "presence" },
+  });
+  const calls = [];
+  let fail = null;
+  const hi = (names, extra = {}) => {
+    const h = hass("off");
+    h.states["binary_sensor.home_eta_someone_home"] = eta(names, extra.persons, extra.state);
+    if (extra.person) h.states[extra.person.entity_id] = extra.person;
+    h.callService = async (...a) => {
+      calls.push(a);
+      if (fail) throw fail;
+    };
+    return h;
+  };
+  const icfg = { ...cfg, presence: { ...cfg.presence, ignored: "binary_sensor.home_eta_someone_home" } };
+  const ci = document.createElement("weather-presence-card");
+  document.body.appendChild(ci);
+  const notes = [];
+  ci.addEventListener("hass-notification", (e) => notes.push(e.detail.message));
+  ci.setConfig(icfg);
+  ci.hass = hi([]);
+  const ri = ci.shadowRoot;
+  const row = ri.querySelector(".ign");
+  assert(row && row.hidden, "nobody ignored: the row is not shown");
+  assert.strictEqual(getComputedStyleSafe(row), "none", "and takes no room");
+
+  ci.hass = hi(["Vasiliki"]);
+  assert(!row.hidden, "someone ignored: the row shows");
+  assert.strictEqual(row.querySelector(".nm").textContent, "Ignoring Vasiliki");
+  assert.strictEqual(row.querySelector(".isc").textContent, "Heating follows the next person home");
+  assert.strictEqual(row.querySelector(".slot ha-icon").getAttribute("icon"), "mdi:account-off");
+  assert.strictEqual(row.querySelector(".stop").textContent.trim(), "Stop ignoring");
+  assert.strictEqual(row.querySelector(".stop").localName, "button");
+  eq([...ri.querySelectorAll(".pills .pill")].map((p) => p.className), ["pill pres", "pill link"], "the weather row's pills are unchanged");
+  // Built once: a new state keeps the same pill under the finger.
+  const stopEl = row.querySelector(".stop");
+  ci.hass = hi(["Vasiliki"]);
+  assert.strictEqual(row.querySelector(".stop"), stopEl);
+
+  // Tap → the house-style dialog; Cancel, Escape and the backdrop call nothing.
+  const dlg = () => document.querySelector("wpc-confirm-dialog");
+  for (const how of ["cancel", "escape", "backdrop"]) {
+    stopEl.click();
+    await tick();
+    const d = dlg();
+    assert(d, `dialog opens (${how})`);
+    const dr = d.shadowRoot;
+    assert.strictEqual(dr.querySelector(".title").textContent, "Stop ignoring Vasiliki");
+    assert.strictEqual(dr.querySelector(".text").textContent, "Home presence will count their phone again.");
+    assert.strictEqual(dr.querySelector(".confirm").textContent.trim(), "Stop ignoring");
+    assert(dr.querySelector(".confirm").getAttribute("style").includes("--teal-color"), "teal, the pill's colour");
+    assert.strictEqual(dr.querySelector(".row .glyph ha-icon").getAttribute("icon"), "mdi:account-check");
+    assertCancel(dr, "stop ignoring");
+    if (how === "cancel") dr.querySelector(".cancel").click();
+    if (how === "escape") document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    if (how === "backdrop") dr.querySelector(".backdrop").click();
+    await tick();
+    assert(!dlg(), `closed (${how})`);
+  }
+  eq(calls, [], "nothing called without confirming");
+  // A second tap while the dialog is open doesn't open another.
+  stopEl.click();
+  stopEl.click();
+  await tick();
+  assert.strictEqual(document.querySelectorAll("wpc-confirm-dialog").length, 1);
+  dlg().shadowRoot.querySelector(".confirm").click();
+  await tick();
+  // (JSON writes the call's undefined target as null.)
+  eq(calls, [["home_eta", "stop_ignoring", { members: ["person.vasiliki"] }, null, false]],
+    "confirm → home_eta.stop_ignoring for exactly who is shown, without HA's own error toast");
+  assert.strictEqual(stopEl.getAttribute("aria-disabled"), "true", "the pill rests until the row goes");
+  stopEl.click();
+  await tick();
+  assert(!dlg(), "a resting pill opens nothing");
+  ci.hass = hi(["Nancy"]);
+  assert.strictEqual(stopEl.getAttribute("aria-disabled"), "false", "someone else ignored meanwhile: the pill works for them");
+  ci.hass = hi([]);
+  assert(row.hidden, "nobody ignored any more: the row goes");
+  ci.hass = hi(["Vasiliki"]);
+  assert.strictEqual(stopEl.getAttribute("aria-disabled"), "false", "a new ignore starts afresh");
+
+  // Several people: one title, "their phones", and every one of them stopped.
+  calls.length = 0;
+  ci.hass = hi(["Nancy", "Vasiliki"]);
+  assert.strictEqual(row.querySelector(".nm").textContent, "Ignoring Nancy and Vasiliki");
+  stopEl.click();
+  await tick();
+  assert.strictEqual(dlg().shadowRoot.querySelector(".title").textContent, "Stop ignoring Nancy and Vasiliki");
+  assert.strictEqual(dlg().shadowRoot.querySelector(".text").textContent, "Home presence will count their phones again.");
+  dlg().shadowRoot.querySelector(".confirm").click();
+  await tick();
+  eq(calls.map((c) => c[2]), [{ members: ["person.nancy", "person.vasiliki"] }]);
+  ci.hass = hi(["Ioannis", "Nancy", "Vasiliki"]);
+  assert.strictEqual(row.querySelector(".nm").textContent, "Ignoring Ioannis, Nancy and Vasiliki");
+
+  // The call fails (a user Home Assistant refuses): its own message, once, and the pill works again.
+  ci.hass = hi([]);
+  ci.hass = hi(["Vasiliki"]);
+  calls.length = 0;
+  fail = new Error("Unauthorized");
+  stopEl.click();
+  await tick();
+  dlg().shadowRoot.querySelector(".confirm").click();
+  await tick();
+  eq(notes, ["Unauthorized"]);
+  assert.strictEqual(stopEl.getAttribute("aria-disabled"), "false");
+  fail = {};
+  stopEl.click();
+  await tick();
+  dlg().shadowRoot.querySelector(".confirm").click();
+  await tick();
+  eq(notes, ["Unauthorized", "Couldn't stop ignoring Vasiliki."], "no message of its own: the card says what failed");
+  fail = null;
+
+  // Names come from the sensor; without them, the people's own names – never an id.
+  ci.hass = hi([], { persons: ["person.vasiliki"], person: { entity_id: "person.vasiliki", state: "home", attributes: { friendly_name: "Vasiliki" } } });
+  assert.strictEqual(row.querySelector(".nm").textContent, "Ignoring Vasiliki");
+  // The sensor unavailable, or missing: no row.
+  ci.hass = hi(["Vasiliki"], { state: "unavailable" });
+  assert(row.hidden);
+  const gone = hass("off");
+  ci.hass = gone;
+  assert(row.hidden);
+  // Without presence.ignored there is no row at all.
+  assert(!r.querySelector(".ign"));
+  // Design rules: the row's glyph amber (early warning), the pill's icon teal (you can tap it).
+  const icss = ri.querySelector("style").textContent;
+  assert(/\.slot ha-icon \{ --mdc-icon-size: 24px; color: var\(--amber-color/.test(icss));
+  assert(/\.pill\.stop ha-icon \{ color: var\(--teal-color/.test(icss));
+  assert(/\.ign\[hidden\] \{ display: none; \}/.test(icss));
 
   console.log("ALL WEATHER-PRESENCE TESTS PASSED");
   process.exit(0);

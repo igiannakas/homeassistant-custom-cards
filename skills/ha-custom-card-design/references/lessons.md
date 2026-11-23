@@ -46,6 +46,7 @@ Most of them generalise to any dashboard.
 - A reading follows the circuit it measures, not the switch on the card (`power_sensor_switch`). While the machine is off and the strip is on, show the watts on their own: no toggle (the one-control rule still holds) and no glow. Never add a control for an upstream plug the user didn't ask to switch.
 - A dashboard monitors a machine; it does not operate it. Offer power and convenience (light) only, and ask which other actions go when removing one.
 - Confirmation belongs in the card (`confirmation` on the action, templated text), not in a pop-up card on every view. Fewer dependencies, one dialog look.
+- A stock card with Home Assistant's own "Are you sure?" confirmation between the custom cards reads as foreign ("This styling is not consistent", 23 Nov 2026, a Mushroom card for Home ETA's ignored phones). A state belongs in the custom card that already owns its subject (presence → the weather & presence card's own row), and every confirmation on a view is the cards' own dialog.
 - The moment an icon gets an action it gets the Mushroom circle (36px, colour at 20%).
 - Alignment is checked by measurement on every change: glyph x, title x (edge + 46), and one shared vertical centre for icon, text block and trailing control.
 - Every number is its own tap target. The watts on a power pill open the power sensor, while On/Off still toggles.
